@@ -1,0 +1,36 @@
+# 社交软件缓存专项（红线项默认不勾选，动它们会删聊天媒体）
+/data/data/com.tencent.mm/cache/*
+/sdcard/Android/data/com.tencent.mm/cache/*
+/data/data/com.tencent.mm/app_webview/*/Cache/*
+/data/data/com.tencent.mobileqq/cache/*
+/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatimg/*
+/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatthumb/*
+/sdcard/tencent/MobileQQ/log/*
+/sdcard/tencent/MobileQQ/thumb/*
+/sdcard/tencent/MobileQQ/ptv_template/*
+/sdcard/tencent/MobileQQ/artfilter/*
+/sdcard/tencent/MobileQQ/RedPacket/*
+/sdcard/tencent/MobileQQ/emoji/*
+/sdcard/tencent/MobileQQ/portrait/*
+/sdcard/tencent/MobileQQ/qav/*
+/sdcard/tencent/msflogs/*
+/sdcard/tencent/wtlogin/*
+/sdcard/tencent/mta/*
+/sdcard/tencent/MicroMsg/wxacache/*
+/sdcard/tencent/MicroMsg/failmsg/*
+/sdcard/tencent/MicroMsg/CheckResUpdate/*
+/sdcard/tencent/MicroMsg/SQLTrace/*
+/sdcard/tencent/MicroMsg/fts/*
+/sdcard/tencent/MicroMsg/newyear/*
+/sdcard/tencent/MicroMsg/xlog/*
+/sdcard/tencent/MicroMsg/emoji/*
+/data/data/org.telegram.messenger/cache/*
+/data/data/org.telegram.messenger/files/Telegram/thumbnails/*
+/data/data/com.ss.android.ugc.aweme/cache/*
+/data/data/com.ss.android.ugc.aweme/files/image_pipeline_cache/*
+#RED 聊天媒体（强烈建议保留；误勾将删除聊天图片/语音/视频）
+/data/data/com.tencent.mm/MicroMsg/*/image2/*
+/data/data/com.tencent.mm/MicroMsg/*/video/*
+/data/data/com.tencent.mm/MicroMsg/*/voice2/*
+/data/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*
+/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*

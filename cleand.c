@@ -1,0 +1,561 @@
+/* cleand.c - JunkClean daemon: HTTP :8801 + timer + progress + AI orchestration
+ * 静态编译：aarch64-linux-gnu-gcc -O2 -static -o bin/cleand cleand.c -pthread
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define PORT 8801
+#define MAXBUF 65536
+#define MAXRES 262144
+
+static char ADR[512]  = "/data/adb/junk-cleaner";   /* runtime data */
+static char MODDIR[512] = "/data/adb/modules/junkclean"; /* module dir */
+static char SH[64] = "/system/bin/sh";
+
+/* ---- task state (progress) ---- */
+static struct {
+    volatile int running;
+    volatile int pct;
+    char msg[128];
+    char result[MAXRES];
+    time_t last_ts;
+} task = {0, 0, "", "", 0};
+static pthread_mutex_t task_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static void tsave(const char *pct, const char *msg){
+    pthread_mutex_lock(&task_mu);
+    task.pct = atoi(pct); if (task.pct<0) task.pct=0; if (task.pct>100) task.pct=100;
+    snprintf(task.msg, sizeof(task.msg), "%s", msg);
+    pthread_mutex_unlock(&task_mu);
+}
+
+/* ---- tiny HTTP helpers ---- */
+static void http_head(int fd, int code, const char *ct, long len){
+    char b[512];
+    snprintf(b, sizeof(b), "HTTP/1.1 %d OK\r\nContent-Type: %s\r\nContent-Length: %ld\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n", code, ct, len);
+    write(fd, b, strlen(b));
+}
+static void http_json(int fd, const char *s){
+    http_head(fd, 200, "application/json", (long)strlen(s));
+    write(fd, s, strlen(s));
+}
+static void http_err(int fd, int code, const char *s){
+    http_head(fd, code, "application/json", (long)strlen(s));
+    write(fd, s, strlen(s));
+}
+/* url-decode into dst (in-place safe) */
+static void urldec(char *s){
+    char *d = s;
+    for (; *s; s++){
+        if (*s=='%' && s[1] && s[2]){
+            int h1 = s[1]>='0'&&s[1]<='9'?s[1]-'0':(s[1]|32)-'a'+10;
+            int h2 = s[2]>='0'&&s[2]<='9'?s[2]-'0':(s[2]|32)-'a'+10;
+            *d++ = (char)(h1*16+h2); s+=2;
+        } else *d++ = *s;
+    }
+    *d = 0;
+}
+/* extract key=value from JSON-ish body: {"a":"b","c":1} -> val for key (first occurrence) */
+static int jget(const char *body, const char *key, char *out, int outsz){
+    const char *k = strstr(body, key);
+    if (!k) return -1;
+    k += strlen(key);
+    while (*k==' '||*k==':') k++;
+    if (*k=='"'){
+        k++; const char *e = strchr(k,'"'); if(!e) return -1;
+        int n = (int)(e-k); if (n>=outsz) n=outsz-1;
+        memcpy(out,k,n); out[n]=0; return 0;
+    }
+    return -1; /* numeric keys not needed here */
+}
+
+/* ---- run cleaner.sh subcommand in background thread; stream PROG; collect last JSON line ---- */
+static void *runner(void *arg){
+    char *cmd = (char*)arg;      /* full command line e.g. "clean cache,apk force" */
+    int pipefd[2];
+    if (pipe(pipefd)) { pthread_mutex_lock(&task_mu); task.running=0; pthread_mutex_unlock(&task_mu); free(arg); return NULL; }
+    setenv("JC_ADR", ADR, 1);      /* cleaner.sh 继承运行时目录 */
+    setenv("JC_MOD", MODDIR, 1);   /* 模块目录 */
+    pid_t pid = fork();
+    if (pid==0){
+        dup2(pipefd[1],1); dup2(pipefd[1],2); close(pipefd[0]);
+        char p[600]; snprintf(p,sizeof(p),"%s/cleaner.sh",MODDIR);
+        execl(SH, SH, p, cmd, (char*)NULL);
+        _exit(127);
+    }
+    close(pipefd[1]);
+    pthread_mutex_lock(&task_mu); task.running=1; task.pct=0; strcpy(task.msg,"启动…"); task.result[0]=0; pthread_mutex_unlock(&task_mu);
+    /* read stream */
+    char buf[1024]; ssize_t n; int lastline=0;
+    while ((n = read(pipefd[0], buf, sizeof(buf)-1)) > 0){
+        buf[n]=0;
+        char *nl;
+        char *rest = buf;
+        while ((nl = strchr(rest,'\n'))){
+            *nl=0;
+            if (!strncmp(rest,"PROG ",5)){ char *s=rest+5,*sp=strchr(s,' '); if(sp){*sp=0; tsave(s,sp+1);} }
+            else if (rest[0] == '{') strncpy(task.result, rest, sizeof(task.result)-1);
+            lastline=1;
+            rest = nl+1;
+        }
+        if (lastline && *rest) { /* partial line: keep simple, drop */ }
+    }
+    close(pipefd[0]);
+    int st=0; waitpid(pid,&st,0);
+    pthread_mutex_lock(&task_mu); task.running=0; task.pct=100; snprintf(task.msg,sizeof(task.msg),"完成"); task.last_ts=time(NULL); pthread_mutex_unlock(&task_mu);
+    free(arg);
+    return NULL;
+}
+/* spawn background task; returns 0 on start */
+static int bg(const char *cmdline){
+    pthread_t t;
+    char *c = strdup(cmdline);
+    return pthread_create(&t, NULL, runner, c);
+}
+
+/* ---- static file from webroot (no traversal) ---- */
+static void serve_file(int fd, char *path){
+    char full[700];
+    if (strstr(path,"..") || strchr(path,'\\')){ http_err(fd,403,"{\"e\":\"forbidden\"}"); return; }
+    if (!strcmp(path,"/")) { strcpy(path,"/index.html"); }
+    snprintf(full,sizeof(full),"%s/webroot%s",MODDIR,path);
+    FILE *f = fopen(full,"rb");
+    if (!f){ http_err(fd,404,"{\"e\":\"not found\"}"); return; }
+    fseek(f,0,SEEK_END); long sz = ftell(f); fseek(f,0,SEEK_SET);
+    const char *ct = "text/plain";
+    if (strstr(path,".html")) ct="text/html; charset=utf-8";
+    else if (strstr(path,".js")) ct="application/javascript";
+    else if (strstr(path,".css")) ct="text/css";
+    else if (strstr(path,".png")) ct="image/png";
+    else if (strstr(path,".svg")) ct="image/svg+xml";
+    http_head(fd,200,ct,sz);
+    char *mem = malloc(sz); 
+    if (fread(mem,1,sz,f)==(size_t)sz) write(fd,mem,sz);
+    free(mem); fclose(f);
+}
+
+/* ---- config file read/write ---- */
+static void api_config(int fd, const char *method, const char *body){
+    char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
+    if(getenv("JC_DEBUG")){ FILE*dbg=fopen("/tmp/jc/run/post.dbg","w"); fprintf(dbg,"method=[%.8s] body=[%.200s]\n",method,body?body:"<null>"); fclose(dbg); }
+    if (!strcmp(method,"POST")){
+        if (body && *body){
+            /* atomic-ish write */
+            char tmp[600]; snprintf(tmp,sizeof(tmp),"%s/config.conf.tmp",ADR);
+            FILE *f=fopen(tmp,"w");
+            if (f){ fwrite(body,1,strlen(body),f); fclose(f); rename(tmp,p); chmod(p,0600); }
+            http_json(fd,"{\"ok\":1}");
+            /* reload interval effects happen on next loop */
+        } else http_err(fd,400,"{\"e\":\"empty body\"}");
+        return;
+    }
+    char buf[8192]; int n=0; FILE *f=fopen(p,"r");
+    if (!f){ http_json(fd,"{}"); return; }
+    n = fread(buf,1,sizeof(buf)-1,f); fclose(f); buf[n]=0;
+    char *out = malloc(n+64); snprintf(out,n+64,"{\"cfg\":%s}",buf);
+    http_json(fd,out); free(out);
+}
+
+/* ---- rules read/write: /api/rules?type=cache|junk|... ---- */
+static void api_rules(int fd, const char *method, const char *q, const char *body){
+    char type[64]="cache";
+    const char *tq = strstr(q,"type="); 
+    if (tq){ tq+=5; const char *e=strchr(tq,'&'); int n=e?(int)(e-tq):(int)strlen(tq); if(n>63)n=63; memcpy(type,tq,n); type[n]=0; }
+    char p[700];
+    if (strstr(type,"..")||strchr(type,'/')||strchr(type,'\\')){ http_err(fd,400,"{\"e\":\"bad type\"}"); return; }
+    snprintf(p,sizeof(p),"%s/rules/%s.list",ADR,type);
+    if (!strcmp(method,"POST")){
+        if (!body || !*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
+        char bak[700]; snprintf(bak,sizeof(bak),"%s.bak",p);
+        rename(p,bak);
+        FILE *f=fopen(p,"w");
+        if (f){ fwrite(body,1,strlen(body),f); fclose(f); http_json(fd,"{\"ok\":1}"); }
+        else { rename(bak,p); http_err(fd,500,"{\"e\":\"write fail\"}"); }
+        return;
+    }
+    char out[MAXRES]; int n=0;
+    n = snprintf(out,sizeof(out),"{\"type\":\"%s\",\"content\":",type);
+    FILE *f=fopen(p,"r"); if(!f){ strcat(out,"\"\""); } else {
+        char *txt=malloc(MAXRES-100); int tn=fread(txt,1,MAXRES-100,f); fclose(f);
+        /* escape */
+        n += snprintf(out+n,sizeof(out)-n,"\"");
+        for(int i=0;i<tn;i++){
+            char c=txt[i];
+            if (c=='"'){ n += snprintf(out+n,sizeof(out)-n,"\\\""); }
+            else if (c=='\\'){ n += snprintf(out+n,sizeof(out)-n,"\\\\"); }
+            else if (c=='\n'){ n += snprintf(out+n,sizeof(out)-n,"\\n"); }
+            else if (c=='\r'||c=='\t') continue;
+            else out[n++]=c;
+        }
+        out[n++]='"'; out[n]=0; free(txt);
+    }
+    strcat(out,"}");
+    http_json(fd,out);
+}
+
+/* ---- cleaner.log tail ---- */
+static void api_log(int fd, const char *q){
+    (void)q;
+    char p[600]; snprintf(p,sizeof(p),"%s/cleaner.log",ADR);
+    FILE *f=fopen(p,"rb"); if(!f){ http_json(fd,"{\"log\":\"\"}"); return; }
+    fseek(f,0,SEEK_END); long sz=ftell(f);
+    long off = sz>60000 ? sz-60000 : 0;
+    fseek(f,off,SEEK_SET);
+    char *txt=malloc(70000); long n=fread(txt,1,70000-1,f); fclose(f); txt[n]=0;
+    char *out=malloc(140000); snprintf(out,140000,"{\"log\":\"");
+    int olen = strlen(out);
+    for(long i=0;i<n;i++){
+        char c=txt[i];
+        if(c=='\n'){ out[olen++]='\\'; out[olen++]='n'; }
+        else if(c=='"'){ out[olen++]='\\'; out[olen++]='"'; }
+        else if(c=='\\'){ out[olen++]='\\'; out[olen++]='\\'; }
+        else out[olen++]=c;
+        if(olen>120000) break;
+    }
+    out[olen++]='"'; out[olen++]='}'; out[olen]=0;
+    http_json(fd,out); free(txt); free(out);
+}
+
+/* ---- AI: fork bundled curl, 15s timeout, POST /chat/completions ---- */
+static void api_ai(int fd){
+    char base[512]="", key[512]="", model[128]="";
+    char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
+    FILE *f=fopen(p,"r");
+    if (f){
+        char line[600];
+        while(fgets(line,sizeof(line),f)){
+            char *v;
+            if(!strncmp(line,"ai_base=",8)){ v=line+8; v[strcspn(v,"\r\n")]=0; snprintf(base,sizeof(base),"%s",v); }
+            else if(!strncmp(line,"ai_key=",7)){ v=line+7; v[strcspn(v,"\r\n")]=0; snprintf(key,sizeof(key),"%s",v); }
+            else if(!strncmp(line,"ai_model=",9)){ v=line+9; v[strcspn(v,"\r\n")]=0; snprintf(model,sizeof(model),"%s",v); }
+        }
+        fclose(f);
+    }
+    if (!*base || !*model){ http_err(fd,400,"{\"e\":\"AI 未配置：请在设置页填写 API 地址/模型\"}"); return; }
+    /* load scan.json as aggregate context */
+    char sc[700]; snprintf(sc,sizeof(sc),"%s/scan.json",ADR);
+    char agg[4096]="{}";
+    f=fopen(sc,"r"); if(f){ int n=fread(agg,1,sizeof(agg)-1,f); fclose(f); agg[n]=0; }
+    /* build payload */
+    char prompt[2048];
+    snprintf(prompt,sizeof(prompt),
+        "你是手机存储清理助手。设备体检数据：%s。请用中文给出建议：\\n"
+        "1)按优先级列出建议清理的前3类及理由（删除影响）\\n"
+        "2)指出红线数据（聊天媒体/下载文件）不要动\\n"
+        "3)预计可释放空间。不要建议删除系统关键文件。", agg);
+    char url[700];
+    /* base 可能是 https://host/v1 或完整 .../chat/completions */
+    if (strstr(base,"/chat/completions")) snprintf(url,sizeof(url),"%s",base);
+    else snprintf(url,sizeof(url),"%s/chat/completions", base);
+    char req[4096];
+    snprintf(req,sizeof(req),
+        "{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],\"max_tokens\":600}",
+        model, prompt);
+    /* temp file payload to avoid argv limits */
+    char rq[600]; snprintf(rq,sizeof(rq),"%s/.ai_req.json",ADR);
+    f=fopen(rq,"w"); if(f){ fwrite(req,1,strlen(req),f); fclose(f); }
+    char out[600]; snprintf(out,sizeof(out),"%s/.ai_resp.json",ADR);
+    char curlbin[600]; snprintf(curlbin,sizeof(curlbin),"%s/bin/curl",MODDIR);
+    char cmdline[2048];
+    snprintf(cmdline,sizeof(cmdline),
+        "\"%s\" -s -m 15 -X POST \"%s\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer %s\" -d @%s -o %s",
+        curlbin, url, key, rq, out);
+    /* run synchronously with 15+s timeout */
+    char *shcmd = malloc(2300);
+    snprintf(shcmd,2300,"%s; echo __JC__$?; head -c 4000 %s 2>/dev/null", cmdline, out);
+    if(getenv("JC_DEBUG")){ FILE*dbg=fopen("/tmp/jc/run/cmd.dbg","w"); fprintf(dbg,"%s",shcmd); fclose(dbg); }
+    int pipefd[2]; pipe(pipefd);
+    pid_t pid=fork();
+    if(pid==0){ dup2(pipefd[1],1); close(pipefd[0]);
+        execl(SH,SH,"-c",shcmd,(char*)NULL);
+        int er=errno; FILE*e=fopen("/tmp/jc/run/exec.err","w"); fprintf(e,"execfail errno=%d(%s)",er,strerror(er)); fclose(e);
+        _exit(127); }
+    close(pipefd[1]);
+    struct timeval tv={18,0}; setsockopt(pipefd[0],SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
+    char res[8192]=""; long rdtotal=0; char rdlog[256]; int rdlogn=0;
+    for(;;){
+        ssize_t rd=read(pipefd[0],res+rdtotal,sizeof(res)-1-rdtotal);
+        rdlogn+=snprintf(rdlog+rdlogn,sizeof(rdlog)-rdlogn,"rd=%zd ",rd);
+        if(rd<=0) break;
+        rdtotal+=rd;
+        if(rdtotal>7000) break;
+    }
+    res[rdtotal]=0;
+    if(getenv("JC_DEBUG")){ FILE*dbg=fopen("/tmp/jc/run/ai.dbg","w"); fprintf(dbg,"%s\n--res--\n%.2000s",rdlog,res); fclose(dbg); }
+    close(pipefd[0]);
+    int st; 
+    for(int i=0;i<30;i++){ if(waitpid(pid,&st,WNOHANG)==pid) break; usleep(500000); }
+    kill(pid,SIGKILL); waitpid(pid,&st,0);
+    /* parse choices[0].message.content */
+    char *ch = strstr(res,"\"content\"");
+    char text[7000]="";
+    if (ch){
+        char *c2 = strchr(ch,':');
+        if (c2){ c2++; while(*c2==' '||*c2=='\t') c2++;
+            if (*c2=='"'){ c2++; char *e=strchr(c2,'"');
+                if (e){ int len=(int)(e-c2); if(len>6800)len=6800; memcpy(text,c2,len); text[len]=0; }
+            }
+        }
+    } 
+    if (!*text){
+        /* fallback: raw first line */
+        char *nl=strchr(res,'\n'); int len = nl?(int)(nl-res):(int)strlen(res);
+        if(len>6800)len=6800; memcpy(text,res,len); text[len]=0;
+    }
+    unlink(rq); unlink(out);
+    /* JSON-escape */
+    char *js=malloc(14000); snprintf(js,14000,"{\"ai\":\"");
+    int o=7;
+    for(char *c=text;*c && o<13600;c++){
+        if(*c=='"'){js[o++]='\\';js[o++]='"';}
+        else if(*c=='\n'){js[o++]='\\';js[o++]='n';}
+        else if(*c=='\\'){js[o++]='\\';js[o++]='\\';}
+        else js[o++]=*c;
+    }
+    js[o++]='"'; js[o++]='}'; js[o]=0;
+    http_json(fd,js); free(js); free(shcmd);
+}
+
+
+/* ---- delete user-confirmed big files (argv-safe rm, prefix guard) ---- */
+static void api_delbig(int fd, const char* body){
+    if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
+    char tmp[4096]; snprintf(tmp,sizeof(tmp),"%s",body);
+    int deleted=0;
+    char* tok=strtok(tmp,",");
+    while(tok){
+        size_t l=strlen(tok);
+        while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
+        if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
+           && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')){
+            pid_t c=fork();
+            if(c==0){ execl("/bin/rm","rm","-rf",tok,(char*)NULL); execl("/system/bin/rm","rm","-rf",tok,(char*)NULL); _exit(127); }
+            int st=0; waitpid(c,&st,0);
+            if(WIFEXITED(st)&&WEXITSTATUS(st)==0) deleted++;
+        }
+        tok=strtok(NULL,",");
+    }
+    char out[96]; snprintf(out,sizeof(out),"{\"deleted\":%d}",deleted);
+    http_json(fd,out);
+}
+
+/* ---- progress ---- */
+static void api_progress(int fd){
+    char out[256];
+    pthread_mutex_lock(&task_mu);
+    snprintf(out,sizeof(out),"{\"running\":%d,\"pct\":%d,\"msg\":\"%s\"}", task.running, task.pct, task.msg);
+    pthread_mutex_unlock(&task_mu);
+    http_json(fd,out);
+}
+
+/* ---- status ---- */
+static void api_status(int fd){
+    char out[1024];
+    char p[600]; snprintf(p,sizeof(p),"%s/cleaner.sh",MODDIR);
+    pthread_mutex_lock(&task_mu);
+    int busy = task.running;
+    pthread_mutex_unlock(&task_mu);
+    snprintf(out,sizeof(out),
+        "{\"daemon\":1,\"busy\":%d,\"port\":%d,\"start\":\"%d\"}", busy, PORT, (int)time(NULL));
+    http_json(fd,out);
+}
+
+/* ---- tasks (timer) management: tasks.conf lines: enable=1,every=12h|daily=03:00,cats=cache,social,sqlite ---- */
+static void api_tasks(int fd, const char *method, const char *body){
+    char p[600]; snprintf(p,sizeof(p),"%s/tasks.conf",ADR);
+    if(!strcmp(method,"POST")){
+        if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
+        char tmp[600]; snprintf(tmp,sizeof(tmp),"%s/tasks.conf.tmp",ADR);
+        FILE*f=fopen(tmp,"w"); if(!f){ http_err(fd,500,"{\"e\":\"w\"}"); return; }
+        fwrite(body,1,strlen(body),f); fclose(f);
+        rename(tmp,p); chmod(p,0600);
+        http_json(fd,"{\"ok\":1}");
+        return;
+    }
+    FILE*f=fopen(p,"r"); if(!f){ http_json(fd,"{\"tasks\":[]}"); return; }
+    char *txt=malloc(16384); int n=fread(txt,1,16383,f); fclose(f); txt[n]=0;
+    /* wrap as {"tasks":[...lines...]} keep simple: return raw text */
+    char *out=malloc(32768); snprintf(out,32768,"{\"tasks\":\"");
+    int o=9;
+    for(int i=0;i<n;i++){ char c=txt[i];
+        if(c=='\n'){out[o++]='\\';out[o++]='n';} else if(c=='"'){out[o++]='\\';out[o++]='"';} else out[o++]=c;
+        if(o>32000)break;
+    }
+    out[o++]='"'; out[o++]='}'; out[o]=0;
+    http_json(fd,out); free(txt); free(out);
+}
+
+/* ---- timer loop: every 60s check tasks.conf; run authorized cats when due ---- */
+static void timer_loop(void){
+    char p[600]; snprintf(p,sizeof(p),"%s/tasks.conf",ADR);
+    struct stat stt;
+    char stamp[600]; snprintf(stamp,sizeof(stamp),"%s/.task_stamp",ADR);
+    while(1){
+        sleep(60);
+        if(!stat(p,&stt)){
+            /* read tasks */
+            FILE *f=fopen(p,"r"); if(!f) continue;
+            int run=0;
+            char line[512];
+            while(fgets(line,sizeof(line),f)){
+                line[strcspn(line,"\r\n")]=0;
+                if(!strstr(line,"enable=1")) continue;
+                char every[32]="", daily[16]="", cats[128]="";
+                char *tok=strtok(line,",");
+                while(tok){ 
+                    if(!strncmp(tok,"every=",6)) snprintf(every,sizeof(every),"%s",tok+6);
+                    else if(!strncmp(tok,"daily=",6)) snprintf(daily,sizeof(daily),"%s",tok+6);
+                    else if(!strncmp(tok,"cats=",5)) snprintf(cats,sizeof(cats),"%s",tok+5);
+                    tok=strtok(NULL,",");
+                }
+                if(!*cats) continue;
+                time_t now=time(NULL); struct tm *tmv=localtime(&now);
+                /* daily: match HH:MM */
+                if(*daily){
+                    char hhmm[8]; snprintf(hhmm,sizeof(hhmm),"%02d:%02d",tmv->tm_hour,tmv->tm_min);
+                    if(strcmp(hhmm,daily)==0) run=1;
+                } else {
+                    /* every=12h -> interval check via stamp */
+                    int h=atoi(every); if(h<=0) h=12;
+                    if(access(stamp,F_OK)!=0) {
+                        FILE *sf=fopen(stamp,"w"); if(sf){fprintf(sf,"%ld",(long)now); fclose(sf);} run=1;
+                    } else {
+                        FILE *sf=fopen(stamp,"r"); long last=0; if(sf){ fscanf(sf,"%ld",&last); fclose(sf); }
+                        if(now-last >= h*3600) { run=1; sf=fopen(stamp,"w"); if(sf){fprintf(sf,"%ld",(long)now); fclose(sf);} }
+                    }
+                }
+                if(run){
+                    char taskid[64]; snprintf(taskid,sizeof(taskid),"%d",(int)getpid());
+                    (void)taskid;
+                    /* spawn clean with authorized cats (no force => whitelist protected) */
+                    char *cmd=malloc(256);
+                    snprintf(cmd,256,"clean %s",cats);
+                    bg(cmd);
+                    /* only one task per tick */
+                    break;
+                }
+            }
+            fclose(f);
+        }
+    }
+}
+
+void *api_ai_threaded(void *p);
+void *handle_threaded(void *p);
+void *timer_thread_wrap(void *p);
+
+/* ---- connection handler: parse first line + body, route ---- */
+static void handle(int fd){
+    char base[1024];
+    char buf[32768]; int n=0;
+    struct timeval tv={20,0}; setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
+    /* read until header end */
+    int hdr_end=-1;
+    while(n < (int)sizeof(buf)-1){
+        int r=read(fd,buf+n,256);
+        if(r<=0) break;
+        n+=r; buf[n]=0;
+        char *he=strstr(buf,"\r\n\r\n");
+        if(he){ hdr_end=(int)(he-buf)+4; break; }
+    }
+    if(hdr_end<0){ close(fd); return; }
+    if(hdr_end>=4) buf[hdr_end-4]=0;   /* 终止 header，保留 body */
+    char *body_start = buf+hdr_end;
+    /* parse request line INTO COPY (never corrupt shared buf:   would kill later strstr) */
+    char *sp1=strchr(buf,' '); if(!sp1){ close(fd); return; }
+    char method[8]; int ml=(int)(sp1-buf); if(ml>6)ml=6; memcpy(method,buf,ml); method[ml]=0;
+    char *sp2=strchr(sp1+1,' '); if(!sp2){ close(fd); return; }
+    int plen=(int)(sp2-sp1-1); if(plen>1023)plen=1023;
+    memcpy(base,sp1+1,plen); base[plen]=0;   /* path+query copy */
+    /* body length */
+    long cl=0;
+    char *clh=strstr(buf,"Content-Length:");
+    if(clh){ cl=atol(clh+15); }
+    /* read remainder of body */
+    long have = (long)(n - hdr_end);
+    while(have<cl && n < (int)sizeof(buf)-1){
+        int r=read(fd,buf+n,sizeof(buf)-1-n);
+        if(r<=0)break; n+=r; have = (long)(n - hdr_end);
+    }
+    if(getenv("JC_DEBUG")){ FILE*dbg=fopen("/tmp/jc/run/req.dbg","w");
+        fprintf(dbg,"n=%d hdr_end=%d cl=%ld have=%ld\n",n,hdr_end,cl,have);
+        fwrite(buf,1,n>80?80:n,dbg); fclose(dbg); }
+    char *body = body_start;
+    if(have>cl) body[cl]=0;
+    char *q=strchr(base,'?');
+    /* route */
+    if(!strncmp(base,"/api/status",11)) api_status(fd);
+    else if(!strncmp(base,"/api/config",11)) api_config(fd, method, (char*)body);
+    else if(!strncmp(base,"/api/rules",10)) api_rules(fd, method, q?q:"", (char*)body);
+    else if(!strncmp(base,"/api/log",8)) api_log(fd, q?q:"");
+    else if(!strncmp(base,"/api/progress",13)) api_progress(fd);
+    else if(!strncmp(base,"/api/tasks",10)) api_tasks(fd, method, (char*)body);
+    else if(!strncmp(base,"/api/clean",10) && !strcmp(method,"POST")){
+        char cats[128]="all", force[8]="";
+        jget(body,"cats",cats,sizeof(cats));
+        if((q?strstr(q,"force"):NULL)||jget(body,"force",force,sizeof(force))==0){ /* any force */ }
+        char *cmd=malloc(256);
+        snprintf(cmd,256,"clean %s%s",cats,q?(strstr(q,"force")?" force":""):"");
+        bg(cmd);
+        http_json(fd,"{\"ok\":1,\"started\":1}");
+    }
+    else if(!strncmp(base,"/api/scan",9)){
+        if(!strcmp(method,"POST")){ char *cmd=strdup("scan"); bg(cmd); http_json(fd,"{\"ok\":1,\"scanning\":1}"); }
+        else { /* serve cached scan.json */ char p[600]; snprintf(p,sizeof(p),"%s/scan.json",ADR); FILE*f=fopen(p,"r");
+            if(f){ char *t=malloc(MAXRES); int sz=fread(t,1,MAXRES-1,f); fclose(f); t[sz]=0; http_json(fd,t); free(t); }
+            else http_err(fd,404,"{\"e\":\"no scan yet\"}");
+        }
+    }
+    else if(!strncmp(base,"/api/ai",7)){
+        /* run in thread to not block server */
+        pthread_t t; pthread_create(&t,NULL,(void*(*)(void*))api_ai_threaded,(void*)(long)fd); pthread_detach(t);
+        return; /* api_ai_threaded closes fd */
+    }
+    else if(!strncmp(base,"/api/delbig",11) && !strcmp(method,"POST")) api_delbig(fd,(char*)body);
+    else if(!strncmp(base,"/api/classify",13)){ char *c=strdup("classify"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup("duplicate"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/fstrim",11)){ char *c=strdup("fstrim"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/rescan",11)){ char *c=strdup("rescan"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else serve_file(fd, base);
+    close(fd);
+}
+/* wrapper for AI in its own thread */
+void *api_ai_threaded(void *p){ long fd=(long)p; api_ai((int)fd); close((int)fd); return NULL; }
+
+int main(int argc, char**argv){
+    for(int i=1;i<argc;i++){
+        if(!strcmp(argv[i],"-d")&&i+1<argc) snprintf(ADR,sizeof(ADR),"%s",argv[++i]);
+        else if(!strcmp(argv[i],"-m")&&i+1<argc) snprintf(MODDIR,sizeof(MODDIR),"%s",argv[++i]);
+        else if(!strcmp(argv[i],"-sh")&&i+1<argc) snprintf(SH,sizeof(SH),"%s",argv[++i]);
+    }
+    signal(SIGPIPE,SIG_IGN);
+    /* ensure runtime dirs */
+    char p[600]; snprintf(p,sizeof(p),"%s/rules",ADR); mkdir(p,0755);
+    pthread_t timer; pthread_create(&timer,NULL,(void*(*)(void*))timer_thread_wrap,NULL);
+    int lfd=socket(AF_INET,SOCK_STREAM,0);
+    int one=1; setsockopt(lfd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one));
+    struct sockaddr_in sa; memset(&sa,0,sizeof(sa));
+    sa.sin_family=AF_INET; sa.sin_addr.s_addr=htonl(INADDR_LOOPBACK); sa.sin_port=htons(PORT);
+    if(bind(lfd,(struct sockaddr*)&sa,sizeof(sa))<0){ sleep(2); bind(lfd,(struct sockaddr*)&sa,sizeof(sa)); }
+    listen(lfd,16);
+    for(;;){
+        int cfd=accept(lfd,NULL,NULL);
+        if(cfd<0){ usleep(200000); continue; }
+        pthread_t ht; pthread_create(&ht,NULL,(void*(*)(void*))handle_threaded,(void*)(long)cfd); pthread_detach(ht);
+    }
+}
+void *timer_thread_wrap(void*p){ (void)p; timer_loop(); return NULL; }
+void *handle_threaded(void *p){ long fd=(long)p; handle((int)fd); return NULL; }

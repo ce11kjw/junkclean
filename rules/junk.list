@@ -1,0 +1,12 @@
+# 系统垃圾：日志/崩溃/缩略图/毒瘤SDK残留
+/data/system/dropbox/*
+/data/anr/*
+/data/tombstones/*
+/sdcard/DCIM/.thumbnails
+/sdcard/Android/data/.um
+/sdcard/Android/obj/.um
+/sdcard/.UTSystemConfig
+/sdcard/alipay
+/sdcard/msc
+/sdcard/tbs/disk
+/sdcard/backup/.SystemConfig

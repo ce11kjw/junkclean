@@ -1,0 +1,4 @@
+# 目录重定向：源相对路径 目标路径（默认全注释，按需启用）
+# 仅 Android 12+ FUSE 存储有效；相对 /sdcard；已运行 App 可能需重启生效
+# 示例：
+# Android/data/com.some.game/cache /storage/ABCD-1234/game_cache

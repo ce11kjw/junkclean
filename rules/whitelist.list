@@ -1,0 +1,16 @@
+# 白名单：每行一个路径前缀，命中即跳过（优先级最高）
+# 用户数据保护区（默认）
+/sdcard/Download
+/sdcard/DCIM/Camera
+/sdcard/Pictures
+/sdcard/Movies
+/sdcard/Music
+/sdcard/Documents
+/sdcard/Android/obb
+/sdcard/Tencent/MicroMsg/Download
+/sdcard/Android/data/com.tencent.mm/MicroMsg/Download
+# 系统关键数据
+/data/system/users
+/data/system/packages.list
+/data/misc
+/data/property

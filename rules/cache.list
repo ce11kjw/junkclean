@@ -1,0 +1,7 @@
+# 应用缓存（删除后自动重建，安全）
+/data/data/*/cache/*
+/data/data/*/code_cache/*
+/data/user/*/cache/*
+/data/user_de/*/cache/*
+/sdcard/Android/data/*/cache/*
+/data/user_de/*/*/cache/*

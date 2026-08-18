@@ -1,0 +1,7 @@
+# 文件分类：扩展名列表 目标目录（相对 /sdcard 自动前缀）
+jpg jpeg png gif webp heic /sdcard/Pictures
+mp4 mkv mov avi webm 3gp /sdcard/Movies
+mp3 wav flac m4a ogg aac /sdcard/Music
+pdf doc docx xls xlsx ppt pptx txt md epub /sdcard/Documents
+apk xapk apks /sdcard/AppInstall
+zip 7z rar tar gz xz iso /sdcard/Archives
