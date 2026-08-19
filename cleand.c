@@ -52,6 +52,10 @@ static void http_json(int fd, const char *s){
     http_head(fd, 200, "application/json", (long)strlen(s));
     write(fd, s, strlen(s));
 }
+
+static void cleanup_exit(int sig);
+static volatile int ai_last=0;
+static void cleanup_exit(int sig){ (void)sig; kill(0,SIGTERM); usleep(500000); _exit(0); }
 static void http_err(int fd, int code, const char *s){
     http_head(fd, code, "application/json", (long)strlen(s));
     write(fd, s, strlen(s));
@@ -114,7 +118,7 @@ static void *runner(void *arg){
         if (lastline && *rest) { /* partial line: keep simple, drop */ }
     }
     close(pipefd[0]);
-    int st=0; waitpid(pid,&st,0);
+    int st=0; for(int w=0;w<180;w++){ if(waitpid(pid,&st,WNOHANG)==pid) break; usleep(500000); } kill(pid,SIGKILL); waitpid(pid,&st,0);
     pthread_mutex_lock(&task_mu); task.running=0; task.pct=100; snprintf(task.msg,sizeof(task.msg),"完成"); task.last_ts=time(NULL); pthread_mutex_unlock(&task_mu);
     free(arg);
     return NULL;
@@ -231,6 +235,7 @@ static void api_log(int fd, const char *q){
 
 /* ---- AI: fork bundled curl, 15s timeout, POST /chat/completions ---- */
 static void api_ai(int fd){
+    int now=(int)time(NULL); if(now-ai_last<30){ http_err(fd,429,"{\"e\":\"AI 请求频率过高，请30秒后再试\"}"); return; } ai_last=now;
     char base[512]="", key[512]="", model[128]="";
     char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
     FILE *f=fopen(p,"r");
@@ -542,6 +547,7 @@ int main(int argc, char**argv){
         else if(!strcmp(argv[i],"-sh")&&i+1<argc) snprintf(SH,sizeof(SH),"%s",argv[++i]);
     }
     signal(SIGPIPE,SIG_IGN);
+    signal(SIGTERM,cleanup_exit); signal(SIGINT,cleanup_exit);
     /* ensure runtime dirs */
     char p[600]; snprintf(p,sizeof(p),"%s/rules",ADR); mkdir(p,0755);
     pthread_t timer; pthread_create(&timer,NULL,(void*(*)(void*))timer_thread_wrap,NULL);
@@ -559,3 +565,4 @@ int main(int argc, char**argv){
 }
 void *timer_thread_wrap(void*p){ (void)p; timer_loop(); return NULL; }
 void *handle_threaded(void *p){ long fd=(long)p; handle((int)fd); return NULL; }
+

@@ -121,12 +121,9 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
     i=$((i+1))
     f=$RULES/$c.list; load_rules "$f"
     n=0; sz=0
-    for p in $RUL; do
-      case "$p" in /*);; *) continue;; esac
-      [ -e "$p" ] || continue
-      n=$((n+1))
-      sz=$((sz + $(du -sk "$p" 2>/dev/null | awk '{print $1}')))
-    done
+    sz=$(du -sk $RUL 2>/dev/null | awk 'END{print $1}')
+    [ -z "$sz" ] && sz=0
+    for p in $RUL; do case "$p" in /*) n=$((n + $(find $p -type f 2>/dev/null | wc -l)));; esac; done
     total_kb=$((total_kb+sz))
     sc="$sc\"$c\":{\"count\":$n,\"kb\":\"$sz\"},"
     prog $((5+i*15)) "统计中 $c ($(human $sz))"

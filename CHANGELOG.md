@@ -1,13 +1,8 @@
-# JunkClean Changelog
+# Changelog
 
 ## v1.0.0 (2026-08-19)
-- 首次发布
-- 6 类清理（应用缓存/系统垃圾/安装包/空文件夹/社交专项/SQLite 优化）
-- 体检 + 健康度 + 大文件 Top20
-- 文件分类 + 重复文件归档
-- fstrim/F2FS-GC 智能维护
-- 目录重定向（bind mount）
-- AI 深度建议（OpenAI 兼容接口）
-- 5 页 WebUI（Alpine.js 内联）+ 中英双语
-- 冲突检测安装 + 白名单/红线/force 分层保护
-- 定时任务（多任务热重载）
+- 首发：智能垃圾清理 + 存储维护模块 (KSU/AP)
+- C 守护进程 (:8801) + Shell 引擎 + Alpine WebUI (5Tab, i18n)
+- 体检/清理6类/文件分类/重复归档/fstrim-GC/目录重定向/AI建议
+- 冲突检测安装 · 白名单/红线/force 分层 · 中英双语
+- 致谢：ClearBox/Sortify/F2FS-Optimizer/苏柚SUU 等
