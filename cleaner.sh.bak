@@ -100,20 +100,16 @@ sqlite_opt() {
   [ -x "$sq" ] || { log WARN "sqlite3 不可用，跳过"; prog_start_c=0; return; }
   free_kb=$(df -k /data | awk 'NR==2{print $4}')
   [ "$free_kb" -lt 1048576 ] && { log WARN "磁盘<1GB 跳过 VACUUM"; return; }
-  # 排除系统 DB（避免影响系统进程）
-  excl="/system/|/data/system/|/data/misc/|/data/virtual/"
-  n=0; tot=0
+  n=0
   for db in /data/data/*/databases/*.db; do
     [ -f "$db" ] || continue
-    tot=$((tot+1))
     bj "$db" || continue
-    echo "$db" | grep -qE "$excl" && continue
     "$sq" "$db" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1
     "$sq" "$db" "VACUUM;" >/dev/null 2>&1
     "$sq" "$db" "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;" >/dev/null 2>&1
     n=$((n+1))
   done
-  log INFO "sqlite-opt $n/$tot dbs"
+  log INFO "sqlite-opt $n dbs"
 }
 
 do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
@@ -189,11 +185,10 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
   prog 10 "比对重复文件中…"
-  find /sdcard -type f -size +10M ! -path "$dest/*" 2>/dev/null | \
-    xargs -P5 -I{} md5sum {} 2>/dev/null | \
-    while IFS=$'\t' read -r h _; do [ -n "$h" ] || continue
-      echo "$h|$_" >> "$tmp"
-    done
+  find /sdcard -type f -size +10M ! -path "$dest/*" 2>/dev/null | while IFS= read -r sf; do
+    h=$(md5sum "$sf" 2>/dev/null | cut -d' ' -f1); [ -n "$h" ] || continue
+    echo "$h|$sf" >> "$tmp"
+  done
   prog 60 "发现重复项，归档中…"
   # 分组合并（awk 保持顺序）
   awk -F'|' '{n[$1]++; if(n[$1]==2) print; else if(n[$1]>2) print}' "$tmp" > "$tmp.dup"
