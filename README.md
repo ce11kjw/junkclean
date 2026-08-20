@@ -1,9 +1,23 @@
-# JunkClean 🧹 v1.0.0
+# JunkClean 🧹 v1.2
+
+智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
+本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢
 
 智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
 本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢
 
 ## ✨ 功能
+
+## 🚀 v1.2 性能优化
+- ⚡ **do_duplicate 并行化**：`find | xargs -P5 md5sum` 替代串行，5 线程同时计算大文件哈希
+- ⚡ **sqlite_opt 排除系统 DB**：跳过 `/system/` `/data/system/` `/data/misc/` `/data/virtual/` 路径，避免 VACUUM 卡系统
+- ⚡ **do_scan 优化**（v1.1）：一次 `du` 统计目录总大小，替代逐项子进程 fork
+
+## 🚀 v1.1 功能增强
+- 🔄 **远程更新**：`updateJson` 配好，KSU 管理器可直接检测更新
+- 🎨 **UI 打磨**：卡片阴影 / Tab 底部指示条 / 按钮动效 / 输入框聚焦反馈 / 致谢区移至设置页底部（普通卡片）
+- 🛡️ **健壮性**：cleand 捕获 SIGTERM/SIGINT 优雅退出；子进程 180s 超时强杀
+- 🔒 **安全**：AI 请求 30s 冷却，超频返回 429；delbig 路径注入守卫
 | 页 | 功能 |
 |---|---|
 | 🩺 体检 | 分类垃圾统计 / 大文件 Top20(只列不删) / 红黄绿健康度 / 推荐项一键清 / AI 深度建议 |
