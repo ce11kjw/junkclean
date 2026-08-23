@@ -7,7 +7,7 @@ BIN=$MODDIR/bin
 # 1) 目录重定向（失败仅记日志，不影响其他）
 sh "$MODDIR/binder.sh" mount >> "$ADR/cleaner.log" 2>&1 &
 
-# 2) 启动 cleand 守护（HTTP :8801 + 内置定时 + WebUI 静态服务）
+# 2) 启动 cleand 守护（HTTP :46780 + 内置定时 + WebUI 静态服务）
 if [ -x "$BIN/cleand" ]; then
   # 重复启动保护
   if ! pidof cleand >/dev/null 2>&1; then

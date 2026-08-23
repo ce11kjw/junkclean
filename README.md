@@ -35,11 +35,11 @@
 1. 下载 Release 中的 `JunkClean-v1.2.0.zip`
 2. KSU / APatch 管理器 → 刷入模块（免 recovery，原生格式；也含 META-INF 兼容 Magisk）
 3. 首次安装会检测 fstrim / GC / 清理类冲突模块，发现即中止提示
-4. 重启后 cleand 守护自启（127.0.0.1:8801）
+4. 重启后 cleand 守护自启（127.0.0.1:46780）
 
 ## 🖥 使用
 
-- **WebUI**：浏览器打开 `http://127.0.0.1:8801`（KSU 管理器模块 WebUI 入口亦可，若 CSP 受限请用浏览器）
+- **WebUI**：浏览器打开 `http://127.0.0.1:46780`（KSU 管理器模块 WebUI 入口亦可，若 CSP 受限请用浏览器）
 - **快捷动作**：管理器 Action 按钮 = 立即全量清理（受白名单保护）
 - **终端命令**：`su -c /data/adb/modules/junkclean/bin/junkclean <cmd>`
   - 可用命令：`clean` / `scan` / `classify` / `duplicate` / `fstrim` / `rescan` / `ai` / `status`

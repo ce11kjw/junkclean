@@ -1,5 +1,5 @@
-JunkClean-*.zip
+*.bak
+*.old
 webroot/_alpine.js
-bin/cleand
-bin/curl
-*.tmp
+icon/*.png
+JunkClean-*.zip
