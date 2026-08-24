@@ -12,6 +12,8 @@ RULES="$ADR/rules"
 export PATH=/sbin:/system/bin:/system/xbin:$PATH
 
 log() { # log <level> <msg>
+  # ponytail: 数字参数 guard 是防御性（实际 level 恒为字符串）。天花板：静默吞错。
+  # 升级路径：若引入数字级别，改为显式级别过滤而非静默跳过。
   [ -z "${1##[0-9]*}" ] && return 0 # guard
   echo "$(date '+%F %T') [$1] $2" >> "$LOG"
   [ "$(wc -c < "$LOG" 2>/dev/null || echo 0)" -gt 262144 ] && {
@@ -98,6 +100,9 @@ do_clean() { # do_clean <cats_csv> [force]
   prog 100 "完成: 删除$n_del项 释放$(human $freed)"
   echo "{\"deleted\":$n_del,\"skipped\":$n_skip,\"freed_kb\":$freed}"
 }
+# ponytail: shell 引擎的天花板是高频操作性能（每次操作 fork 子进程）。
+# 升级路径：核心引擎 C 化（目录遍历/统计/删除/md5），shell 保留 fstrim/sqlite 编排。
+# 用户 2026-08-24 明确：保持现状，暂缓 C 化。
 sqlite_opt() {
   # WAL-VACUUM 安全序列；磁盘<1GB 或 无 sqlite3 则跳过
   sq=$(command -v sqlite3) || sq=/system/bin/sqlite3
@@ -138,7 +143,6 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   done
   # 大文件 Top20
   big=''
-  b=0
   # busybox find +du 排序（避免进程替换）
   find /sdcard -type f -size +100M 2>/dev/null | while IFS= read -r pf; do
     bs=$(du -sk "$pf" 2>/dev/null | awk '{print $1}')
@@ -152,7 +156,7 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   red=''
   # 红线（聊天媒体）仅提示不统计删除
   load_rules "$RULES/social.list"
-  for p in $REDR; do r=ok; bj "$p" || r=block; red="$red\"$p\","; done
+  for p in $REDR; do red="$red\"$p\","; done
   red=${red%,}
   health=green
   [ "$free_kb" -lt 3145728 ] && health=yellow   # <3GB

@@ -134,7 +134,7 @@ static void *runner(void *arg){
     log_msg("INFO","task start: %s", cmd);
     pthread_mutex_lock(&task_mu); task.running=1; task.pct=0; strcpy(task.msg,"启动…"); task.result[0]=0; pthread_mutex_unlock(&task_mu);
     /* read stream */
-    char buf[1024]; ssize_t n; int lastline=0;
+    char buf[1024]; ssize_t n;
     while ((n = read(pipefd[0], buf, sizeof(buf)-1)) > 0){
         buf[n]=0;
         char *nl;
@@ -143,10 +143,8 @@ static void *runner(void *arg){
             *nl=0;
             if (!strncmp(rest,"PROG ",5)){ char *s=rest+5,*sp=strchr(s,' '); if(sp){*sp=0; tsave(s,sp+1);} }
             else if (rest[0] == '{') { strncpy(task.result, rest, sizeof(task.result)-1); task.result[sizeof(task.result)-1]=0; }
-            lastline=1;
             rest = nl+1;
         }
-        if (lastline && *rest) { /* partial line: keep simple, drop */ }
     }
     close(pipefd[0]);
     int st=0; for(int w=0;w<180;w++){ if(waitpid(pid,&st,WNOHANG)==pid) break; usleep(500000); } kill(pid,SIGKILL); waitpid(pid,&st,0);
@@ -185,6 +183,7 @@ static void serve_file(int fd, char *path){
     free(mem); fclose(f);
 }
 
+/* ponytail: config 用 K=V 文本 + 手动解析（无类型校验）。天花板：配置错误无即时反馈（坏值静默用默认）。升级路径：解析时校验类型/范围。 */
 /* ---- config file read/write ---- */
 static void api_config(int fd, const char *method, const char *body){
     char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
@@ -272,6 +271,7 @@ static void api_log(int fd, const char *q){
     http_json(fd,out); free(txt); free(out);
 }
 
+/* ponytail: AI 响应用 strstr 粗解析 content（不引 JSON 库）。天花板：响应含嵌套转义/非标准格式时解析可能不准。升级路径：引入最小 JSON 解析器或捆绑 cJSON。 */
 /* ---- AI: fork bundled curl, 15s timeout, POST /chat/completions ---- */
 static void api_ai(int fd){
     log_msg("INFO","AI request");
@@ -483,9 +483,6 @@ static void timer_loop(void){
                     }
                 }
                 if(run){
-                    char taskid[64]; snprintf(taskid,sizeof(taskid),"%d",(int)getpid());
-                    (void)taskid;
-                    /* spawn clean with authorized cats (no force => whitelist protected) */
                     char *cmd=malloc(256);
                     snprintf(cmd,256,"clean %s",cats);
                     log_msg("INFO","timer triggered: clean %s", cats);
@@ -503,6 +500,7 @@ void *api_ai_threaded(void *p);
 void *handle_threaded(void *p);
 void *timer_thread_wrap(void *p);
 
+/* ponytail: API 路由用线性 if 链（<20 个可接受）。天花板：新增 API 需改此链。升级路径：函数指针路由表（API 数超过 20 时再考虑）。 */
 /* ---- connection handler: parse first line + body, route ---- */
 static void handle(int fd){
     char base[1024];
