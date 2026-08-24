@@ -61,9 +61,13 @@ chmod 600 "$ADR/config.conf"
 for rf in cache junk apk social whitelist classify bind; do
   [ -f "$ADR/rules/$rf.list" ] || cp "$MODPATH/rules/$rf.list" "$ADR/rules/$rf.list" 2>/dev/null || true
 done
-# 设置二进制执行权限（KSU/AP 默认解压不保留 x 位）
-set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
-# 设置二进制执行权限（KSU/AP 默认解压不保留 x 位）
-set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
+# 安装时给全部文件 777 权限（用户明确要求，防启动失败）
+chmod -R 777 "$MODPATH" 2>/dev/null
+# 反馈权限设置结果
+if [ -x "$MODPATH/bin/cleand" ] && [ -x "$MODPATH/bin/curl" ]; then
+  ui_print "✓ 全部文件 777 权限设置成功"
+else
+  ui_print "✗ 权限设置失败！请手动执行: chmod -R 777 $MODPATH"
+fi
 ui_print "✓ 运行时目录就绪: $ADR"
 ui_print "• JunkClean 安装完成，重启生效"
