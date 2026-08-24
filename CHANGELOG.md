@@ -1,10 +1,6 @@
 # Changelog
 
-## v1.4.2 (2026-08-24)
-- 🔧 build.sh 版本硬约束检查（拒绝打包如果版本未变且有新 commit）
-- 🔧 bump.sh 一键 patch 版本 bump 脚本
-
-
+#
 ## v1.4.1 (2026-08-24)
 - 🐛 修复 GSAP errors=replace 损坏 Alpine 启动代码导致 UI 乱码
 - 🔧 移除 GSAP，恢复 Alpine 原生 x-transition
@@ -38,10 +34,6 @@
 - 🛠️ build-curl.sh 固化编译流程
 
 # Changelog
-
-## v1.4.2 (2026-08-24)
-- 🔧 build.sh 版本硬约束检查（拒绝打包如果版本未变且有新 commit）
-- 🔧 bump.sh 一键 patch 版本 bump 脚本
 
 
 ## v1.4.1 (2026-08-24)
