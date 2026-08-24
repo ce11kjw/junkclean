@@ -105,6 +105,7 @@
 - 清理 / 整理 / 重定向 / 自动化架构 → **ClearBox** · FLYCOM-E（GPL-3.0）· [github.com/FLYCOM-E/ClearBox](https://github.com/FLYCOM-E/ClearBox)；F2FS GC 方案 → 酷安 @Amktiao；App → Kr-Script 项目（helloklf）
 - 文件分类 / 下载完整性 / 重复文件归档 → **Sortify** · xCaptaiN09（MIT）· [github.com/xCaptaiN09/Sortify](https://github.com/xCaptaiN09/Sortify)
 - fstrim / F2FS-GC 智能感知（脏段阈值 / 灭屏充电） → **F2FS-Optimizer** · Coolapk-Code9527（酷安 乄代号9527，MIT）
+- 清理规则与定时思路（多源）：深度规则库参考 **Ghost Cleaner**（酷安 柒黑，WebUI 多线程清理模块）
 - 清理规则与定时思路（多源） → Clear-Optimization（DEMONNICA，Apache-2.0）· SmartClear（S123123sd，Apache-2.0）· Cache Cleaner（taamarin）· 小玖清理（Axiaosanjiu）· BasicCleaner（WeirdMidas）
 - 整理·清理·重定向三位一体 → **苏柚 SUU** · 回忆溢出工作组 OOM-WG（@梦璃酱 发起 / @白彩恋 维护，[github.com/OOM-WG/ShiroSU-Utils](https://github.com/OOM-WG/ShiroSU-Utils)）；分类规则贡献 → @GunRain（安音咲汀）/ 酷安 @Luxus_ / 酷安 @爱生活的土豆子
 - per-app 存储隔离参考 → **存储空间隔离（Storage Redirect）** · RikkaW & Xingchen（RikkaApps / He Hanbo，GPL-3.0）· [sr.rikka.app](https://sr.rikka.app/)
