@@ -1,5 +1,6 @@
 #!/bin/sh
-# bump.sh - patch 版本一键 bump（v1.4.2 → v1.4.3）
+# bump.sh - patch 版本一键 bump（v1.5.0 → v1.5.1）
+# ⚠️ minor 升级（v1.4.x→v1.5.0）需手动改 module.prop + update.json
 # 用户硬规则：动一次代码就更新版本号
 set -e
 cur_v=$(grep '^version=' module.prop | cut -d= -f2 | sed 's/^v//')

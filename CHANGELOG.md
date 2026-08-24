@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.5.1 (2026-08-25)
+- 📚 文档严审修复：README 全面更新（下载链接/功能表/版本史/日志路径）+ CHANGELOG 补 v1.4.8/v1.5.0 + git tag 补同步
+
+## v1.5.0 (2026-08-25)
+- 🎨 frontend-design 全面美化（纯CSS零依赖）：健康数字发光/卡片毛玻璃/按钮光晕/17个SVG图标/卡片hover上浮
+
+## v1.4.8 (2026-08-25)
+- 🔴 严审修复：clean 命令不执行（execl 单参 vs case 匹配）→ set -- 拆分；force body 支持；delbig .. 检查
+
+
+
 ## v1.4.7 (2026-08-24)
 - 🔧 bump.sh 修复 update.json 缺 v 前缀（zipUrl 404）
 - 🔧 CHANGELOG 整理（v1.4.2~v1.4.6 补全）

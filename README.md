@@ -1,4 +1,4 @@
-# JunkClean 🧹 v1.5.0
+# JunkClean 🧹 v1.5.1
 
 智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
 本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢
@@ -8,13 +8,31 @@
 | 页签 | 功能 |
 |---|---|
 | 🩺 体检 | 分类垃圾统计 / 大文件 Top20（只列不删）/ 红黄绿健康度 / 推荐项一键清 / AI 深度建议 |
-| 🧹 清理 | 应用缓存 / 系统垃圾 / 安装包压缩包 / 空文件夹 / 社交专项 / SQLite 优化（WAL+VACUUM） |
+| 🧹 清理 | 应用缓存 / 系统垃圾 / 安装包压缩包 / 空文件夹 / 社交专项 / 压缩数据库文件 |
 | 🗂 整理 | 文件分类（跳过未下载完文件） / 重复文件归档（移至 Duplicates/，只移不删） |
 | 🔧 维护 | fstrim / F2FS 智能 GC（脏段阈值 + 灭屏充电） / 目录重定向（bind mount） / 媒体库刷新 |
 | ⚙️ 设置 | 定时任务（多任务 / 热重载） / AI 配置（自填 URL·Key·Model） / 规则编辑器 / 白名单 / 中英双语 / 功能致谢 |
 
-## 🚀 v1.2.0 更新
+## 🚀 版本更新
 
+### v1.5.0 · 全面美化
+- 🎨 健康度数字呼吸发光 / 卡片毛玻璃 / 按钮光晕扫过 / 17 个 SVG 图标替换 emoji / 卡片 hover 上浮
+- 纯 CSS 零依赖，尊重 prefers-reduced-motion
+
+### v1.4.8 · 严审修复
+- 🔴 修复 `clean` 命令不执行（参数传递 bug，此前一键清理实际无效）
+- force 走 body 支持 / delbig 路径穿越守卫
+
+### v1.4.4 · 启动日志
+- 守护启动失败也有日志（shell 写，不依赖 cleand）
+
+### v1.4.0 · 日志+审计
+- daemon.log 生命周期日志 + WebUI 双日志切换 / 文案用户语言 / 死代码清理
+
+### v1.3.0 · Premium UI
+- Ethereal Glass 玻璃拟态重设计 / 全量审计修复 / curl 完全静态 / 端口 46780
+
+### v1.2.0 · 性能优化
 - ⚡ **do_duplicate 并行化**：`find \| xargs -P5 md5sum`，5 线程同时计算大文件哈希，提速 ~5×
 - ⚡ **sqlite_opt 排除系统 DB**：跳过 `/system/` `/data/system/` `/data/misc/` `/data/virtual/` 路径，避免 VACUUM 卡系统进程
 - 🎨 **UI 全面打磨**：卡片阴影增强、Tab 底部指示条、按钮动效反馈、输入框焦点高亮
@@ -32,7 +50,7 @@
 
 ## 📦 安装
 
-1. 下载 Release 中的 `JunkClean-v1.2.0.zip`
+1. 下载 Release 中的 `JunkClean-v1.5.1.zip`
 2. KSU / APatch 管理器 → 刷入模块（免 recovery，原生格式；也含 META-INF 兼容 Magisk）
 3. 首次安装会检测 fstrim / GC / 清理类冲突模块，发现即中止提示
 4. 重启后 cleand 守护自启（127.0.0.1:46780）
@@ -47,7 +65,8 @@
   - `/data/adb/junk-cleaner/config.conf`（权限 0600，含 AI Key）
   - `/data/adb/junk-cleaner/rules/{cache,junk,apk,social,whitelist,classify,bind}.list`
   - `/data/adb/junk-cleaner/scan.json`（体检结果）
-  - `/data/adb/junk-cleaner/cleaner.log`（256KB 循环日志）
+  - `/data/adb/junk-cleaner/cleaner.log`（清理操作日志）
+  - `/data/adb/junk-cleaner/daemon.log`（守护生命周期日志，启动失败也记录）
   - `/data/adb/junk-cleaner/tasks.conf`（定时任务，格式 `enable=1,every=12h,cats=cache,social`，热重载）
 
 ## 🤖 AI 深度建议

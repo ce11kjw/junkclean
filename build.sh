@@ -10,8 +10,6 @@ if [ "$head_code" = "$cur_code" ] && ! git diff --quiet; then
   exit 1
 fi
 
-# ---- 自动版本 bump：代码有新提交但版本未变 → patch+1 ----
-
 VER=$(grep '^version=' module.prop | cut -d= -f2)
 OUT="JunkClean-${VER}.zip"
 rm -f "$OUT"
