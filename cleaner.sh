@@ -83,6 +83,10 @@ do_clean() { # do_clean <cats_csv> [force]
       case "$p" in /*);; *) continue;; esac
       for rp in $p; do
         [ -e "$rp" ] || continue
+        # force 模式跳过白名单，但绝不允许删除根/关键系统目录
+        case "$rp" in
+          /|//|/system/*|/data/*|/cache/*|/vendor/*|/product/*|/apex/*) n_skip=$((n_skip+1)); continue;;
+        esac
         if [ "$FORCE" != "1" ]; then
           bj "$rp" || { n_skip=$((n_skip+1)); continue; }
         fi
@@ -97,7 +101,7 @@ do_clean() { # do_clean <cats_csv> [force]
 sqlite_opt() {
   # WAL-VACUUM 安全序列；磁盘<1GB 或 无 sqlite3 则跳过
   sq=$(command -v sqlite3) || sq=/system/bin/sqlite3
-  [ -x "$sq" ] || { log WARN "sqlite3 不可用，跳过"; prog_start_c=0; return; }
+  [ -x "$sq" ] || { log WARN "sqlite3 不可用，跳过"; return; }
   free_kb=$(df -k /data | awk 'NR==2{print $4}')
   [ "$free_kb" -lt 1048576 ] && { log WARN "磁盘<1GB 跳过 VACUUM"; return; }
   # 排除系统 DB（避免影响系统进程）
@@ -169,6 +173,7 @@ do_classify() { # 文件分类（跳过下载中文件，重名加序号）
     case "$dest" in /*) ;; *) dest="/sdcard/$dest";; esac
     [ -d "$dest" ] || mkdir -p "$dest" 2>/dev/null || continue
     for ext in $exts; do
+      # 用临时文件计数（避免管道子 shell 变量丢失）
       find /sdcard -maxdepth 4 -type f -name "*.$ext" ! -path "/sdcard/$dest/*" 2>/dev/null | while IFS= read -r sf; do
         base=$(basename "$sf")
         case "$base" in
@@ -176,11 +181,12 @@ do_classify() { # 文件分类（跳过下载中文件，重名加序号）
         esac
         tgt="$dest/$base"
         [ -e "$tgt" ] && tgt="$dest/${base%.*}_$(date +%s).${ext}"
-        mv -f "$sf" "$tgt" 2>/dev/null && moved=$((moved+1))
+        mv -f "$sf" "$tgt" 2>/dev/null && echo x >> "$ADR/.classify.cnt"
       done
     done
     prog 50 "分类完成 $dest"
   done < "$f"
+  [ -f "$ADR/.classify.cnt" ] && { moved=$(wc -l < "$ADR/.classify.cnt"); rm -f "$ADR/.classify.cnt"; }
   log INFO "classify moved=$moved"
   echo "{\"moved\":$moved}"
 }
@@ -191,8 +197,8 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   prog 10 "比对重复文件中…"
   find /sdcard -type f -size +10M ! -path "$dest/*" 2>/dev/null | \
     xargs -P5 -I{} md5sum {} 2>/dev/null | \
-    while IFS=$'\t' read -r h _; do [ -n "$h" ] || continue
-      echo "$h|$_" >> "$tmp"
+    while read -r h sf; do [ -n "$h" ] || continue
+      echo "$h|$sf" >> "$tmp"
     done
   prog 60 "发现重复项，归档中…"
   # 分组合并（awk 保持顺序）

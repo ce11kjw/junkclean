@@ -56,7 +56,7 @@ ai_key=
 ai_model=
 CFG
 chmod 600 "$ADR/config.conf"
-[ -f "$ADR/whitelist.list" ] || cp "$MODPATH/rules/whitelist.list" "$ADR/rules/whitelist.list" 2>/dev/null || true
+[ -f "$ADR/rules/whitelist.list" ] || cp "$MODPATH/rules/whitelist.list" "$ADR/rules/whitelist.list" 2>/dev/null || true
 # 复制默认规则（仅当运行时缺失，不覆盖用户改动）
 for rf in cache junk apk social whitelist classify bind; do
   [ -f "$ADR/rules/$rf.list" ] || cp "$MODPATH/rules/$rf.list" "$ADR/rules/$rf.list" 2>/dev/null || true

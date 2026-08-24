@@ -94,6 +94,7 @@ static void *runner(void *arg){
     setenv("JC_ADR", ADR, 1);      /* cleaner.sh 继承运行时目录 */
     setenv("JC_MOD", MODDIR, 1);   /* 模块目录 */
     pid_t pid = fork();
+    if (pid<0){ pthread_mutex_lock(&task_mu); task.running=0; pthread_mutex_unlock(&task_mu); close(pipefd[0]); close(pipefd[1]); free(arg); return NULL; }
     if (pid==0){
         dup2(pipefd[1],1); dup2(pipefd[1],2); close(pipefd[0]);
         char p[600]; snprintf(p,sizeof(p),"%s/cleaner.sh",MODDIR);
@@ -111,7 +112,7 @@ static void *runner(void *arg){
         while ((nl = strchr(rest,'\n'))){
             *nl=0;
             if (!strncmp(rest,"PROG ",5)){ char *s=rest+5,*sp=strchr(s,' '); if(sp){*sp=0; tsave(s,sp+1);} }
-            else if (rest[0] == '{') strncpy(task.result, rest, sizeof(task.result)-1);
+            else if (rest[0] == '{') { strncpy(task.result, rest, sizeof(task.result)-1); task.result[sizeof(task.result)-1]=0; }
             lastline=1;
             rest = nl+1;
         }
@@ -160,7 +161,10 @@ static void api_config(int fd, const char *method, const char *body){
             /* atomic-ish write */
             char tmp[600]; snprintf(tmp,sizeof(tmp),"%s/config.conf.tmp",ADR);
             FILE *f=fopen(tmp,"w");
-            if (f){ fwrite(body,1,strlen(body),f); fclose(f); rename(tmp,p); chmod(p,0600); }
+            if (!f){ http_err(fd,500,"{\"e\":\"write fail\"}"); return; }
+            fwrite(body,1,strlen(body),f); fclose(f);
+            if (rename(tmp,p)!=0){ http_err(fd,500,"{\"e\":\"rename fail\"}"); return; }
+            chmod(p,0600);
             http_json(fd,"{\"ok\":1}");
             /* reload interval effects happen on next loop */
         } else http_err(fd,400,"{\"e\":\"empty body\"}");
