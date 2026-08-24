@@ -1,4 +1,4 @@
-# JunkClean 🧹 v1.5.3
+# JunkClean 🧹 v1.5.4
 
 智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
 本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢
@@ -48,6 +48,20 @@
 - 所有删除写入日志；SQLite VACUUM 前检查磁盘空间 ≥1GB
 - 安装时检测同类别模块冲突并中止安装
 
+## 🧩 兼容性（root 管理器）
+
+| 管理器 | 支持 | 说明 |
+|---|---|---|
+| Magisk | ✅ v20.4+ | META-INF 官方安装器，原生格式通用 |
+| KernelSU | ✅ | 原生模块格式（module.prop / customize.sh / service.sh / action.sh / updateJson）|
+| APatch | ✅ | 原生格式 + action.sh（已真机验证）|
+| Zygisk | — | 无需适配（不注入 app 进程，无 zygisk 目录）|
+| mountify | — | 无需适配（不替换 system 文件）|
+| SELinux | ✅ | 守护以 su 域运行，已真机验证端口/目录访问 |
+
+- **WebUI 仅浏览器访问**：`http://127.0.0.1:46780`，勿用管理器内置 WebUI 入口（API 端口不匹配）
+- 更新检测：KSU/APatch 管理器读 `module.prop` 的 `updateJson` 指向的 update.json
+
 ## 📦 安装
 
 1. 下载 Release 中的 `JunkClean-v1.5.1.zip`
@@ -57,7 +71,7 @@
 
 ## 🖥 使用
 
-- **WebUI**：浏览器打开 `http://127.0.0.1:46780`（KSU 管理器模块 WebUI 入口亦可，若 CSP 受限请用浏览器）
+- **WebUI**：浏览器打开 `http://127.0.0.1:46780`（⚠️ 仅支持浏览器直接访问；KSU/APatch 管理器内置 WebUI 入口会把静态页挂到其自身服务器，页面 API 请求会打到错误端口，**不要用管理器内置 WebUI 入口**）
 - **快捷动作**：管理器 Action 按钮 = 立即全量清理（受白名单保护）
 - **终端命令**：`su -c /data/adb/modules/junkclean/bin/junkclean <cmd>`
   - 可用命令：`clean` / `scan` / `classify` / `duplicate` / `fstrim` / `rescan` / `ai` / `status`

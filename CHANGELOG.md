@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.5.4 (2026-08-25)
+- 📚 root 管理器文档严审：修正 KSU/APatch 内置 WebUI 入口误导（API 端口不匹配）+ 新增兼容性矩阵（Magisk/KSU/APatch/Zygisk/mountify/SELinux）
+
 ## v1.5.3 (2026-08-25)
 - 🐛 前端 poll 不更新 daemon 状态（页面打开时守护重启中→永远显示未启动）→ poll 同时拉 /api/status
 
