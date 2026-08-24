@@ -276,6 +276,8 @@ do_status() { # cleand/WebUI 状态
   echo "{\"free_kb\":\"$fk\",\"health\":\"$h\",\"author\":\"$aut\",\"version\":\"$ver\",\"daemon\":1}"
 }
 [ "${JC_LIB:-0}" = "1" ] && return 0
+# 入口参数拆分：cleand 传整个命令行串（"clean cache,apk force" → $1=clean $2=cache,apk $3=force）
+set -- $1
 case "$1" in
   clean)     do_clean "${2:-all}" "$3" ;;
   scan)      do_scan ;;

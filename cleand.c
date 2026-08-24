@@ -387,6 +387,7 @@ static void api_delbig(int fd, const char* body){
         size_t l=strlen(tok);
         while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
         if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
+           && !strstr(tok,"/../") && !strstr(tok,"/..") && !strcmp(tok,"..")
            && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')){
             pid_t c=fork();
             if(c==0){ execl("/bin/rm","rm","-rf",tok,(char*)NULL); execl("/system/bin/rm","rm","-rf",tok,(char*)NULL); _exit(127); }
@@ -552,9 +553,9 @@ static void handle(int fd){
     else if(!strncmp(base,"/api/clean",10) && !strcmp(method,"POST")){
         char cats[128]="all", force[8]="";
         jget(body,"cats",cats,sizeof(cats));
-        if((q?strstr(q,"force"):NULL)||jget(body,"force",force,sizeof(force))==0){ /* any force */ }
+        int hasforce = (q?strstr(q,"force"):NULL)!=0 || jget(body,"force",force,sizeof(force))==0;
         char *cmd=malloc(256);
-        snprintf(cmd,256,"clean %s%s",cats,q?(strstr(q,"force")?" force":""):"");
+        snprintf(cmd,256,"clean %s%s",cats,hasforce?" force":"");
         bg(cmd);
         http_json(fd,"{\"ok\":1,\"started\":1}");
     }
