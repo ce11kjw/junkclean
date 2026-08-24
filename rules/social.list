@@ -3,8 +3,6 @@
 /sdcard/Android/data/com.tencent.mm/cache/*
 /data/data/com.tencent.mm/app_webview/*/Cache/*
 /data/data/com.tencent.mobileqq/cache/*
-/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatimg/*
-/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatthumb/*
 /sdcard/tencent/MobileQQ/log/*
 /sdcard/tencent/MobileQQ/thumb/*
 /sdcard/tencent/MobileQQ/ptv_template/*
@@ -28,9 +26,39 @@
 /data/data/org.telegram.messenger/files/Telegram/thumbnails/*
 /data/data/com.ss.android.ugc.aweme/cache/*
 /data/data/com.ss.android.ugc.aweme/files/image_pipeline_cache/*
-#RED 聊天媒体（强烈建议保留；误勾将删除聊天图片/语音/视频）
-/data/data/com.tencent.mm/MicroMsg/*/image2/*
-/data/data/com.tencent.mm/MicroMsg/*/video/*
-/data/data/com.tencent.mm/MicroMsg/*/voice2/*
-/data/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*
-/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*
+#RED 聊天媒体（红线：误勾将删除聊天图片/语音/视频）
+#RED /data/data/com.tencent.mm/MicroMsg/*/image2/*
+#RED /data/data/com.tencent.mm/MicroMsg/*/video/*
+#RED /data/data/com.tencent.mm/MicroMsg/*/voice2/*
+#RED /data/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*
+#RED /sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/chatpic/chatraw/*
+# --- 微信/QQ 深度缓存（参考 Ghost Cleaner 规则库扩充）---
+/sdcard/Android/data/com.tencent.mm/MicroMsg/xlog/*
+/sdcard/Android/data/com.tencent.mm/MicroMsg/crash/*
+/sdcard/Android/data/com.tencent.mm/MicroMsg/*/avatar/*
+/sdcard/Android/data/com.tencent.mm/MicroMsg/*/emoji/*
+/sdcard/tencent/MicroMsg/emoji/*
+/sdcard/tencent/MicroMsg/xlog/*
+/sdcard/tencent/MicroMsg/failmsg/*
+/sdcard/tencent/MicroMsg/CheckResUpdate/*
+/sdcard/tencent/MicroMsg/SQLTrace/*
+/sdcard/tencent/MicroMsg/wxacache/*
+/sdcard/tencent/tbs/backup/*
+/sdcard/tencent/tbs/log/*
+/sdcard/tencent/tbs_live_log/*
+/sdcard/tencent/blob/*
+/sdcard/tencent/msflogs/*
+/sdcard/tencent/wtlogin/*
+/sdcard/tencent/mta/*
+/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/diskcache/*
+/sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/ad/*
+/sdcard/tencent/MobileQQ/diskcache/*
+/sdcard/tencent/MobileQQ/ad/*
+#RED 微信/QQ 聊天媒体（红线：误勾将删除聊天图片/视频/语音）
+#RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/image2/*
+#RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/video/*
+#RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/voice2/*
+#RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/attachment/*
+#RED /sdcard/tencent/MicroMsg/image2/*
+#RED /sdcard/tencent/MicroMsg/video/*
+#RED /sdcard/tencent/MobileQQ/chatpic/*

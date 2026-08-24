@@ -10,3 +10,21 @@
 /sdcard/msc
 /sdcard/tbs/disk
 /sdcard/backup/.SystemConfig
+# --- 厂商日志/调试残留（参考 Ghost Cleaner 规则库扩充）---
+/sdcard/MIUI/debug_log
+/sdcard/MIUI/.cache
+/sdcard/.oppo_log
+/sdcard/ColorOS/Log
+/sdcard/Vivo/Log
+/sdcard/Huawei/Log
+/sdcard/.log
+/sdcard/.tmp
+/sdcard/LOST.DIR
+/sdcard/found.000
+/sdcard/.SystemConfig
+/sdcard/.sys_config
+/sdcard/blockcanary
+/sdcard/360
+/sdcard/backups/.SystemConfig
+/sdcard/Android/data/.um
+/sdcard/Android/obj/.um

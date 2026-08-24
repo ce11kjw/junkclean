@@ -5,3 +5,24 @@
 /data/user_de/*/cache/*
 /sdcard/Android/data/*/cache/*
 /data/user_de/*/*/cache/*
+# --- 广告 SDK 残留（通配任意包，删除安全）---
+/sdcard/Android/data/*/files/ad_cache/*
+/sdcard/Android/data/*/files/unity_ad/*
+/sdcard/Android/data/*/files/unityads/*
+/sdcard/Android/data/*/files/unity_ads_cache/*
+/sdcard/Android/data/*/files/GDT_AD/*
+/sdcard/Android/data/*/files/GDT_CACHE/*
+/sdcard/Android/data/*/files/pangle_com/*
+/sdcard/Android/data/*/files/ksad_cache/*
+/sdcard/Android/data/*/files/tt_ad/*
+# --- 常用 App 缓存（参考 Ghost Cleaner 规则库扩充）---
+/sdcard/Douyin/cache/*
+/sdcard/gifshow/cache/*
+/sdcard/netease/cloudmusic/Cache/*
+/sdcard/netease/cloudmusic/Ad/*
+/sdcard/BaiduMap/cache/*
+/sdcard/qqmusic/cache/*
+/sdcard/UCDownloads/VideoData/*
+/sdcard/UCDownloads/Ad/*
+/sdcard/tencent/tbs/disk/*
+/sdcard/.UTSystemConfig
