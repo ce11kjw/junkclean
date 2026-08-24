@@ -267,6 +267,33 @@ details[open] summary{opacity:1}
 .jc-enter{transition:transform .8s var(--spring),opacity .8s var(--spring)}
 .jc-enter-start{transform:translateY(18px);opacity:0}
 .jc-enter-end{transform:translateY(0);opacity:1}
+
+/* ===== v1.5 美化层（纯 CSS，零依赖）===== */
+/* ① 健康度数字发光 + 呼吸 */
+.ring{filter:drop-shadow(0 0 10px rgba(45,212,191,.30))}
+@keyframes jc-glow{0%,100%{text-shadow:0 0 14px rgba(45,212,191,.22)}50%{text-shadow:0 0 34px rgba(45,212,191,.55)}}
+.ring>div,.ring>span{animation:jc-glow 3.5s ease-in-out infinite}
+/* ② 卡片毛玻璃 */
+.card,.sum-card{
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.07);box-shadow:0 8px 32px rgba(0,0,0,.35)}
+/* ⑤ 卡片 hover 上浮 */
+.card{transition:transform .35s var(--spring),box-shadow .35s}
+.card:active{transform:scale(.985)}
+@media(hover:hover){.card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.45)}}
+/* ③ 按钮光晕扫过 */
+.btn,.iconbtn{position:relative;overflow:hidden}
+.btn::after,.iconbtn::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.08),transparent);transform:skewX(-20deg)}
+@keyframes jc-sheen{0%{left:-60%}60%,100%{left:130%}}
+.btn:hover::after,.iconbtn:hover::after{animation:jc-sheen .8s ease}
+/* 全局背景微光 */
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(1200px 500px at 50% -10%,rgba(45,212,191,.06),transparent 60%),
+  radial-gradient(900px 400px at 85% 110%,rgba(167,139,250,.05),transparent 60%)}
+/* reduced-motion 尊重 */
+@media(prefers-reduced-motion:reduce){.ring>div,.ring>span,.btn::after,.iconbtn::after{animation:none}}
 </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -274,11 +301,11 @@ details[open] summary{opacity:1}
 <div id="msgline" x-show="pb.busy" x-text="pb.msg"></div>
 
 <header>
-  <div class="logo">🧹 <b>Junk</b>Clean</div>
+  <div class="logo"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> <b>Junk</b>Clean</div>
   <span class="dot" :class="!daemon&&'down'"></span>
   <span class="muted" style="font-size:12px" x-text="daemon?t('running'):t('stopped')"></span>
   <div class="grow"></div>
-  <button class="iconbtn" @click="openLog()" title="日志">📄</button>
+  <button class="iconbtn" @click="openLog()" title="日志"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></button>
 </header>
 
 <main>
@@ -290,7 +317,7 @@ details[open] summary{opacity:1}
       <div class="sum-card"><div class="v"><span class="badge" :class="'b-'+health" x-text="healthText"></span></div><div class="l" x-text="t('health')"></div></div>
     </div>
     <div class="card spanfull">
-      <h3>🩺 <span x-text="t('healthcheck')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> <span x-text="t('healthcheck')"></span></h3>
       <div class="btns">
         <button class="btn block" @click="runScan()" :disabled="pb.busy" x-text="t('scan')"></button>
       </div>
@@ -305,7 +332,7 @@ details[open] summary{opacity:1}
       </div>
     </div>
     <div class="card spanfull">
-      <h3>🗃 <span x-text="t('bigfiles')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> <span x-text="t('bigfiles')"></span></h3>
       <div class="bigitem" x-for="b in big" :key="b.p">
         <span class="chk" @click="toggleBig(b.p)" :class="selBig[b.p]&&'on'"><span x-text="selBig[b.p]?'✓':''"></span></span>
         <div class="grow"><div class="t" x-text="base(b.p)"></div><div class="p" x-text="b.p"></div></div>
@@ -317,7 +344,7 @@ details[open] summary{opacity:1}
       </div>
     </div>
     <div class="card spanfull">
-      <h3>🧠 <span x-text="t('aiadv')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg> <span x-text="t('aiadv')"></span></h3>
       <button class="btn ghost block" @click="runAI()" :disabled="ai.run" x-text="ai.run?t('aithink'):t('aigo')"></button>
       <div class="aiout" x-show="ai.out" x-text="ai.out"></div>
       <div class="muted" style="margin-top:6px" x-show="ai.err" x-text="ai.err"></div>
@@ -327,7 +354,7 @@ details[open] summary{opacity:1}
   <!-- ============ 清理 ============ -->
   <section x-show="tab=='clean'" data-tab="clean" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card">
-      <h3>🧹 <span x-text="t('cleanx')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> <span x-text="t('cleanx')"></span></h3>
       <div class="cleanitem" x-for="c in cats" :key="c.id">
         <span class="chk" @click="toggleCat(c.id)" :class="selCat[c.id]&&'on'"><span x-text="selCat[c.id]?'✓':''"></span></span>
         <div class="ic"><span x-text="c.ic"></span></div>
@@ -342,7 +369,7 @@ details[open] summary{opacity:1}
   <!-- ============ 整理 ============ -->
   <section x-show="tab=='organize'" data-tab="organize" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card">
-      <h3>🗂 <span x-text="t('classify')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg> <span x-text="t('classify')"></span></h3>
       <div class="muted" x-text="t('classifydesc')"></div>
       <div class="btns"><button class="btn" @click="postRun('/api/classify',t('classify'))" :disabled="pb.busy" x-text="t('run')"></button></div>
     </div>
@@ -376,7 +403,7 @@ details[open] summary{opacity:1}
   <!-- ============ 设置 ============ -->
   <section x-show="tab=='setting'" data-tab="setting" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card about-banner" style="text-align:center">
-      <div class="author">🧹 JunkClean <span class="badge b-green" x-text="ver"></span></div>
+      <div class="author"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> JunkClean <span class="badge b-green" x-text="ver"></span></div>
       <div class="muted" style="margin-top:4px">👤 <span x-text="author"></span> · <span x-text="t('localonly')"></span></div>
       <div class="muted" style="margin-top:2px" x-text="t('slogan')"></div>
     </div>
@@ -404,7 +431,7 @@ details[open] summary{opacity:1}
       </div>
     </div>
     <div class="card">
-      <h3>🧠 <span x-text="t('ai')"></span></h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg> <span x-text="t('ai')"></span></h3>
       <label class="f" x-text="t('aibase')"></label><input type="text" x-model="ai.base" placeholder="https://api.example.com/v1">
       <label class="f" x-text="t('aikey')"></label><input type="password" x-model="ai.key" placeholder="sk-...">
       <label class="f" x-text="t('aimodel')"></label><input type="text" x-model="ai.model" placeholder="model-id">
@@ -446,19 +473,19 @@ details[open] summary{opacity:1}
 
 <nav>
   <div class="tabrow">
-    <button @click="tab='health'" :class="tab=='health'&&'act'"><span class="em">🩺</span><span x-text="t('health')"></span></button>
-    <button @click="tab='clean'" :class="tab=='clean'&&'act'"><span class="em">🧹</span><span x-text="t('clean')"></span></button>
-    <button @click="tab='organize'" :class="tab=='organize'&&'act'"><span class="em">🗂</span><span x-text="t('organize')"></span></button>
-    <button @click="tab='maintain'" :class="tab=='maintain'&&'act'"><span class="em">🔧</span><span x-text="t('maintain')"></span></button>
-    <button @click="tab='setting'" :class="tab=='setting'&&'act'"><span class="em">⚙️</span><span x-text="t('setting')"></span></button>
+    <button @click="tab='health'" :class="tab=='health'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span><span x-text="t('health')"></span></button>
+    <button @click="tab='clean'" :class="tab=='clean'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span><span x-text="t('clean')"></span></button>
+    <button @click="tab='organize'" :class="tab=='organize'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span><span x-text="t('organize')"></span></button>
+    <button @click="tab='maintain'" :class="tab=='maintain'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span><span x-text="t('maintain')"></span></button>
+    <button @click="tab='setting'" :class="tab=='setting'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg></span><span x-text="t('setting')"></span></button>
   </div>
 </nav>
 
 <div id="logpage">
   <div class="row" style="padding:4px 2px 8px">
-    <div class="grow" style="font-weight:700">📄 <span x-text="t('logs')"></span></div>
+    <div class="grow" style="font-weight:700"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> <span x-text="t('logs')"></span></div>
     <div class="row" style="gap:6px">
-      <button class="logtab" :class="logType=='cleaner'&&'on'" @click="switchLog('cleaner')">🧹 清理</button>
+      <button class="logtab" :class="logType=='cleaner'&&'on'" @click="switchLog('cleaner')"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 清理</button>
       <button class="logtab" :class="logType=='daemon'&&'on'" @click="switchLog('daemon')">🛡️ 守护</button>
     </div>
     <button class="iconbtn" @click="closeLog()" style="font-size:13px">✕</button>
@@ -534,7 +561,7 @@ return{
 tab:'health',lang:(localStorage.getItem('jc_lang')||(navigator.language||'zh').startsWith('zh')?'zh':'en'),
 dict:I18N.zh,daemon:false,ver:'',author:'',freeK:'0',junkK:0,health:'green',scanTs:'',
 cats:[
- {id:'cache',ic:'🗃️',name:()=>T('cn_cache'),desc:()=>T('cn_cached')},
+ {id:'cache',ic:'<svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>️',name:()=>T('cn_cache'),desc:()=>T('cn_cached')},
  {id:'junk',ic:'🧾',name:()=>T('cn_junk'),desc:()=>T('cn_junkd')},
  {id:'apk',ic:'📦',name:()=>T('cn_apk'),desc:()=>T('cn_apkd')},
  {id:'empty',ic:'📂',name:()=>T('cn_empty'),desc:()=>T('cn_emptyd')},
