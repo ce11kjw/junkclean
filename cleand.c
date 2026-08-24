@@ -46,7 +46,7 @@ static void tsave(const char *pct, const char *msg){
 /* ---- tiny HTTP helpers ---- */
 static void http_head(int fd, int code, const char *ct, long len){
     char b[512];
-    snprintf(b, sizeof(b), "HTTP/1.1 %d OK\r\nContent-Type: %s\r\nContent-Length: %ld\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n", code, ct, len);
+    snprintf(b, sizeof(b), "HTTP/1.1 %d OK\r\nContent-Type: %s\r\nContent-Length: %ld\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n", code, ct, len);
     write(fd, b, strlen(b));
 }
 static void http_json(int fd, const char *s){

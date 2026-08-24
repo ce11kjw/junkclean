@@ -1,4 +1,4 @@
-# JunkClean 🧹 v1.5.4
+# JunkClean 🧹 v1.5.5
 
 智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
 本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢
@@ -59,7 +59,7 @@
 | mountify | — | 无需适配（不替换 system 文件）|
 | SELinux | ✅ | 守护以 su 域运行，已真机验证端口/目录访问 |
 
-- **WebUI 仅浏览器访问**：`http://127.0.0.1:46780`，勿用管理器内置 WebUI 入口（API 端口不匹配）
+- **WebUI**：浏览器 `http://127.0.0.1:46780` 或管理器内置 WebUI 入口均可（API 绝对地址 + CORS 已适配）
 - 更新检测：KSU/APatch 管理器读 `module.prop` 的 `updateJson` 指向的 update.json
 
 ## 📦 安装
@@ -71,7 +71,9 @@
 
 ## 🖥 使用
 
-- **WebUI**：浏览器打开 `http://127.0.0.1:46780`（⚠️ 仅支持浏览器直接访问；KSU/APatch 管理器内置 WebUI 入口会把静态页挂到其自身服务器，页面 API 请求会打到错误端口，**不要用管理器内置 WebUI 入口**）
+- **WebUI**（两种方式皆可）：
+  - 浏览器打开 `http://127.0.0.1:46780`
+  - **KSU / APatch 管理器内置 WebUI 入口**（webroot 已适配：API 走绝对地址 + CORS）
 - **快捷动作**：管理器 Action 按钮 = 立即全量清理（受白名单保护）
 - **终端命令**：`su -c /data/adb/modules/junkclean/bin/junkclean <cmd>`
   - 可用命令：`clean` / `scan` / `classify` / `duplicate` / `fstrim` / `rescan` / `ai` / `status`

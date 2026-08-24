@@ -590,7 +590,7 @@ animateCards(t){
     ease:'power3.out',clearProps:'all',overwrite:'auto'
   });
 },
-async $f(p,o){let r=await fetch(p,o);return r.json().catch(()=>({}));},
+async $f(p,o){if(p.startsWith('/api'))p='http://127.0.0.1:46780'+p;let r=await fetch(p,o);return r.json().catch(()=>({}));},
 async loadAll(){let [s,cfg]=await Promise.all([this.$f('/api/status'),this.$f('/api/config')]);
  this.daemon=!!s.daemon;this.ver=s.version||this.ver;this.author=s.author||this.author;
  if(cfg&&cfg.cfg){let c=cfg.cfg.split('\n');for(let l of c){let i=l.indexOf('=');if(i>0){

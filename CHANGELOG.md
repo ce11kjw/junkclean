@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.5 (2026-08-25)
+- 🌐 WebUI 适配 KSU/APatch 管理器内置入口（官方文档核实）：API 改绝对地址 http://127.0.0.1:46780 + cleand 加 CORS 头
+- 📚 README 修正 WebUI 说明（此前误判'勿用管理器入口'）
+
 ## v1.5.4 (2026-08-25)
 - 📚 root 管理器文档严审：修正 KSU/APatch 内置 WebUI 入口误导（API 端口不匹配）+ 新增兼容性矩阵（Magisk/KSU/APatch/Zygisk/mountify/SELinux）
 
