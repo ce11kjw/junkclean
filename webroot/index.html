@@ -5,124 +5,264 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>JunkClean</title>
 <style>
+/* ============ JunkClean v1.3 Premium (Ethereal Glass) ============ */
 :root{
-  --bg:#0F172A;--card:#1E293B;--card2:#243248;--acc:#2DD4BF;--acc2:#14B8A6;
-  --ok:#34D399;--warn:#F59E0B;--bad:#F87171;--txt:#E2E8F0;--sub:#94A3B8;
-  --line:#334155;--purple:#A78BFA;--blue:#60A5FA;
+  --bg:#050505; --card:rgba(255,255,255,0.04); --card2:rgba(255,255,255,0.07);
+  --acc:#2DD4BF; --acc2:#14B8A6; --ok:#34D399; --warn:#F59E0B; --bad:#F87171;
+  --txt:#F5F5F7; --sub:rgba(245,245,247,0.55); --line:rgba(255,255,255,0.08);
+  --purple:#A78BFA; --blue:#60A5FA;
+  --spring:cubic-bezier(0.32,0.72,0,1);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:var(--bg);color:var(--txt);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+html{background:var(--bg)}
+body{
+  background:var(--bg);color:var(--txt);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  min-height:100dvh; overflow-x:hidden;
+}
+/* ---- 背景光晕（Ethereal Glass）---- */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(600px at 15% 8%, rgba(45,212,191,.14), transparent 60%),
+    radial-gradient(520px at 88% 20%, rgba(167,139,250,.11), transparent 60%),
+    radial-gradient(700px at 50% 100%, rgba(45,212,191,.07), transparent 60%);
+}
+/* ---- 噪点颗粒（fixed 覆盖层）---- */
+body::after{
+  content:"";position:fixed;inset:0;z-index:999;pointer-events:none;opacity:.028;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 .num{font-variant-numeric:tabular-nums}
-/* ------- header ------- */
-header{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;gap:10px;
-  padding:0 16px;background:linear-gradient(180deg,rgba(15,23,42,.97),rgba(15,23,42,.88));backdrop-filter:blur(12px);z-index:30;border-bottom:1px solid var(--line)}
-header .logo{font-weight:700;font-size:17px;letter-spacing:.3px}
-.logo b{color:var(--acc)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 2s infinite}
-.dot.down{background:var(--bad);animation:none}
+.muted{color:var(--sub);font-size:13px;line-height:1.6}
+
+/* ============ 浮岛 Header（Fluid Island） ============ */
+header{
+  position:fixed;top:14px;left:14px;right:14px;z-index:40;
+  height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;
+  background:rgba(10,10,14,.72);border:1px solid var(--line);
+  border-radius:999px;backdrop-filter:blur(18px);
+  box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+  transition:transform .5s var(--spring);
+}
+header .logo{font-weight:700;font-size:16px;letter-spacing:.2px;white-space:nowrap}
+.logo b{background:linear-gradient(135deg,var(--acc),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 2s infinite;box-shadow:0 0 10px var(--ok)}
+.dot.down{background:var(--bad);animation:none;box-shadow:none}
 @keyframes pulse{50%{opacity:.35}}
 header .grow{flex:1}
-.iconbtn{background:var(--card);border:1px solid var(--line);color:var(--txt);width:36px;height:36px;border-radius:10px;font-size:17px;cursor:pointer}
-.iconbtn:active{transform:scale(.9)}
-/* ------- progress ------- */
-#topbar{position:fixed;top:0;left:0;height:3px;width:0%;z-index:99;background:linear-gradient(90deg,var(--acc),var(--ok));transition:width .25s cubic-bezier(.4,0,.2,1);display:none}
+.iconbtn{
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);
+  width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .4s var(--spring);
+}
+.iconbtn:active{transform:scale(.88);opacity:.6}
+
+/* ============ 进度条 ============ */
+#topbar{position:fixed;top:0;left:0;height:3px;width:0%;z-index:100;display:none;
+  background:linear-gradient(90deg,var(--acc),var(--blue));border-radius:0 2px 2px 0;
+  box-shadow:0 0 12px rgba(45,212,191,.5);
+  transition:width .5s var(--spring)}
 #topbar.busy{display:block}
-#topbar.moving{animation:flow 1.2s linear infinite}
+#topbar.moving{animation:flow 1.4s linear infinite}
 @keyframes flow{0%{background-position:0 0}100%{background-position:200% 0}}
-@keyframes ring-pulse{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
-.ring.running{animation:ring-pulse 2s ease-in-out infinite}
-#msgline{position:fixed;top:8px;right:14px;z-index:99;font-size:12px;color:var(--acc);background:rgba(15,23,42,.9);padding:2px 10px;border-radius:99px;display:none}
-/* ------- layout ------- */
-main{max-width:600px;margin:0 auto;padding:72px 14px 84px}
-.card{background:var(--card);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 4px 20px rgba(0,0,0,.28),0 1px 3px rgba(0,0,0,.12);border:1px solid rgba(255,255,255,.05)}
-.card h3{font-size:14px;color:var(--sub);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+#msgline{position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:100;
+  font-size:12px;color:var(--acc);background:rgba(5,5,5,.85);padding:4px 14px;border-radius:999px;
+  border:1px solid var(--line);display:none;backdrop-filter:blur(8px)}
+
+/* ============ 布局 ============ */
+main{position:relative;z-index:1;max-width:640px;margin:0 auto;padding:84px 16px 120px}
+/* Asymmetrical Bento: 手机单列 + 平板双列 */
+@media(min-width:560px){
+  .bento{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .bento .span2{grid-column:span 2}
+  .bento .spanfull{grid-column:1/-1}
+}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;
+  margin:12px 0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 40px rgba(0,0,0,.4);
+  transition:transform .5s var(--spring),border-color .5s var(--spring),background .5s var(--spring);
+}
+.card:active{transform:scale(.985)}
+.card h3{font-size:11px;color:var(--sub);font-weight:600;margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.16em}
+.card h3::before{content:"";width:18px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--acc),transparent)}
 .row{display:flex;align-items:center;gap:10px}
 .grow{flex:1}
-.muted{color:var(--sub);font-size:13px;line-height:1.5}
-/* ------- health summary ------- */
-.summary{display:flex;gap:10px}
-.sum-card{flex:1;background:var(--card2);border-radius:14px;padding:12px;text-align:center}
-.sum-card .v{font-size:20px;font-weight:700}.sum-card .l{font-size:11px;color:var(--sub);margin-top:2px}
-.badge{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
-.b-green{background:rgba(52,211,153,.15);color:var(--ok)}.b-yellow{background:rgba(245,158,11,.15);color:var(--warn)}.b-red{background:rgba(248,113,113,.15);color:var(--bad)}
-/* ------- buttons ------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer;
-  border-radius:12px;font-size:14px;font-weight:600;padding:11px 18px;background:var(--acc);color:#06251f;transition:.15s}
-.btn:active{transform:scale(.95);opacity:.85}
-.btn{transition:transform .15s,opacity .15s,background .2s}
-.btn.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
-.btn.danger{background:var(--bad);color:#fff}
+
+/* ============ 体检摘要（巨型数字） ============ */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 2px}
+.sum-card{
+  background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;
+  padding:16px 10px;text-align:center;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+.sum-card::after{content:"";position:absolute;top:-30px;right:-30px;width:70px;height:70px;
+  background:radial-gradient(circle,rgba(45,212,191,.12),transparent 70%)}
+.sum-card .v{font-size:26px;font-weight:750;letter-spacing:-.03em;line-height:1.1}
+.sum-card .l{font-size:10px;color:var(--sub);margin-top:4px;text-transform:uppercase;letter-spacing:.14em}
+.badge{padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em}
+.b-green{background:rgba(52,211,153,.15);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(52,211,153,.2)}
+.b-yellow{background:rgba(245,158,11,.15);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(245,158,11,.2)}
+.b-red{background:rgba(248,113,113,.15);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(248,113,113,.2)}
+
+/* ============ 按钮（Island + Button-in-Button） ============ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;cursor:pointer;
+  border-radius:999px;font-size:14px;font-weight:600;padding:12px 22px;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));color:#052e29;
+  transition:transform .4s var(--spring),opacity .4s var(--spring),box-shadow .4s var(--spring);
+  box-shadow:0 4px 20px rgba(45,212,191,.25);
+}
+.btn:active{transform:scale(.96);opacity:.85}
+.btn.ghost{background:rgba(255,255,255,.04);color:var(--acc);border:1px solid rgba(45,212,191,.3);
+  box-shadow:none}
+.btn.danger{background:linear-gradient(135deg,var(--bad),#EF4444);color:#fff}
 .btn.block{width:100%}
-.btns{display:flex;gap:10px;margin-top:12px}
+.btns{display:flex;gap:10px;margin-top:14px}
 .btns .btn{flex:1}
-.btn.primary-bar{position:sticky;bottom:76px;width:92%;margin:0 auto;display:block;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 6px 20px rgba(45,212,191:.3),0 2px 6px rgba(45,212,191,.15);border-radius:14px;font-size:15px}
-/* ------- clean cards ------- */
-.cleanitem{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid rgba(51,65,85,.5)}
+.btn.primary-bar{
+  position:sticky;bottom:88px;width:calc(100% - 40px);margin:0 auto;display:flex;
+  border-radius:999px;font-size:15px;padding:14px 18px;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));
+  box-shadow:0 10px 40px rgba(45,212,191,.35),inset 0 1px 0 rgba(255,255,255,.3);
+}
+/* Button-in-Button 尾图标圈 */
+.btn.primary-bar::after{
+  content:"✓";width:28px;height:28px;border-radius:50%;flex:none;
+  background:rgba(5,5,5,.18);display:inline-flex;align-items:center;justify-content:center;
+  font-size:13px;margin-left:4px;transition:transform .4s var(--spring);
+}
+.btn.primary-bar:active::after{transform:translateX(2px) scale(1.08)}
+
+/* ============ 清理项 ============ */
+.cleanitem{display:flex;align-items:center;gap:14px;padding:14px 4px;
+  border-bottom:1px solid rgba(255,255,255,.05);transition:background .4s var(--spring)}
 .cleanitem:last-child{border-bottom:none}
-.cleanitem .ic{width:40px;height:40px;border-radius:12px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:20px}
+.cleanitem .ic{
+  width:42px;height:42px;border-radius:14px;flex:none;
+  background:rgba(255,255,255,.05);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:19px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
 .cleanitem .t{font-weight:600;font-size:14px}
 .cleanitem .s{font-size:12px;color:var(--sub)}
-.chk{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:all .2s;background:var(--card2)}
-.chk.on{background:var(--acc);border-color:var(--acc);color:#06251f;transform:scale(1.05)}
-/* ------- list ------- */
-.bigitem{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid rgba(51,65,85,.35);font-size:13px;transition:background .15s}
+.chk{
+  width:24px;height:24px;border-radius:8px;flex:none;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.03);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .35s var(--spring);
+}
+.chk.on{background:var(--acc);border-color:var(--acc);color:#052e29;transform:scale(1.06);
+  box-shadow:0 0 14px rgba(45,212,191,.4)}
+
+/* ============ 大文件列表 ============ */
+.bigitem{display:flex;align-items:center;gap:12px;padding:11px 4px;
+  border-bottom:1px solid rgba(255,255,255,.045);font-size:13px;
+  transition:background .35s var(--spring)}
+.bigitem:last-child{border-bottom:none}
+.bigitem:active{background:rgba(255,255,255,.05);border-radius:12px}
 .bigitem .p{flex:1;word-break:break-all;color:var(--sub);font-size:12px}
-.redtag{color:var(--bad);font-size:11px;border:1px solid var(--bad);border-radius:6px;padding:1px 6px;flex:none}
-/* ------- ring ------- */
-.ringwrap{display:none;position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.redtag{color:var(--bad);font-size:11px;border:1px solid rgba(248,113,113,.4);border-radius:6px;padding:1px 7px;flex:none}
+
+/* ============ 环形进度（清理中） ============ */
+.ringwrap{display:none;position:fixed;inset:0;z-index:90;background:rgba(5,5,5,.85);
+  backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;gap:18px}
 .ringwrap.show{display:flex}
-.ring{width:116px;height:116px;border-radius:50%;background:conic-gradient(var(--acc) calc(var(--p)*1%),#243248 0);
-  display:flex;align-items:center;justify-content:center;position:relative}
-.ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--bg)}
-.ring .pctval{position:relative;font-size:26px;font-weight:800;color:var(--txt)}
-.ring .rmsg{position:fixed;margin-top:150px;font-size:14px;color:var(--acc)}
-/* ------- tabs ------- */
-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(15,23,42,.95);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
-nav .tabrow{max-width:600px;margin:0 auto;display:flex}
-nav button{flex:1;background:none;border:none;color:var(--sub);padding:9px 0 10px;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
-nav button .em{font-size:19px;filter:grayscale(1);opacity:.6}
+.ring{width:120px;height:120px;border-radius:50%;
+  background:conic-gradient(var(--acc) calc(var(--p)*1%),rgba(255,255,255,.06) 0);
+  display:flex;align-items:center;justify-content:center;position:relative;
+  filter:drop-shadow(0 0 30px rgba(45,212,191,.25))}
+.ring::before{content:"";position:absolute;inset:10px;border-radius:50%;background:#0a0a0e}
+.ring .pctval{position:relative;font-size:28px;font-weight:800;letter-spacing:-.02em}
+.ring .rmsg{position:fixed;margin-top:150px;font-size:14px;color:var(--acc);letter-spacing:.02em}
+
+/* ============ 底部 Tab 浮岛 ============ */
+nav{position:fixed;bottom:14px;left:14px;right:14px;z-index:40;
+  background:rgba(10,10,14,.72);border:1px solid var(--line);border-radius:999px;
+  backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+nav .tabrow{max-width:640px;margin:0 auto;display:flex;padding:4px}
+nav button{
+  flex:1;background:none;border:none;color:var(--sub);padding:8px 0 9px;font-size:10px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:999px;position:relative;
+  transition:color .4s var(--spring),background .4s var(--spring)}
+nav button .em{font-size:18px;filter:grayscale(1);opacity:.55;transition:filter .4s var(--spring),opacity .4s var(--spring)}
+nav button.act{color:var(--acc);background:rgba(45,212,191,.08)}
 nav button.act .em{filter:none;opacity:1}
-nav button.act{color:var(--acc)}
-nav button{position:relative}
-nav button.act::after{content:"";position:absolute;bottom:0;left:30%;right:30%;height:3px;border-radius:99px;background:var(--acc)}
-nav button.act .em{filter:none;opacity:1}
-nav button.act::after{content:"";position:absolute;bottom:0;left:30%;right:30%;height:3px;border-radius:99px;background:var(--acc)}
-/* ------- toggles/inputs ------- */
-.toggle{width:46px;height:27px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;transition:.2s;flex:none}
-.toggle::after{content:"";position:absolute;width:21px;height:21px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s}
-.toggle.on{background:var(--acc)}.toggle.on::after{left:22px}
-input[type=text],input[type=password],textarea,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);
-  border-radius:10px;padding:10px 12px;font-size:14px;outline:none;margin:4px 0;cursor:pointer}
-textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical}
-input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(45,212,191,.15)}
-label.f{display:block;font-size:12px;color:var(--sub);margin-top:8px}
-/* ------- ai ------- */
-.aiout{white-space:pre-wrap;background:var(--card2);border-radius:12px;padding:14px;font-size:13.5px;margin-top:10px;border-left:3px solid var(--purple)}
-/* ------- log ------- */
-#logpage{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;padding:56px 12px 70px}
+nav button.act::after{content:"";position:absolute;bottom:2px;left:38%;right:38%;height:3px;
+  border-radius:99px;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+
+/* ============ 开关/输入 ============ */
+.toggle{width:46px;height:28px;border-radius:999px;background:rgba(255,255,255,.1);
+  position:relative;cursor:pointer;transition:background .4s var(--spring);flex:none}
+.toggle::after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;
+  top:3px;left:3px;transition:left .4s var(--spring);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.toggle.on{background:var(--acc)}
+.toggle.on::after{left:21px}
+input[type=text],input[type=password],textarea,select{
+  width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--txt);
+  border-radius:14px;padding:12px 14px;font-size:14px;outline:none;margin:4px 0;
+  transition:border-color .4s var(--spring),box-shadow .4s var(--spring)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical;
+  line-height:1.6}
+input:focus,textarea:focus,select:focus{border-color:var(--acc);
+  box-shadow:0 0 0 3px rgba(45,212,191,.12)}
+label.f{display:block;font-size:11px;color:var(--sub);margin-top:10px;
+  text-transform:uppercase;letter-spacing:.12em}
+
+/* ============ AI 输出 ============ */
+.aiout{white-space:pre-wrap;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.18);
+  border-radius:16px;padding:16px;font-size:13.5px;margin-top:12px;line-height:1.7;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+
+/* ============ 日志浮层 ============ */
+#logpage{position:fixed;inset:0;z-index:60;background:rgba(5,5,5,.92);display:none;
+  flex-direction:column;padding:78px 16px 30px;backdrop-filter:blur(20px)}
 #logpage.show{display:flex}
-#logbox{flex:1;overflow:auto;background:#0B1220;border-radius:12px;padding:12px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;color:#7DD3FC}
+#logbox{flex:1;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--line);
+  border-radius:18px;padding:14px;font:12px/1.6 ui-monospace,Menlo,monospace;
+  white-space:pre-wrap;color:#7DD3FC}
 .err{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}
-/* ------- modal ------- */
-.modal{position:fixed;inset:0;z-index:80;background:rgba(2,6,23,.7);display:none;align-items:center;justify-content:center;padding:24px}
+
+/* ============ 确认弹窗 ============ */
+.modal{position:fixed;inset:0;z-index:80;background:rgba(5,5,5,.8);display:none;
+  align-items:center;justify-content:center;padding:28px;backdrop-filter:blur(16px)}
 .modal.show{display:flex}
-.modal .box{background:var(--card);border-radius:16px;padding:20px;max-width:360px;width:100%;border:1px solid var(--line)}
-.modal .q{font-size:16px;font-weight:700;margin-bottom:6px}
-.modal .d{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6}
-/* ------- about/credits ------- */
-.about-banner{background:linear-gradient(135deg,#134e4a,#0f172a 70%);border:1px solid rgba(45,212,191,.25)}
-.about-banner .author{font-size:20px;font-weight:800}
-.credits{font-size:12.5px;color:var(--sub)}
-.credits li{margin:6px 0 6px 18px}
+.modal .box{
+  background:#101014;border:1px solid var(--line);border-radius:24px;padding:24px;
+  max-width:360px;width:100%;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 24px 80px rgba(0,0,0,.7)}
+.modal .q{font-size:17px;font-weight:700;margin-bottom:8px}
+.modal .d{font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.7}
+
+/* ============ 设置页 ============ */
+.about-banner{
+  background:linear-gradient(135deg,rgba(45,212,191,.12),rgba(20,184,166,.04) 60%);
+  border:1px solid rgba(45,212,191,.2);border-radius:24px;padding:28px 18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.about-banner .author{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.credits{font-size:12.5px;color:var(--sub);line-height:1.7}
+.credits li{margin:8px 0;list-style:none;padding-left:16px;position:relative}
+.credits li::before{content:"•";position:absolute;left:0;color:var(--acc)}
 .credits b{color:var(--acc)}
-details{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:var(--card);transition:border-color .2s}
+details{border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin:10px 0;
+  background:var(--card);transition:border-color .4s var(--spring)}
 details summary{cursor:pointer;font-weight:600;font-size:14px;opacity:.85}
 details[open] summary{opacity:1}
-summary::-webkit-details-marker{display:none}
-.task{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid rgba(51,65,85,.35);font-size:13px}
+.task{display:flex;align-items:center;gap:12px;padding:12px 4px;
+  border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
 .task:last-child{border:none}
-.tag{font-size:11px;background:var(--card2);color:var(--acc);border-radius:6px;padding:2px 7px}
-.footer-note{text-align:center;color:var(--sub);font-size:11px;margin:26px 0 8px}
+.tag{font-size:11px;background:rgba(255,255,255,.05);color:var(--acc);border-radius:8px;
+  padding:3px 9px;border:1px solid rgba(45,212,191,.15)}
+.footer-note{text-align:center;color:var(--sub);font-size:11px;margin:32px 0 8px;
+  letter-spacing:.05em}
+
+/* 入口动画（滚动进入） */
+.jc-enter{transition:transform .8s var(--spring),opacity .8s var(--spring)}
+.jc-enter-start{transform:translateY(18px);opacity:0}
+.jc-enter-end{transform:translateY(0);opacity:1}
 </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -139,13 +279,13 @@ summary::-webkit-details-marker{display:none}
 
 <main>
   <!-- ============ 体检 ============ -->
-  <section x-show="tab=='health'">
-    <div class="card summary">
+  <section x-show="tab=='health'" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
+    <div class="card summary spanfull">
       <div class="sum-card"><div class="v num" x-text="fmtK(freeK)"></div><div class="l" x-text="t('free')"></div></div>
       <div class="sum-card"><div class="v num" x-text="fmtK(junkK)"></div><div class="l" x-text="t('junk')"></div></div>
       <div class="sum-card"><div class="v"><span class="badge" :class="'b-'+health" x-text="healthText"></span></div><div class="l" x-text="t('health')"></div></div>
     </div>
-    <div class="card">
+    <div class="card spanfull">
       <h3>🩺 <span x-text="t('healthcheck')"></span></h3>
       <div class="btns">
         <button class="btn block" @click="runScan()" :disabled="pb.busy" x-text="t('scan')"></button>
@@ -160,7 +300,7 @@ summary::-webkit-details-marker{display:none}
         <div class="btns"><button class="btn" @click="cleanSel(recs.map(r=>r.cat).join(','),'force')" x-text="t('cleanrec')"></button></div>
       </div>
     </div>
-    <div class="card">
+    <div class="card spanfull">
       <h3>🗃 <span x-text="t('bigfiles')"></span></h3>
       <div class="bigitem" x-for="b in big" :key="b.p">
         <span class="chk" @click="toggleBig(b.p)" :class="selBig[b.p]&&'on'">{{selBig[b.p]?'✓':''}}</span>
@@ -172,7 +312,7 @@ summary::-webkit-details-marker{display:none}
         <button class="btn ghost" @click="delBig()" x-text="t('delSel',[bigSelN])"></button>
       </div>
     </div>
-    <div class="card">
+    <div class="card spanfull">
       <h3>🧠 <span x-text="t('aiadv')"></span></h3>
       <button class="btn ghost block" @click="runAI()" :disabled="ai.run" x-text="ai.run?t('aithink'):t('aigo')"></button>
       <div class="aiout" x-show="ai.out" x-text="ai.out"></div>
@@ -181,7 +321,7 @@ summary::-webkit-details-marker{display:none}
   </section>
 
   <!-- ============ 清理 ============ -->
-  <section x-show="tab=='clean'">
+  <section x-show="tab=='clean'" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card">
       <h3>🧹 <span x-text="t('cleanx')"></span></h3>
       <div class="cleanitem" x-for="c in cats" :key="c.id">
@@ -196,7 +336,7 @@ summary::-webkit-details-marker{display:none}
   </section>
 
   <!-- ============ 整理 ============ -->
-  <section x-show="tab=='organize'">
+  <section x-show="tab=='organize'" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card">
       <h3>🗂 <span x-text="t('classify')"></span></h3>
       <div class="muted" x-text="t('classifydesc')"></div>
@@ -210,7 +350,7 @@ summary::-webkit-details-marker{display:none}
   </section>
 
   <!-- ============ 维护 ============ -->
-  <section x-show="tab=='maintain'">
+  <section x-show="tab=='maintain'" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card">
       <h3>💽 <span x-text="t('disk')"></span></h3>
       <div class="muted" x-text="t('diskdesc')"></div>
@@ -230,7 +370,7 @@ summary::-webkit-details-marker{display:none}
   </section>
 
   <!-- ============ 设置 ============ -->
-  <section x-show="tab=='setting'">
+  <section x-show="tab=='setting'" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
     <div class="card about-banner" style="text-align:center">
       <div class="author">🧹 JunkClean <span class="badge b-green" x-text="ver"></span></div>
       <div class="muted" style="margin-top:4px">👤 <span x-text="author"></span> · <span x-text="t('localonly')"></span></div>
