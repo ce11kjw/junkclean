@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0 (2026-08-24)
+- 🎨 frontend-design 文案校准（技术术语→用户语言）+ 空状态行动邀请
+- 🎬 GSAP 卡片 stagger 入场（tab 切换错峰上浮 + reduced-motion 尊重）
+- 📝 daemon.log 完整生命周期日志（cleand 启动/bind 失败/子进程退出码/WebUI 双切换）
+- 🏷️ ponytail 标注 7 处（简化点天花板+升级路径）
+- 🐛 死代码清理（taskid/lastline/b/r）
+
+# Changelog
+
 ## v1.3.0 (2026-08-24)
 - 🎨 **Premium UI 重设计**：Ethereal Glass 玻璃拟态 / 浮岛 Header+Tab / Asymmetrical Bento / 入口动效 / Button-in-Button / 噪点纹理
 - 🐛 **全量审计修复**：do_duplicate tab分隔、do_classify 子shell计数、force 系统目录保护、runner fork 检查、strncpy 补0、api_config 写失败处理等 10+ 项
