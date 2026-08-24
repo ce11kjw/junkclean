@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.4.1 (2026-08-24)
+- 🐛 修复 GSAP errors=replace 损坏 Alpine 启动代码导致 UI 乱码
+- 🔧 移除 GSAP，恢复 Alpine 原生 x-transition
+
+
 ## v1.4.0 (2026-08-24)
 - 🎨 frontend-design 文案校准（技术术语→用户语言）+ 空状态行动邀请
 - 🎬 GSAP 卡片 stagger 入场（tab 切换错峰上浮 + reduced-motion 尊重）
@@ -8,6 +13,11 @@
 - 🐛 死代码清理（taskid/lastline/b/r）
 
 # Changelog
+
+## v1.4.1 (2026-08-24)
+- 🐛 修复 GSAP errors=replace 损坏 Alpine 启动代码导致 UI 乱码
+- 🔧 移除 GSAP，恢复 Alpine 原生 x-transition
+
 
 ## v1.3.0 (2026-08-24)
 - 🎨 **Premium UI 重设计**：Ethereal Glass 玻璃拟态 / 浮岛 Header+Tab / Asymmetrical Bento / 入口动效 / Button-in-Button / 噪点纹理
@@ -18,6 +28,11 @@
 - 🛠️ build-curl.sh 固化编译流程
 
 # Changelog
+
+## v1.4.1 (2026-08-24)
+- 🐛 修复 GSAP errors=replace 损坏 Alpine 启动代码导致 UI 乱码
+- 🔧 移除 GSAP，恢复 Alpine 原生 x-transition
+
 
 ## v1.2.0 (2026-08-20)
 - ⚡ do_duplicate 并行化：xargs -P5 md5sum，5 线程同时计算哈希
