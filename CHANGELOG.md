@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.5.2 (2026-08-25)
+- 🐛 cleaner.sh 严审修复4项：duplicate xargs空格拆词→-print0/-0；scan find引号；白名单精确匹配；fstrim gc_urgent多分区
+
 ## v1.5.1 (2026-08-25)
 - 📚 文档严审修复：README 全面更新（下载链接/功能表/版本史/日志路径）+ CHANGELOG 补 v1.4.8/v1.5.0 + git tag 补同步
 

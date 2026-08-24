@@ -35,7 +35,7 @@ bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截
   p=$1; [ -n "$p" ] || return 1
   while IFS= read -r w; do
     case "$w" in \#*|"") continue;; esac
-    case "$p" in "$w"*) return 1;; esac
+    case "$p" in "$w"|"$w"/*) return 1;; esac
   done < "$RULES/whitelist.list"
   return 0
 }
@@ -136,7 +136,7 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
     n=0; sz=0
     sz=$(du -sk $RUL 2>/dev/null | awk 'END{print $1}')
     [ -z "$sz" ] && sz=0
-    for p in $RUL; do case "$p" in /*) n=$((n + $(find $p -type f 2>/dev/null | wc -l)));; esac; done
+    for p in $RUL; do case "$p" in /*) n=$((n + $(find "$p" -type f 2>/dev/null | wc -l)));; esac; done
     total_kb=$((total_kb+sz))
     sc="$sc\"$c\":{\"count\":$n,\"kb\":\"$sz\"},"
     prog $((5+i*15)) "统计中 $c ($(human $sz))"
@@ -199,8 +199,8 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
   prog 10 "比对重复文件中…"
-  find /sdcard -type f -size +10M ! -path "$dest/*" 2>/dev/null | \
-    xargs -P5 -I{} md5sum {} 2>/dev/null | \
+  find /sdcard -type f -size +10M ! -path "$dest/*" -print0 2>/dev/null | \
+    xargs -0 -P5 -I{} md5sum {} 2>/dev/null | \
     while read -r h sf; do [ -n "$h" ] || continue
       echo "$h|$sf" >> "$tmp"
     done
@@ -242,8 +242,9 @@ do_fstrim() { # 磁盘维护：EXT4 fstrim / F2FS 智能 GC（灭屏/充电检�
         dirty=$(cat /sys/fs/f2fs/*/dirty_segments 2>/dev/null | paste -sd+ | bc 2>/dev/null)
         [ -z "$dirty" ] && dirty=0
         if [ "$dirty" -gt "${F2FS_DIRTY_MIN:-200}" ] 2>/dev/null; then
-          echo 1 > /sys/fs/f2fs/*/gc_urgent 2>/dev/null
-          sleep 2; echo 0 > /sys/fs/f2fs/*/gc_urgent 2>/dev/null
+          for gc in /sys/fs/f2fs/*/gc_urgent; do echo 1 > "$gc" 2>/dev/null; done
+          sleep 2
+          for gc in /sys/fs/f2fs/*/gc_urgent; do echo 0 > "$gc" 2>/dev/null; done
           log INFO "f2fs-gc $mp dirty=$dirty"
         else
           log INFO "f2fs healthy $mp dirty=$dirty (skip)"
