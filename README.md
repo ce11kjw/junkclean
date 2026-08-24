@@ -45,10 +45,10 @@
   - 可用命令：`clean` / `scan` / `classify` / `duplicate` / `fstrim` / `rescan` / `ai` / `status`
 - **配置/规则路径**（升级保留）：
   - `/data/adb/junk-cleaner/config.conf`（权限 0600，含 AI Key）
-  - `/data/adb/junk-cleaner/rules/{cache,junk,apk,social,whitelist,redline}.list`
+  - `/data/adb/junk-cleaner/rules/{cache,junk,apk,social,whitelist,classify,bind}.list`
   - `/data/adb/junk-cleaner/scan.json`（体检结果）
   - `/data/adb/junk-cleaner/cleaner.log`（256KB 循环日志）
-  - `/data/adb/junk-cleaner/tasks.conf`（定时任务，热重载）
+  - `/data/adb/junk-cleaner/tasks.conf`（定时任务，格式 `enable=1,every=12h,cats=cache,social`，热重载）
 
 ## 🤖 AI 深度建议
 
@@ -72,7 +72,7 @@
 - fstrim / F2FS-GC 智能感知（脏段阈值 / 灭屏充电） → **F2FS-Optimizer** · Coolapk-Code9527（酷安 乄代号9527，MIT）
 - 清理规则与定时思路（多源） → Clear-Optimization（DEMONNICA，Apache-2.0）· SmartClear（S123123sd，Apache-2.0）· Cache Cleaner（taamarin）· 小玖清理（Axiaosanjiu）· BasicCleaner（WeirdMidas）
 - 整理·清理·重定向三位一体 → **苏柚 SUU** · 回忆溢出工作组 OOM-WG（@梦璃酱 发起 / @白彩恋 维护，[github.com/OOM-WG/ShiroSU-Utils](https://github.com/OOM-WG/ShiroSU-Utils)）；分类规则贡献 → @GunRain（安音咲汀）/ 酷安 @Luxus_ / 酷安 @爱生活的土豆子
-- per-app 存储隔离参考 → **存储空间隔离（Storage Redirect）** · Riad (GPL-3.0)
+- per-app 存储隔离参考 → **存储空间隔离（Storage Redirect）** · RikkaW & Xingchen（RikkaApps / He Hanbo，GPL-3.0）· [sr.rikka.app](https://sr.rikka.app/)
 - 感谢所有在酷安 / XDA / GitHub 贡献开源清理工具的同好们 🙏
 
 ## 📄 License
