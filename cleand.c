@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <time.h>
@@ -53,9 +54,37 @@ static void http_json(int fd, const char *s){
     write(fd, s, strlen(s));
 }
 
+static void log_msg(const char *level, const char *fmt, ...);
 static void cleanup_exit(int sig);
 static volatile int ai_last=0;
-static void cleanup_exit(int sig){ (void)sig; kill(0,SIGTERM); usleep(500000); _exit(0); }
+static void cleanup_exit(int sig){ log_msg("INFO","daemon exiting (sig=%d)", sig); kill(0,SIGTERM); usleep(500000); _exit(0); }
+
+/* ---- daemon log: $ADR/daemon.log (256KB rotate) ---- */
+static void log_msg(const char *level, const char *fmt, ...){
+    char path[700]; snprintf(path,sizeof(path),"%s/daemon.log",ADR);
+    FILE *f = fopen(path,"a");
+    /* ADR 不可写时降级到 /data/local/tmp，确保失败也有迹可查 */
+    if(!f){ snprintf(path,sizeof(path),"/data/local/tmp/jc_daemon.log"); f=fopen(path,"a"); }
+    if(!f) return;
+    time_t now = time(NULL); struct tm *tmv = localtime(&now);
+    fprintf(f,"%04d-%02d-%02d %02d:%02d:%02d [%s] ",
+        tmv->tm_year+1900,tmv->tm_mon+1,tmv->tm_mday,tmv->tm_hour,tmv->tm_min,tmv->tm_sec, level);
+    va_list ap; va_start(ap,fmt); vfprintf(f,fmt,ap); va_end(ap);
+    fprintf(f,"\n");
+    fclose(f);
+    if(access(path,F_OK)==0){
+        long sz = 0; FILE *sf=fopen(path,"r"); if(sf){ fseek(sf,0,SEEK_END); sz=ftell(sf); fclose(sf); }
+        if(sz > 262144){
+            char tmp[700]; snprintf(tmp,sizeof(tmp),"%s.old",path);
+            rename(path,tmp);
+            FILE *t=fopen(tmp,"r"); FILE *n=fopen(path,"w");
+            if(t&&n){ fseek(t,-131072,SEEK_END); char b[8192]; size_t r;
+                while((r=fread(b,1,sizeof(b),t))>0) fwrite(b,1,r,n); }
+            if(t)fclose(t); if(n)fclose(n); unlink(tmp);
+        }
+    }
+}
+
 static void http_err(int fd, int code, const char *s){
     http_head(fd, code, "application/json", (long)strlen(s));
     write(fd, s, strlen(s));
@@ -102,6 +131,7 @@ static void *runner(void *arg){
         _exit(127);
     }
     close(pipefd[1]);
+    log_msg("INFO","task start: %s", cmd);
     pthread_mutex_lock(&task_mu); task.running=1; task.pct=0; strcpy(task.msg,"启动…"); task.result[0]=0; pthread_mutex_unlock(&task_mu);
     /* read stream */
     char buf[1024]; ssize_t n; int lastline=0;
@@ -120,7 +150,10 @@ static void *runner(void *arg){
     }
     close(pipefd[0]);
     int st=0; for(int w=0;w<180;w++){ if(waitpid(pid,&st,WNOHANG)==pid) break; usleep(500000); } kill(pid,SIGKILL); waitpid(pid,&st,0);
+    if(WIFEXITED(st)&&WEXITSTATUS(st)!=0) log_msg("WARN","task %s exited rc=%d", cmd, WEXITSTATUS(st));
+    else if(WIFSIGNALED(st)) log_msg("WARN","task %s killed by sig %d", cmd, WTERMSIG(st));
     pthread_mutex_lock(&task_mu); task.running=0; task.pct=100; snprintf(task.msg,sizeof(task.msg),"完成"); task.last_ts=time(NULL); pthread_mutex_unlock(&task_mu);
+    log_msg("INFO","task done: %s", cmd);
     free(arg);
     return NULL;
 }
@@ -216,8 +249,10 @@ static void api_rules(int fd, const char *method, const char *q, const char *bod
 
 /* ---- cleaner.log tail ---- */
 static void api_log(int fd, const char *q){
+    char p[600];
+    if(q && strstr(q,"type=daemon")) snprintf(p,sizeof(p),"%s/daemon.log",ADR);
+    else snprintf(p,sizeof(p),"%s/cleaner.log",ADR);
     (void)q;
-    char p[600]; snprintf(p,sizeof(p),"%s/cleaner.log",ADR);
     FILE *f=fopen(p,"rb"); if(!f){ http_json(fd,"{\"log\":\"\"}"); return; }
     fseek(f,0,SEEK_END); long sz=ftell(f);
     long off = sz>60000 ? sz-60000 : 0;
@@ -239,6 +274,7 @@ static void api_log(int fd, const char *q){
 
 /* ---- AI: fork bundled curl, 15s timeout, POST /chat/completions ---- */
 static void api_ai(int fd){
+    log_msg("INFO","AI request");
     int now=(int)time(NULL); if(now-ai_last<30){ http_err(fd,429,"{\"e\":\"AI 请求频率过高，请30秒后再试\"}"); return; } ai_last=now;
     char base[512]="", key[512]="", model[128]="";
     char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
@@ -452,6 +488,7 @@ static void timer_loop(void){
                     /* spawn clean with authorized cats (no force => whitelist protected) */
                     char *cmd=malloc(256);
                     snprintf(cmd,256,"clean %s",cats);
+                    log_msg("INFO","timer triggered: clean %s", cats);
                     bg(cmd);
                     /* only one task per tick */
                     break;
@@ -552,19 +589,32 @@ int main(int argc, char**argv){
     }
     signal(SIGPIPE,SIG_IGN);
     signal(SIGTERM,cleanup_exit); signal(SIGINT,cleanup_exit);
+    log_msg("INFO","daemon starting (ADR=%s MOD=%s port=%d)", ADR, MODDIR, PORT);
     /* ensure runtime dirs */
     char p[600]; snprintf(p,sizeof(p),"%s/rules",ADR); mkdir(p,0755);
-    pthread_t timer; pthread_create(&timer,NULL,(void*(*)(void*))timer_thread_wrap,NULL);
+    pthread_t timer; if(pthread_create(&timer,NULL,(void*(*)(void*))timer_thread_wrap,NULL)!=0){ log_msg("ERR","pthread_create timer failed"); }
     int lfd=socket(AF_INET,SOCK_STREAM,0);
     int one=1; setsockopt(lfd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one));
     struct sockaddr_in sa; memset(&sa,0,sizeof(sa));
     sa.sin_family=AF_INET; sa.sin_addr.s_addr=htonl(INADDR_LOOPBACK); sa.sin_port=htons(PORT);
-    if(bind(lfd,(struct sockaddr*)&sa,sizeof(sa))<0){ sleep(2); bind(lfd,(struct sockaddr*)&sa,sizeof(sa)); }
-    listen(lfd,16);
+    if(bind(lfd,(struct sockaddr*)&sa,sizeof(sa))<0){
+        log_msg("ERR","bind port %d failed: %s", PORT, strerror(errno));
+        sleep(2);
+        if(bind(lfd,(struct sockaddr*)&sa,sizeof(sa))<0){
+            log_msg("ERR","bind retry failed, exiting: %s", strerror(errno));
+            _exit(1);
+        }
+    }
+    if(listen(lfd,16)<0){ log_msg("ERR","listen failed: %s", strerror(errno)); _exit(1); }
+    log_msg("INFO","daemon running on 127.0.0.1:%d", PORT);
     for(;;){
         int cfd=accept(lfd,NULL,NULL);
         if(cfd<0){ usleep(200000); continue; }
-        pthread_t ht; pthread_create(&ht,NULL,(void*(*)(void*))handle_threaded,(void*)(long)cfd); pthread_detach(ht);
+        pthread_t ht;
+        if(pthread_create(&ht,NULL,(void*(*)(void*))handle_threaded,(void*)(long)cfd)!=0){
+            log_msg("WARN","pthread_create handler failed: %s", strerror(errno)); close(cfd); continue;
+        }
+        pthread_detach(ht);
     }
 }
 void *timer_thread_wrap(void*p){ (void)p; timer_loop(); return NULL; }

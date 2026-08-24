@@ -221,6 +221,10 @@ label.f{display:block;font-size:11px;color:var(--sub);margin-top:10px;
 #logpage{position:fixed;inset:0;z-index:60;background:rgba(5,5,5,.92);display:none;
   flex-direction:column;padding:78px 16px 30px;backdrop-filter:blur(20px)}
 #logpage.show{display:flex}
+.logtab{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--sub);
+  font-size:12px;padding:6px 12px;border-radius:999px;cursor:pointer;
+  transition:all .4s var(--spring)}
+.logtab.on{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.35);color:var(--acc)}
 #logbox{flex:1;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--line);
   border-radius:18px;padding:14px;font:12px/1.6 ui-monospace,Menlo,monospace;
   white-space:pre-wrap;color:#7DD3FC}
@@ -453,6 +457,10 @@ details[open] summary{opacity:1}
 <div id="logpage">
   <div class="row" style="padding:4px 2px 8px">
     <div class="grow" style="font-weight:700">📄 <span x-text="t('logs')"></span></div>
+    <div class="row" style="gap:6px">
+      <button class="logtab" :class="logType=='cleaner'&&'on'" @click="switchLog('cleaner')">🧹 清理</button>
+      <button class="logtab" :class="logType=='daemon'&&'on'" @click="switchLog('daemon')">🛡️ 守护</button>
+    </div>
     <button class="iconbtn" @click="closeLog()" style="font-size:13px">✕</button>
   </div>
   <div id="logbox" x-text="logs" style="font-size:12px"></div>
@@ -537,6 +545,7 @@ ai:{run:false,out:'',err:'',base:'',key:'',model:''},
 tasks:[],newTaskType:'every',newTaskEvery:'12',newTaskTime:'03:00',newCat:{},
 ruleType:'cache',ruleTxt:'',bindTxt:'',logs:'',
 confirm:{show:false,title:'',desc:'',ok:null},
+  logType:'cleaner',
 pb:{busy:false,pct:0,msg:'',moving:false,ring:false},_timer:null,
 t(k,a){let s=this.dict[k]||k;if(a!==undefined)s=s.replace('{0}',a);return s},
 init(){this.dict=I18N[this.lang]||I18N.zh;this.newCat={cache:1,junk:1,apk:1,empty:0,social:1,sqlite:1};
@@ -580,7 +589,8 @@ async delBig(){let ps=this.big.filter(b=>this.selBig[b.p]);if(!ps.length)return;
   ok:()=>{this.confirm.show=false;this.$f('/api/delbig',{method:'POST',body:ps.map(x=>x.p).join(',')});this.selBig={};this.loadScan();}};},
 async openLog(){document.getElementById('logpage').classList.add('show');this.loadLog();},
 closeLog(){document.getElementById('logpage').classList.remove('show');},
-async loadLog(){let r=await this.$f('/api/log');if(r.log!==undefined)this.logs=r.log;},
+switchLog(t){this.logType=t;this.loadLog();},
+async loadLog(){let r=await this.$f('/api/log?type='+this.logType);if(r.log!==undefined)this.logs=r.log;},
 async loadRule(){let r=await this.$f('/api/rules?type='+this.ruleType);
  if(r.content!==undefined){if(this.ruleType==='bind')this.bindTxt=r.content;else this.ruleTxt=r.content;}},
 async saveRule(tp,txt){let r=await this.$f('/api/rules?type='+tp,{method:'POST',body:txt});
