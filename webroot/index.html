@@ -603,7 +603,8 @@ async loadScan(){let sc=await this.$f('/api/scan');if(!sc||sc.ts){this.scan=sc;
  this.recs=[];if(sc&&sc.cats){for(let c of this.cats){let v=sc.cats[c.id];if(v&&+v.kb>512000)this.recs.push({cat:c.id,kb:v.kb,desc:T('cn_'+c.id)+(+v.kb>=1048576?' ≥1G':'')});}}
  this.big=(sc&&sc.big||[]).map(b=>({p:b.p,kb:b.kb}));}},
 async runScan(){this.pb.busy=true;this.pb.ring=false;await this.$f('/api/scan',{method:'POST'});},
-async poll(){let p=await this.$f('/api/progress');if(!p)return;
+async poll(){let [p,s]=await Promise.all([this.$f('/api/progress'),this.$f('/api/status')]);if(!p)return;
+ this.daemon=!!s.daemon;
  this.pb.busy=!!p.running;this.pb.pct=p.pct||0;this.pb.msg=p.msg||'';
  this.pb.moving=p.running&&!p.pct;this.pb.ring=p.running&&(this._ring||false);
  if(!p.running&&this._ring){this._ring=false;this.loadScan();setTimeout(()=>{this.pb.ring=false;this.pb.busy=false;},800);}},

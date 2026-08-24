@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.5.3 (2026-08-25)
+- 🐛 前端 poll 不更新 daemon 状态（页面打开时守护重启中→永远显示未启动）→ poll 同时拉 /api/status
+
 ## v1.5.2 (2026-08-25)
 - 🐛 cleaner.sh 严审修复4项：duplicate xargs空格拆词→-print0/-0；scan find引号；白名单精确匹配；fstrim gc_urgent多分区
 
