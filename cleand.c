@@ -254,6 +254,7 @@ static void api_log(int fd, const char *q){
     (void)q;
     FILE *f=fopen(p,"rb"); if(!f){ http_json(fd,"{\"log\":\"\"}"); return; }
     fseek(f,0,SEEK_END); long sz=ftell(f);
+    /* ponytail: 日志接口只回尾部 60KB（无分页）。天花板：大日志无法回溯早期。升级路径：/api/log?tail=N    long off = sz>60000 ? sz-60000 : 0;lines 分页。 */
     long off = sz>60000 ? sz-60000 : 0;
     fseek(f,off,SEEK_SET);
     char *txt=malloc(70000); long n=fread(txt,1,70000-1,f); fclose(f); txt[n]=0;
@@ -320,6 +321,7 @@ static void api_ai(int fd){
         curlbin, url, key, rq, out);
     /* run synchronously with 15+s timeout */
     char *shcmd = malloc(2300);
+    /* ponytail: AI 响应截断 4000B（防超大回包）。天花板：长回答被截断。升级路径：流式读取或增大上限。 */
     snprintf(shcmd,2300,"%s; echo __JC__$?; head -c 4000 %s 2>/dev/null", cmdline, out);
     if(getenv("JC_DEBUG")){ FILE*dbg=fopen("/tmp/jc/run/cmd.dbg","w"); fprintf(dbg,"%s",shcmd); fclose(dbg); }
     int pipefd[2]; pipe(pipefd);
