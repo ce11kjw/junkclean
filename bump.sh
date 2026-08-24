@@ -12,7 +12,7 @@ sed -i "s|^# JunkClean 🧹 v.*|# JunkClean 🧹 v${new_v}|" README.md
 # update.json 用 python 原子重建（保证合法 JSON）
 python3 - "$new_v" "$new_code" << 'PY'
 import json, sys
-v, code = sys.argv[1], int(sys.argv[2])
+v, code = 'v' + sys.argv[1], int(sys.argv[2])
 d = {
   "version": v,
   "versionCode": code,
