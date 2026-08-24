@@ -307,7 +307,7 @@ details[open] summary{opacity:1}
     <div class="card spanfull">
       <h3>🗃 <span x-text="t('bigfiles')"></span></h3>
       <div class="bigitem" x-for="b in big" :key="b.p">
-        <span class="chk" @click="toggleBig(b.p)" :class="selBig[b.p]&&'on'">{{selBig[b.p]?'✓':''}}</span>
+        <span class="chk" @click="toggleBig(b.p)" :class="selBig[b.p]&&'on'"><span x-text="selBig[b.p]?'✓':''"></span></span>
         <div class="grow"><div class="t" x-text="base(b.p)"></div><div class="p" x-text="b.p"></div></div>
         <span class="num muted" x-text="fmtK(b.kb)"></span>
       </div>
@@ -329,8 +329,8 @@ details[open] summary{opacity:1}
     <div class="card">
       <h3>🧹 <span x-text="t('cleanx')"></span></h3>
       <div class="cleanitem" x-for="c in cats" :key="c.id">
-        <span class="chk" @click="toggleCat(c.id)" :class="selCat[c.id]&&'on'">{{selCat[c.id]?'✓':''}}</span>
-        <div class="ic">{{c.ic}}</div>
+        <span class="chk" @click="toggleCat(c.id)" :class="selCat[c.id]&&'on'"><span x-text="selCat[c.id]?'✓':''"></span></span>
+        <div class="ic"><span x-text="c.ic"></span></div>
         <div class="grow"><div class="t" x-text="c.name"></div><div class="s" x-text="c.desc"></div></div>
         <span class="num muted" x-text="catSize(c.id)"></span>
       </div>
@@ -398,7 +398,7 @@ details[open] summary{opacity:1}
         <div x-show="newTaskType=='daily'"><label class="f" x-text="t('timeat')"></label><input type="text" x-model="newTaskTime" placeholder="03:00"></div>
         <label class="f" x-text="t('cats')"></label>
         <div class="row" style="flex-wrap:wrap;gap:6px" x-for="c in cats" :key="c.id">
-          <span class="tag" style="cursor:pointer;background:newCat[c.id]?'var(--acc)':'var(--card2)'" @click="newCat[c.id]=!newCat[c.id]">{{c.name}}</span>
+          <span class="tag" style="cursor:pointer;background:newCat[c.id]?'var(--acc)':'var(--card2)'" @click="newCat[c.id]=!newCat[c.id]"><span x-text="c.name"></span></span>
         </div>
         <button class="btn block" style="margin-top:10px" @click="addTask()" x-text="t('addtask')"></button>
       </div>
