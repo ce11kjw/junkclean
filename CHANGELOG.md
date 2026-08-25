@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.2 (2026-08-25)
+- 🔴 前端严审修复：saveTasks 裸 $() ReferenceError（无 jQuery）→ 定时任务保存/开关失效 → 删死代码
+- 🔴 saveAISettings 整文件覆盖 config.conf → 用户 cat_* 配置丢失 → 改为读现有+替换ai_行+回写
+- ponytail: UI 用可选链 ?.（需 Android 10+ WebView）
+
 ## v1.6.1 (2026-08-25)
 - 🔴 全功能测试发现修复：load_rules 的 #RED 行被 # 注释分支拦截 → 红线系统失效（REDR 空）→ #RED 优先匹配
 - 🔴 #RED 中文标题行被误当红线路径 → 清理为非路径标题用 # 注释

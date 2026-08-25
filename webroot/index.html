@@ -630,8 +630,14 @@ async runAI(){this.ai.run=true;this.ai.err='';this.ai.out='';let r=await this.$f
  if(r.ai!==undefined)this.ai.out=r.ai;else this.ai.err=r.e||'AI error';},
 async testAI(){this.ai.out='';this.ai.err='';let r=await this.$f('/api/ai',{method:'POST',body:'{}'});
  this.ai.err=r.e||'';this.ai.out=r.ai||'';},
-async saveAISettings(){let c='# JunkClean\nai_base='+this.ai.base+'\nai_key='+this.ai.key+'\nai_model='+this.ai.model+'\n';
- await this.$f('/api/config',{method:'POST',body:c});this.toast=T('save')+' ✓';},
+async saveAISettings(){
+  /* 读现有 config，替换 ai_* 行，保留 cat_* 等其他设置（避免整文件覆盖丢配置） */
+  let r=await this.$f('/api/config');
+  let cfg=(r&&r.cfg)||'';
+  let lines=cfg.split('\n').filter(l=>l&&!l.startsWith('ai_'));
+  lines.push('ai_base='+this.ai.base,'ai_key='+this.ai.key,'ai_model='+this.ai.model);
+  await this.$f('/api/config',{method:'POST',body:lines.join('\n')+'\n'});
+  this.toast=T('save')+' ✓';},
 toggleCat(id){this.selCat[id]=!this.selCat[id];},toggleBig(p){this.selBig[p]=!this.selBig[p];},
 get selN(){return Object.values(this.selCat).filter(Boolean).length},
 get bigSelN(){return Object.values(this.selBig).filter(Boolean).length},
@@ -665,7 +671,7 @@ async addTask(){let cs=Object.keys(this.newCat).filter(k=>this.newCat[k]);
  await this.saveTasks();},
 async delTask(i){this.tasks.splice(i,1);await this.saveTasks();},
 async toggleTask(i){let t=this.tasks[i];t.line=t.line.replace(/^enable=[01]/,'enable='+(t.on?'0':'1'));t.on=!t.on;await this.saveTasks();},
-async saveTasks(){$('#tasks')||0;await this.$f('/api/tasks',{method:'POST',body:this.tasks.map(t=>t.line).join('\n')+'\n'});},
+async saveTasks(){await this.$f('/api/tasks',{method:'POST',body:this.tasks.map(t=>t.line).join('\n')+'\n'});},
 saveLang(){localStorage.setItem('jc_lang',this.lang);this.dict=I18N[this.lang]||I18N.zh;},
 fmtK(kb){kb=+kb;if(!kb)return'0K';if(kb>=1048576)return (kb/1048576).toFixed(1)+'G';if(kb>=1024)return (kb/1024).toFixed(1)+'M';return kb+'K';},
 base(p){p=p||'';let i=p.lastIndexOf('/');return i>=0?p.slice(i+1):p;},
