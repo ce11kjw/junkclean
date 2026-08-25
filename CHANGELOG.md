@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.6 (2026-08-25)
+- 🗜 压缩包后缀全量覆盖（24种：zip/7z/rar/tar/gz/xz/bz2/tgz/tbz2/zst/lz4/cab/arj/iso/img 等）+ 安装包补全(xapk/apks/apex)
+- 📁 classify 分类后缀全量补全（图片18/视频14/音乐13/文档16/压缩包29）
+- 🔴 修复多分类清理失效：cats 逗号→空格（for c in $cats 按空白拆，此前 zip,apk 只跑第一个）
+- 🔀 do_clean 支持文件级规则（*.zip→find父目录 -name）+ set -f 防 glob 展开
+
 ## v2.0.5 (2026-08-25)
 - 🔀 清理规则每条路径独立双开关：子目录 recurse（默认关）/ 完整性 no-integrity（默认开）
 - 🔍 完整性检测：跳过 .part/.crdownload/.tmp/.partial/.downloading/.!q/.aria2

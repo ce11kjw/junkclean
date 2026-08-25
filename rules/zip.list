@@ -1,4 +1,5 @@
-# 压缩包残留（独立分类，勾选后删除）
+# 压缩包残留（独立分类，勾选后转移归档到 下载/压缩包）
+# 常见压缩格式全部覆盖
 /sdcard/Download/*.zip
 /sdcard/Download/*.7z
 /sdcard/Download/*.rar
@@ -6,3 +7,20 @@
 /sdcard/Download/*.gz
 /sdcard/Download/*.xz
 /sdcard/Download/*.bz2
+/sdcard/Download/*.tgz
+/sdcard/Download/*.tbz2
+/sdcard/Download/*.tbz
+/sdcard/Download/*.txz
+/sdcard/Download/*.taz
+/sdcard/Download/*.zst
+/sdcard/Download/*.zstd
+/sdcard/Download/*.lz4
+/sdcard/Download/*.lzma
+/sdcard/Download/*.lzh
+/sdcard/Download/*.lha
+/sdcard/Download/*.cab
+/sdcard/Download/*.arj
+/sdcard/Download/*.z
+/sdcard/Download/*.bz
+/sdcard/Download/*.iso
+/sdcard/Download/*.img

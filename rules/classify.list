@@ -4,9 +4,9 @@
 # 每行: 扩展名列表 目标子目录（相对 @dest；写 /绝对路径 则用绝对路径）
 @src=/sdcard
 @dest=/sdcard/下载
-jpg jpeg png gif webp heic /图片
-mp4 mkv mov avi webm 3gp /视频
-mp3 wav flac m4a ogg aac /音乐
-pdf doc docx xls xlsx ppt pptx txt md epub /文档
-apk xapk apks /安装包
-zip 7z rar tar gz xz iso /压缩包
+jpg jpeg png gif webp heic heif bmp svg tiff tif ico avif raw cr2 nef dng /图片
+mp4 mkv mov avi webm 3gp m4v wmv flv mpg mpeg ts m2ts rmvb /视频
+mp3 wav flac m4a ogg aac opus wma ape alac mid midi aiff /音乐
+pdf doc docx xls xlsx ppt pptx txt md epub mobi azw3 csv xml json html htm /文档
+apk xapk apks apex /安装包
+zip 7z rar tar gz xz bz2 tgz tbz2 tbz txz taz zst zstd lz4 lzma lzh lha cab arj iso img /压缩包

@@ -64,7 +64,7 @@ load_rules() { # load_rules <file> -> RUL(路径) + RFLAGS(|分隔标志)
 rule_flag() { echo "$RFLAGS" | cut -d'|' -f$(( $1 + 1 )); }
 do_clean() { # do_clean <cats_csv> [force]
   FORCE=0; [ "$2" = "force" ] && FORCE=1
-  [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats="$1"
+  [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats=$(echo "$1" | tr ',' ' ')
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
   for c in $cats; do total_jobs=$((total_jobs+1)); done
   for c in $cats; do
@@ -140,16 +140,30 @@ do_clean() { # do_clean <cats_csv> [force]
       # 非 apk 的压缩包仍走规则（不过期）
     fi
     # 红线项默认不删; 每路径按自身开关处理（子目录 recurse 默认关 / 完整性默认开）
+    # set -f 阻止 $RUL 的 glob 展开（保留模式字面量），内层手动展开
+    set -f
     i=1
     for dirpat in $RUL; do
       case "$dirpat" in /*) ;; *) continue;; esac
       flag=$(rule_flag $((i-1)))
       md=''; case "$flag" in *recurse*) ;; *) md='-maxdepth 1';; esac
       int_skip=''; case "$flag" in *no-integrity*) int_skip=1;; esac
-      for d in $dirpat; do
-        [ -d "$d" ] || continue
-        # 临时文件读行（避免管道子 shell 计数丢失）
-        find "$d" $md -type f > "$ADR/.clean.tmp" 2>/dev/null
+      # 文件级规则（*.zip/*.apk）→ find 父目录 -name；目录级规则 → find 目录内
+      if echo "$dirpat" | grep -q '\*\.'; then
+        root=$(echo "$dirpat" | sed 's|/[^/]*\*[^/]*$||'); [ -n "$root" ] || root=/
+        pat=$(echo "$dirpat" | sed 's|.*/||')
+        [ -d "$root" ] || continue
+        find "$root" $md -type f -name "$pat" > "$ADR/.clean.tmp" 2>/dev/null
+      else
+        : > "$ADR/.clean.tmp"
+        set +f; for d in $dirpat; do set -f
+          [ -d "$d" ] || continue
+          find "$d" $md -type f >> "$ADR/.clean.tmp" 2>/dev/null
+        done
+      fi
+      set +f
+      # 临时文件读行（避免管道子 shell 计数丢失）
+      if [ -s "$ADR/.clean.tmp" ]; then
         while IFS= read -r rp; do
           [ -e "$rp" ] || continue
           # 完整性检测：跳过未下载完文件
@@ -174,10 +188,11 @@ do_clean() { # do_clean <cats_csv> [force]
             rm -rf "$rp" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del $rp"; }
           fi
         done < "$ADR/.clean.tmp"
-        rm -f "$ADR/.clean.tmp"
-      done
+      fi
+      rm -f "$ADR/.clean.tmp"
       i=$((i+1))
     done
+    set +f
   done
   prog 100 "完成: 删除$n_del项 释放$(human $freed)"
   # 累计统计（SmartClear/SweepX 模式：管理器 description 可见）
