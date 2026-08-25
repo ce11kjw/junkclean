@@ -417,9 +417,7 @@ static void api_delbig(int fd, const char* body){
     char tmp[4096]; snprintf(tmp,sizeof(tmp),"%s",body);
     int deleted=0;
     char* tok=strtok(tmp,",");
-    { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"body=[%s]\n",body); fclose(df); } }
     while(tok){
-        { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"tok=[%s]\n",tok); fclose(df); } }
         size_t l=strlen(tok);
         while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
         if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
@@ -448,11 +446,9 @@ static void api_bigmove(int fd, const char* body){
         if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
            && !strstr(tok,"/../") && !strcmp(tok,"..")
            && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')){
-            { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"tok=[%s] len=%zu\n",tok,strlen(tok)); fclose(df); } }
             char cmd[1024];
             snprintf(cmd,sizeof(cmd),"mkdir -p '/sdcard/下载/大文件' 2>/dev/null; mv -f '%s' '/sdcard/下载/大文件/' 2>/dev/null",tok);
             int rc=system(cmd);
-            { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"cmd=[%s] rc=%d\n",cmd,rc); fclose(df); } }
             if(rc==0) moved++;
         }
         tok=strtok(NULL,",");
