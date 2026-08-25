@@ -461,7 +461,10 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
     while IFS= read -r sf; do
       [ -n "$sf" ] || continue
       bj "$sf" || continue
-      mv -f "$sf" "$dest/" 2>/dev/null && { mv_n=$((mv_n+1)); log INFO "dup->  $sf"; }
+      # 重名加序号，避免 Duplicates 内互相覆盖
+      tgt="$dest/$(basename "$sf")"
+      [ -e "$tgt" ] && tgt="$dest/$(basename "$sf")_$RANDOM"
+      mv -f "$sf" "$tgt" 2>/dev/null && { mv_n=$((mv_n+1)); log INFO "dup->  $sf"; }
     done < "$tmp.mv"
     rm -f "$tmp" "$tmp.dup" "$tmp.mv"
     log INFO "duplicate moved=$mv_n"
