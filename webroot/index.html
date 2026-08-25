@@ -291,6 +291,10 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
     </div>
   </div>
   <div class="setgroup">
+    <div class="sg-title">自动化</div>
+    <div class="setrow" onclick="openSub('sub-tasks')"><span class="lbl">⏰ 定时任务</span><span class="val">自动清理</span></div>
+  </div>
+  <div class="setgroup">
     <div class="sg-title">日志</div>
     <div class="setrow" onclick="openSub('sub-log')"><span class="lbl">运行日志</span><span class="val">查看</span></div>
   </div>
@@ -353,6 +357,38 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
   <div class="muted">每行一个路径前缀，命中即保护</div>
   <textarea id="wl-text"></textarea>
   <button class="btn primary" style="width:100%" onclick="saveWhitelist()">保存白名单</button>
+</div>
+
+<div class="drawer" id="sub-tasks">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('sub-tasks')">←</button>
+    <h1>定时任务</h1>
+  </div>
+  <div id="task-list"></div>
+  <div style="height:14px"></div>
+  <div class="setgroup">
+    <div class="sg-title">添加任务</div>
+    <div class="setrow"><span class="lbl">执行</span>
+      <select id="task-cats" style="flex:1">
+        <option value="cache,junk,apk">缓存+垃圾+安装包</option>
+        <option value="cache,junk,apk,empty,social,sqlite">全部（含社交）</option>
+        <option value="cache">仅缓存</option>
+      </select>
+    </div>
+    <div class="setrow"><span class="lbl">模式</span>
+      <select id="task-mode" onchange="toggleTaskMode()" style="flex:1">
+        <option value="every">间隔（小时）</option>
+        <option value="daily">每日定时</option>
+      </select>
+    </div>
+    <div class="setrow" id="row-every"><span class="lbl">每</span>
+      <input type="number" id="task-hours" value="12" min="1" max="168" style="flex:1"><span class="val">小时</span>
+    </div>
+    <div class="setrow hidden" id="row-daily"><span class="lbl">时间</span>
+      <input type="time" id="task-daily" value="03:00" style="flex:1">
+    </div>
+    <button class="btn primary" style="width:100%;margin-top:8px" onclick="addTask()">+ 添加</button>
+  </div>
 </div>
 
 <div class="drawer" id="sub-log">
@@ -511,12 +547,15 @@ function renderReview(){
     if(sel[id]) el.classList.add('on');
     box.appendChild(el);
   });
+  renderBig();
   updateSel();
 }
 function updateSel(){
   let sum=0, cnt=0;
   for(const id of Object.keys(sel)){ if(!sel[id]) continue;
-    const kb=+(scan.cats?.[id]?.kb||0); sum+=kb; cnt++; }
+    let kb=+(scan.cats?.[id]?.kb||0);
+    if(id==='big'){ (scan.big||[]).forEach(b=>kb+=(+b.kb||0)); }
+    sum+=kb; cnt++; }
   fmtSize(sum);
 }
 function openConfirm(){
@@ -525,7 +564,9 @@ function openConfirm(){
   const list=$('confirm-list'); list.innerHTML='';
   let sum=0, red=false;
   items.forEach(id=>{
-    const kb=+scan.cats[id].kb||0; sum+=kb;
+    let kb=+(scan.cats[id]?.kb||0);
+    if(id==='big'){ (scan.big||[]).forEach(b=>kb+=(+b.kb||0)); }
+    sum+=kb;
     if(id==='social') red=true;
     const row=document.createElement('div');
     row.className='row';
@@ -541,8 +582,15 @@ function closeConfirm(){ $('confirm').classList.remove('show'); }
 /* ===== 清理流程 ===== */
 async function doClean(){
   closeConfirm();
-  const items=Object.keys(sel).filter(id=>sel[id]).join(',');
-  if(!items) return;
+  const bigSel=!!sel.big;
+  const items=Object.keys(sel).filter(id=>sel[id]&&id!=='big').join(',');
+  if(!items&&!bigSel) return;
+  if(bigSel){
+    // 大文件走 delbig（白名单保护 + 二次确认已在清单层）
+    const paths=(scan.big||[]).map(b=>b.p).join(',');
+    await api('/api/delbig',{method:'POST',body:JSON.stringify(paths)});
+  }
+  if(!items){ showPage('page-done'); return; }
   showPage('page-cleaning');
   $('clean-pct').textContent='0%'; $('clean-arc').style.strokeDashoffset='415';
   $('clean-cur').textContent='开始清理…';
@@ -656,6 +704,72 @@ async function loadLog(tp){
   $('log-box').textContent=(r&&r.log)||'(空)';
 }
 
+/* ===== 定时任务 ===== */
+let tasks=[];
+async function loadTasks(){
+  const r=await api('/api/tasks');
+  tasks=((r&&r.tasks)||'').split('\n').filter(l=>l.trim());
+  renderTasks();
+}
+function renderTasks(){
+  const box=$('task-list'); box.innerHTML='';
+  if(!tasks.length){ box.innerHTML='<div class="muted" style="padding:12px">暂无任务</div>'; return; }
+  tasks.forEach((line,i)=>{
+    const enable=/^enable=1/.test(line);
+    const every=line.match(/every=(\d+)h/);
+    const daily=line.match(/daily=([0-9:]+)/);
+    const cats=line.match(/cats=([^,]+)/);
+    const row=document.createElement('div');
+    row.className='setrow';
+    row.innerHTML=`<div class="switch ${enable?'on':''}" data-i="${i}"></div>
+      <span class="lbl">${every?('每 '+every[1]+' 小时'):(daily?('每日 '+daily[1]):'')} · ${(cats?cats[1]:'').replace(/,/g,'/')}</span>
+      <button class="iconbtn" onclick="delTask(${i})" style="font-size:16px">🗑</button>`;
+    row.querySelector('.switch').onclick=()=>toggleTask(i);
+    box.appendChild(row);
+  });
+}
+function toggleTaskMode(){
+  const m=$('task-mode').value;
+  $('row-every').classList.toggle('hidden',m!=='every');
+  $('row-daily').classList.toggle('hidden',m!=='daily');
+}
+async function toggleTask(i){
+  tasks[i]=tasks[i].replace(/^enable=[01]/,'enable='+(tasks[i].startsWith('enable=1')?'0':'1'));
+  await saveTasks();
+}
+async function delTask(i){
+  tasks.splice(i,1);
+  await saveTasks();
+}
+async function addTask(){
+  const cats=$('task-cats').value;
+  const m=$('task-mode').value;
+  const line=m==='every'?('enable=1,every='+$('task-hours').value+'h,cats='+cats)
+                        :('enable=1,daily='+$('task-daily').value+',cats='+cats);
+  tasks.push(line);
+  await saveTasks();
+}
+async function saveTasks(){
+  const r=await api('/api/tasks',{method:'POST',body:tasks.join('\n')+'\n'});
+  if(r.ok){ toast(T('saved')); renderTasks(); }
+}
+
+/* ===== 大文件清单项（勾选 → delbig 删除） ===== */
+function renderBig(){
+  const big=scan.big||[];
+  if(!big.length) return;
+  let total=0; big.forEach(b=>total+=(+b.kb||0));
+  const el=document.createElement('div');
+  el.className='catcard'+(sel.big?' on':'');
+  el.dataset.cat='big';
+  el.innerHTML=`<div class="chk">✓</div>
+    <div class="nm">大文件 ${sel.big?'<span class="redbadge">'+T('red')+'</span>':''}
+      <div class="cnt">${big.length} ${T('files')} · ≥100MB</div></div>
+    <div class="sz">${fmtKB(total)}</div>`;
+  el.onclick=()=>{ sel.big=!sel.big; el.classList.toggle('on',!!sel.big); updateSel(); };
+  $('catlist').appendChild(el);
+}
+
 /* ===== 初始化 ===== */
 (function init(){
   const th=localStorage.getItem('jc_theme'); if(th) setTheme(th);
@@ -663,6 +777,7 @@ async function loadLog(tp){
   $('sel-theme').value=th||'dark'; $('sel-lang').value=lg||'zh';
   loadHome();
   loadCatSwitches();
+  loadTasks();
 })();
 </script>
 </body>
