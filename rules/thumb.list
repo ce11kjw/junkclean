@@ -1,0 +1,6 @@
+# 缩略图缓存（App 生成的小图缓存，删除后自动重建，安全）
+/sdcard/Pictures/.thumbnails recurse
+/sdcard/DCIM/.thumbnails recurse
+/sdcard/Pictures/Thumbnails recurse
+/sdcard/Android/data/*/cache/thumbnails
+/sdcard/Android/data/*/cache/.thumbnails

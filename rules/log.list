@@ -1,0 +1,4 @@
+# 崩溃日志 / 旧日志（保守：仅 Download 和缓存内）
+/sdcard/Download/*.log
+/sdcard/tencent/*/log recurse
+/sdcard/Android/data/*/cache/*.log

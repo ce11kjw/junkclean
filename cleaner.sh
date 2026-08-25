@@ -79,7 +79,7 @@ rule_flag() { echo "$RFLAGS" | cut -d'|' -f$(( $1 + 1 )); }
 do_clean() { # do_clean <cats_csv> [force]
   check_rules_sha
   FORCE=0; [ "$2" = "force" ] && FORCE=1
-  [ "$1" = "all" ] && cats="cache junk apk zip empty zero social sqlite" || cats=$(echo "$1" | tr ',' ' ')
+  [ "$1" = "all" ] && cats="cache junk apk zip empty zero thumb log temp uninst social sqlite" || cats=$(echo "$1" | tr ',' ' ')
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
   free_before=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_before" ] && free_before=0
   for c in $cats; do total_jobs=$((total_jobs+1)); done
@@ -94,6 +94,8 @@ do_clean() { # do_clean <cats_csv> [force]
       empty)   [ "$(get_cfg cat_empty 1)" = "1" ] || continue; f=""; nm="空文件夹";;
       zero)    [ "$(get_cfg cat_zero 1)" = "1" ] || continue; f=""; nm="空文件";;
       sqlite)  [ "$(get_cfg cat_sqlite 1)" = "1" ] || continue; f=""; nm="SQLite优化";;
+      thumb)   [ "$(get_cfg cat_thumb 1)" = "1" ] || continue; f="$RULES/thumb.list"; nm="缩略图"; mode=del;;
+      log)     [ "$(get_cfg cat_log 1)" = "1" ] || continue; f="$RULES/log.list"; nm="崩溃日志"; mode=del;;
       temp)    [ "$(get_cfg cat_temp 1)" = "1" ] || continue; f=""; nm="临时文件";;
       uninst)  [ "$(get_cfg cat_uninst 0)" = "1" ] || continue; f=""; nm="卸载残留";;
       *) continue;;
@@ -187,9 +189,13 @@ do_clean() { # do_clean <cats_csv> [force]
       if echo "$dirpat" | grep -q '\*\.'; then
         root=$(echo "$dirpat" | sed 's|/[^/]*\*[^/]*$||'); [ -n "$root" ] || root=/
         pat=$(echo "$dirpat" | sed 's|.*/||')
-        [ -d "$root" ] || continue
-        # 兼容数字后缀分卷: *.zip 也匹配 *.zip.1 / *.zip.12（下载工具重名残留）
-        find "$root" $md -type f \( -name "$pat" -o -name "$pat.[0-9]*" \) > "$ADR/.clean.tmp" 2>/dev/null
+        : > "$ADR/.clean.tmp"
+        set +f
+        for r in $root; do set -f
+          [ -d "$r" ] || continue
+          # 兼容数字后缀分卷: *.zip 也匹配 *.zip.1 / *.zip.12（下载工具重名残留）
+          find "$r" $md -type f \( -name "$pat" -o -name "$pat.[0-9]*" \) >> "$ADR/.clean.tmp" 2>/dev/null
+        done
       else
         : > "$ADR/.clean.tmp"
         set +f; for d in $dirpat; do set -f
@@ -306,7 +312,7 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   prog 5 "开始体检…"
   free_kb=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_kb" ] && free_kb=0
   total_kb=0; sc=''
-  i=0; cats="cache junk apk social temp"
+  i=0; cats="cache junk apk social temp thumb log"
   for c in $cats; do
     i=$((i+1))
     f=$RULES/$c.list; [ -f "$f" ] || f=""; load_rules "$f"
