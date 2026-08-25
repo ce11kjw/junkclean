@@ -666,7 +666,13 @@ static void handle(int fd){
         http_json(fd,txt); free(txt);
     }
     else if(!strncmp(base,"/api/classify",13)){ char *c=strdup(body&&strstr(body,"preview")?"classify preview":"classify"); bg(c); http_json(fd,"{\"ok\":1}"); }
-    else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup("duplicate"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/duplicate-preview",22)){
+        char p[640]; snprintf(p,sizeof(p),"%s/.dup.preview.json",ADR);
+        FILE *f=fopen(p,"r"); if(!f){ http_json(fd,"{\"files\":[]}"); return; }
+        char *txt=malloc(32768); int n=fread(txt,1,32767,f); fclose(f); txt[n]=0;
+        http_json(fd,txt); free(txt);
+    }
+    else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup(body&&strstr(body,"preview")?"duplicate preview":"duplicate"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/fstrim",11)){ char *c=strdup("fstrim"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/rescan",11)){ char *c=strdup("rescan"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else serve_file(fd, base);

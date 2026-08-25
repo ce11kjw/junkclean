@@ -337,6 +337,23 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
     case "$l" in
       @src=*)  src="${l#@src=}";  continue;;
       @dest=*) destbase="${l#@dest=}"; continue;;
+      @map=*)  # 自定义模式规则：@map=文件名模式 目标子目录（如 IMG_2024* /照片）
+        mp="${l#@map=}"; mdest=$(echo "$mp" | awk '{print $NF}')
+        mg=$(echo "$mp" | sed 's/ *[^ ]*$//')
+        case "$mdest" in
+          /sdcard/*|/data/*|/storage/*|/mnt/*) ;;
+          /*) mdest="$destbase$mdest";;
+          *)  mdest="$destbase/$mdest";; esac
+        [ -d "$mdest" ] || mkdir -p "$mdest" 2>/dev/null
+        for sf in $(find "$src" -maxdepth 4 -type f -name "$mg" ! -path "$mdest/*" 2>/dev/null); do
+          bj "$sf" || continue
+          if [ "$preview" = "1" ]; then
+            echo "$sf|$mdest" >> "$ADR/.classify.pv"
+          else
+            mv -f "$sf" "$mdest/" 2>/dev/null && echo x >> "$ADR/.classify.cnt"
+          fi
+        done
+        continue;;
     esac
     dest=$(echo "$l" | awk '{print $NF}')
     exts=$(echo "$l" | sed 's/ *[^ ]*$//')
@@ -384,7 +401,8 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
     echo "{\"moved\":$moved}"
   fi
 }
-do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只移不删）
+do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只移不删；preview 参数=只列出）
+  preview=0; [ "$1" = "preview" ] && preview=1
   dest=/sdcard/Duplicates; mkdir -p "$dest" 2>/dev/null
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
@@ -395,19 +413,30 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
       echo "$h|$sf" >> "$tmp"
     done
   prog 60 "发现重复项，归档中…"
-  # 分组合并（awk 保持顺序）
-  awk -F'|' '{n[$1]++; if(n[$1]==2) print; else if(n[$1]>2) print}' "$tmp" > "$tmp.dup"
-  # 上述输出每行 h|sf；逐条移动（保留第一个副本）
+  # 保留第一个副本，其余列入移动清单
   awk -F'|' '!seen[$1]++ {keep[$1]=$2; next} {print $2}' "$tmp" > "$tmp.mv"
-  mv_n=0
-  while IFS= read -r sf; do
-    [ -n "$sf" ] || continue
-    bj "$sf" || continue
-    mv -f "$sf" "$dest/" 2>/dev/null && { mv_n=$((mv_n+1)); log INFO "dup->  $sf"; }
-  done < "$tmp.mv"
-  rm -f "$tmp" "$tmp.dup" "$tmp.mv"
-  log INFO "duplicate moved=$mv_n"
-  echo "{\"moved\":$mv_n}"
+  if [ "$preview" = "1" ]; then
+    # 预览：列出将移动的重复文件
+    out=''
+    while IFS= read -r sf; do
+      [ -n "$sf" ] || continue
+      out="$out{\"p\":\"$sf\"},"
+    done < "$tmp.mv"
+    out=${out%,}
+    rm -f "$tmp" "$tmp.dup" "$tmp.mv"
+    echo "{\"files\":[$out]}" > "$ADR/.dup.preview.json"
+    echo "{\"ok\":1}"
+  else
+    mv_n=0
+    while IFS= read -r sf; do
+      [ -n "$sf" ] || continue
+      bj "$sf" || continue
+      mv -f "$sf" "$dest/" 2>/dev/null && { mv_n=$((mv_n+1)); log INFO "dup->  $sf"; }
+    done < "$tmp.mv"
+    rm -f "$tmp" "$tmp.dup" "$tmp.mv"
+    log INFO "duplicate moved=$mv_n"
+    echo "{\"moved\":$mv_n}"
+  fi
 }
 do_fstrim() { # 磁盘维护：drop_caches 清 RAM + EXT4 fstrim / F2FS 智能 GC
   sync
@@ -487,7 +516,7 @@ case "$1" in
   scan)      do_scan ;;
   classify)  do_classify "$2" ;;
   cleanapp)  do_cleanapp "$2" ;;
-  duplicate) do_duplicate ;;
+  duplicate) do_duplicate "$2" ;;
   fstrim)    do_fstrim ;;
   rescan)    do_rescan ;;
   ai)        do_ai ;;

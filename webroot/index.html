@@ -276,6 +276,12 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
   <div class="setgroup">
     <div class="sg-title">清理项</div>
     <div id="cat-switches"></div>
+<div class="setgroup">
+  <div class="sg-title">📦 规则模板</div>
+  <div class="setrow" onclick="showRuleTemplates()"><span class="lbl">一键应用模板</span><span class="val">精简 / 标准 / 激进</span></div>
+  <div class="setrow" onclick="exportRules()"><span class="lbl">导出规则</span><span class="val">JSON 备份</span></div>
+  <div class="setrow" onclick="importRules()"><span class="lbl">导入规则</span><span class="val">粘贴 JSON</span></div>
+</div>
   </div>
   <div class="setgroup">
     <div class="sg-title">AI 配置</div>
@@ -322,7 +328,10 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
       <button class="sw" onclick="event.stopPropagation();classifyPreview()">预览</button>
       <button class="sw on" onclick="postRun('classify')">归档</button>
     </span></div>
-    <div class="setrow" onclick="postRun('duplicate')"><span class="lbl">📑 重复归档</span><span class="val">移到 Duplicates</span></div>
+    <div class="setrow"><span class="lbl">📑 重复归档</span><span class="val" style="display:flex;gap:6px;align-items:center">
+      <button class="sw" onclick="event.stopPropagation();dupPreview()">预览</button>
+      <button class="sw on" onclick="postRun('duplicate')">归档</button>
+    </span></div>
   </div>
   <div class="setgroup">
     <div class="sg-title">维护</div>
@@ -685,6 +694,19 @@ function showDialog(title,html){
 }
 function escapeHtml(t){return String(t).replace(/[&<>"]/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]||m})}
 
+/* ===== 重复预览 ===== */
+async function dupPreview(){
+  toast('扫描重复文件中…');
+  await api('/api/duplicate',{method:'POST',body:'{"preview":1}'});
+  await new Promise(r=>setTimeout(r,1000));
+  const r=await api('/api/duplicate-preview');
+  const files=r&&r.files||[];
+  if(!files.length){ toast('未发现重复文件'); return; }
+  let html='<div style="max-height:55vh;overflow-y:auto;font-size:12px">';
+  files.forEach(f=>{ html+='<div style="padding:4px 0;border-bottom:1px solid var(--line);word-break:break-all">'+escapeHtml(f.p)+'</div>'; });
+  html+='</div><div style="margin-top:10px;font-size:12px;color:var(--sub)">共 '+files.length+' 个重复文件（将移入 Duplicates）</div>';
+  showDialog('📑 重复文件', html);
+}
 /* ===== 分类预览 ===== */
 async function classifyPreview(){
   toast('生成预览…');
@@ -707,6 +729,58 @@ async function postRun(ep){
   const r=await api('/api/'+ep,{method:'POST',body:'{}'});
   toast((r&&r.ok)?'✓':'✗ '+((r&&r.e)||'error'));
 }
+/* ===== 规则模板/导入导出 ===== */
+const RULE_TEMPLATES={
+  '精简':{'cache':['/sdcard/Android/data/*/cache'],'junk':['/sdcard/Download/*.tmp'],'apk':['/sdcard/Download/*.apk'],'zip':['/sdcard/Download/*.zip']},
+  '标准':{'cache':['/sdcard/Android/data/*/cache','/data/data/*/cache'],'junk':['/sdcard/Download/*.tmp','/sdcard/Download/*.bak','/sdcard/MIUI/log'],'apk':['/sdcard/Download/*.apk'],'zip':['/sdcard/Download/*.zip']},
+  '激进':{'cache':['/sdcard/Android/data/*/cache','/data/data/*/cache','/sdcard/Android/obb/*','/sdcard/tencent/*/cache'],'junk':['/sdcard/Download/*.tmp','/sdcard/Download/*.bak','/sdcard/MIUI/log','/sdcard/Pictures/.thumbnails'],'apk':['/sdcard/Download/*.apk','/sdcard/tmp/*.apk'],'zip':['/sdcard/Download/*.zip','/sdcard/Download/*.rar']}
+};
+function showRuleTemplates(){
+  let html=Object.keys(RULE_TEMPLATES).map(k=>'<div style="padding:8px;margin:4px 0;border-radius:8px;background:var(--card2);cursor:pointer" onclick="applyRuleTemplate(\''+k+'\')">'+k+'：'+
+    Object.keys(RULE_TEMPLATES[k]).map(c=>c+':'+RULE_TEMPLATES[k][c].length+'条').join('、')+'</div>').join('');
+  showDialog('📦 规则模板', html+'<div style="font-size:12px;color:var(--sub);margin-top:8px">点击套用（覆盖当前规则）</div>');
+}
+async function applyRuleTemplate(name){
+  const t=RULE_TEMPLATES[name]; if(!t) return;
+  for(const [type,paths] of Object.entries(t)){
+    const content=paths.map(p=>'# '+type+'
+'+p).join('\n');
+    await api('/api/rules?type='+type,{method:'POST',body:content});
+  }
+  toast('✔ 已应用「'+name+'」模板');
+}
+async function exportRules(){
+  const types=['cache','junk','apk','zip','social','whitelist','classify'];
+  const data={};
+  for(const t of types){
+    const r=await api('/api/rules?type='+t);
+    if(r&&r.content) data[t]=r.content;
+  }
+  const cfg=await api('/api/config');
+  if(cfg&&cfg.cfg) data.config=cfg.cfg;
+  // 复制到剪贴板
+  const txt=JSON.stringify(data,null,2);
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>toast('规则已复制到剪贴板'));
+  else { prompt('复制以下 JSON：', txt); }
+  toast('✔ 已导出 '+Object.keys(data).length+' 项');
+}
+async function importRules(){
+  prompt('粘贴 JSON 规则（覆盖现有）：', ''); // 用户手贴在 prompt
+  // 实际用 showDialog 做 textarea
+  showDialog('📥 导入规则', '<textarea id="import-json" style="width:100%;height:200px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card2);color:var(--text);font-size:12px;font-family:monospace"></textarea><div style="margin-top:8px;text-align:center"><button class="sw on" onclick="doImport()">导入</button></div>');
+}
+async function doImport(){
+  try{
+    const data=JSON.parse($('import-json').value);
+    for(const [type,content] of Object.entries(data)){
+      if(type==='config'){ await api('/api/config',{method:'POST',body:content}); continue; }
+      await api('/api/rules?type='+type,{method:'POST',body:content});
+    }
+    toast('✔ 导入 '+Object.keys(data).length+' 项');
+    $('import-json').closest('div[style]').remove();
+  }catch(e){ toast('✗ JSON 格式错误: '+e.message); }
+}
+
 /* ===== 设置：分类开关 ===== */
 async function loadCatSwitches(){
   const r=await api('/api/config');
@@ -822,7 +896,21 @@ async function loadTasks(){
 }
 function renderTasks(){
   const box=$('task-list'); box.innerHTML='';
-  if(!tasks.length){ box.innerHTML='<div class="muted" style="padding:12px">暂无任务</div>'; return; }
+  if(!tasks.length){ box.innerHTML='<div class="muted" style="padding:12px">暂无任务<br><span style="font-size:11px;color:var(--sub)">在设置页添加定时清理任务</span></div>'; return; }
+  // 计算下次执行：解析 tasks.conf 每行
+  const now=new Date();
+  const nextTimes=tasks.split('\\n').filter(l=>l&&!l.startsWith('#')).map(l=>{
+    const m=l.match(/daily=([0-9:]+)/); if(!m) return null;
+    const [h,mi]=m[1].split(':').map(Number);
+    const next=new Date(now); next.setHours(h,mi,0,0);
+    if(next<=now) next.setDate(next.getDate()+1);
+    return next;
+  }).filter(Boolean);
+  if(nextTimes.length){
+    const nt=nextTimes.reduce((a,b)=>a<b?a:b);
+    const diff=Math.round((nt-now)/3600000*10)/10;
+    box.innerHTML+='<div style="padding:8px;font-size:12px;color:var(--acc)">⏱ 下次清理：'+nt.toLocaleString()+'（'+diff+'小时后）</div>';
+  }
   tasks.forEach((line,i)=>{
     const enable=/^enable=1/.test(line);
     const every=line.match(/every=(\d+)h/);
