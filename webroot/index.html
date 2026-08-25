@@ -544,11 +544,21 @@ document.addEventListener('pointerdown',function(e){
   ink.style.cssText='left:'+(e.clientX-r.left)+'px;top:'+(e.clientY-r.top)+'px;width:20px;height:20px';
   b.appendChild(ink); setTimeout(()=>ink.remove(),560);
 });
-/* ===== API ===== */
-async function api(path,opt){
-  const o=opt||{};
-  const r=await fetch(path,{method:o.method||'GET',body:o.body,headers:o.body?{'Content-Type':'application/json'}:{}});
-  try{ return await r.json(); }catch(e){ return {ok:false,e:'bad json'}; }
+/* ===== API（KSU 桥 + fetch 双通道） ===== */
+const API=location.protocol==='http:'?'http://127.0.0.1:46780':'';
+async function api(p,o){
+  const url=p.startsWith('/api')?API+p:p;
+  if(window.ksu&&typeof window.ksu.exec==='function'){
+    try{
+      const CURL='/data/adb/modules/junkclean/bin/curl';
+      const body=(o&&o.body)?o.body:'';
+      const cmd=CURL+' -s -m 20 '+JSON.stringify(url)+(o&&o.method==='POST'?' -X POST -H "Content-Type: application/json" --data '+JSON.stringify(body):'');
+      const r=await window.ksu.exec(cmd);
+      const txt=typeof r==='string'?r:(r&&(r.stdout||r.result)||'');
+      return JSON.parse(txt);
+    }catch(e){ return {}; }
+  }
+  try{ const r=await fetch(url,o); return r.json(); }catch(e){ return {}; }
 }
 /* ===== Tab / View ===== */
 function showTab(t){
