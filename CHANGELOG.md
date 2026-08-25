@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.2.0 (2026-08-25) — WebUI 三文件拆分
+- 📁 前端拆分：index.html(17KB 骨架) + style.css(17KB 样式) + app.js(30KB 逻辑)
+- ✅ cleand serve_file 原生支持多静态文件（text/css + application/javascript）
+- 🔍 拆后验证：JS balanced / CSS 140=140 / 三文件 200
+
 ## v3.1.5 (2026-08-25)
 - 🧹 JS层审核：删除 cancelScan 死代码
 - ✅ JS审核确认：35处调用因三Tab DOM常驻全部安全（非崩溃）
