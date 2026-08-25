@@ -44,13 +44,24 @@ bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏
 # ponytail: 规则文件用空格分隔路径，含空格路径（如 "我的 目录"）会被拆错。
 # 天花板：用户自定义含空格规则时统计/删除不精确。
 # 升级路径：load_rules 改换行分隔 + 所有 for p in $RUL 调用点改 while read（改动大，内置规则无空格暂缓）。
-load_rules() { # load_rules <file> -> RULES_LINES (norm+red separated)
-  RUL='' REDR=''
+load_rules() { # load_rules <file> -> RUL(路径) + RFLAGS(|分隔标志)
+  # 每路径两开关: recurse 子目录(默认关) / no-integrity 完整性(默认开)
+  RUL='' REDR='' RFLAGS=''
   [ -f "$1" ] || return 0
   while IFS= read -r l; do
-    case "$l" in '#RED '*) REDR="$REDR ${l#\#RED }";; \#*|"") continue;; *) RUL="$RUL $l";; esac
+    case "$l" in '#RED '*) REDR="$REDR ${l#\#RED }";; \#*|"") continue;; esac
+    path=$(echo "$l" | awk '{print $1}'); [ -n "$path" ] || continue
+    case "$path" in /*) ;; *) continue;; esac
+    rest=$(echo "$l" | awk '{$1="";print}')
+    RUL="$RUL $path"
+    flags=''
+    case "$rest" in *recurse*) flags="$flags recurse";; esac
+    case "$rest" in *no-integrity*) flags="$flags no-integrity";; esac
+    RFLAGS="${RFLAGS:+$RFLAGS|}$flags"
   done < "$1"
 }
+# rule_flag <N>: 取第 N 条路径的标志
+rule_flag() { echo "$RFLAGS" | cut -d'|' -f$(( $1 + 1 )); }
 do_clean() { # do_clean <cats_csv> [force]
   FORCE=0; [ "$2" = "force" ] && FORCE=1
   [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats="$1"
@@ -59,10 +70,10 @@ do_clean() { # do_clean <cats_csv> [force]
   for c in $cats; do
     job=$((job+1))
     case "$c" in
-      cache)   [ "$(get_cfg cat_cache 1)" = "1" ] || { prog $((job*100/total_jobs)) "跳过 缓存(已关)"; continue; }; f="$RULES/cache.list"; nm="应用缓存";;
-      junk)    [ "$(get_cfg cat_junk 1)" = "1" ] || continue; f="$RULES/junk.list"; nm="系统垃圾";;
-      apk)     [ "$(get_cfg cat_apk 1)" = "1" ] || continue; f="$RULES/apk.list"; nm="安装包";;
-      zip)     [ "$(get_cfg cat_zip 1)" = "1" ] || continue; f="$RULES/zip.list"; nm="压缩包";;
+      cache)   [ "$(get_cfg cat_cache 1)" = "1" ] || { prog $((job*100/total_jobs)) "跳过 缓存(已关)"; continue; }; f="$RULES/cache.list"; nm="应用缓存"; mode=del;;
+      junk)    [ "$(get_cfg cat_junk 1)" = "1" ] || continue; f="$RULES/junk.list"; nm="系统垃圾"; mode=del;;
+      apk)     [ "$(get_cfg cat_apk 1)" = "1" ] || continue; f="$RULES/apk.list"; nm="安装包"; mode=move;;
+      zip)     [ "$(get_cfg cat_zip 1)" = "1" ] || continue; f="$RULES/zip.list"; nm="压缩包"; mode=move;;
       social)  [ "$(get_cfg cat_social 1)" = "1" ] || continue; f="$RULES/social.list"; nm="社交专项";;
       empty)   [ "$(get_cfg cat_empty 1)" = "1" ] || continue; f=""; nm="空文件夹";;
       sqlite)  [ "$(get_cfg cat_sqlite 1)" = "1" ] || continue; f=""; nm="SQLite优化";;
@@ -128,21 +139,44 @@ do_clean() { # do_clean <cats_csv> [force]
       done
       # 非 apk 的压缩包仍走规则（不过期）
     fi
-    # 红线项默认不删（social 的聊天媒体）; cat_junk 等开关为1时普通规则全清
-    for p in $RUL; do
-      case "$p" in /*);; *) continue;; esac
-      for rp in $p; do
-        [ -e "$rp" ] || continue
-        # force 模式跳过白名单，但绝不允许删除根/关键系统目录
-        case "$rp" in
-          /|//|/system/*|/data/*|/cache/*|/vendor/*|/product/*|/apex/*) n_skip=$((n_skip+1)); continue;;
-        esac
-        if [ "$FORCE" != "1" ]; then
-          bj "$rp" || { n_skip=$((n_skip+1)); continue; }
-        fi
-        sz=$(du -sk "$rp" 2>/dev/null | awk '{print $1}')
-        rm -rf "$rp" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del $rp"; }
+    # 红线项默认不删; 每路径按自身开关处理（子目录 recurse 默认关 / 完整性默认开）
+    i=1
+    for dirpat in $RUL; do
+      case "$dirpat" in /*) ;; *) continue;; esac
+      flag=$(rule_flag $((i-1)))
+      md=''; case "$flag" in *recurse*) ;; *) md='-maxdepth 1';; esac
+      int_skip=''; case "$flag" in *no-integrity*) int_skip=1;; esac
+      for d in $dirpat; do
+        [ -d "$d" ] || continue
+        # 临时文件读行（避免管道子 shell 计数丢失）
+        find "$d" $md -type f > "$ADR/.clean.tmp" 2>/dev/null
+        while IFS= read -r rp; do
+          [ -e "$rp" ] || continue
+          # 完整性检测：跳过未下载完文件
+          if [ "$int_skip" != "1" ]; then
+            case "$rp" in *.part|*.crdownload|*.tmp|*.partial|*.downloading|*.!q|*.aria2) continue;; esac
+          fi
+          # force 模式跳过白名单，但绝不允许删除根/关键系统目录
+          case "$rp" in
+            /|//|/system/*|/data/*|/cache/*|/vendor/*|/product/*|/apex/*) n_skip=$((n_skip+1)); continue;;
+          esac
+          if [ "$FORCE" != "1" ]; then
+            bj "$rp" || { n_skip=$((n_skip+1)); continue; }
+          fi
+          sz=$(du -sk "$rp" 2>/dev/null | awk '{print $1}')
+          if [ "$mode" = "move" ]; then
+            # 安装包/压缩包：只转移归档到 下载/对应目录（不删除，可反悔）
+            mkdir -p "/sdcard/下载/$nm" 2>/dev/null
+            if mv -f "$rp" "/sdcard/下载/$nm/" 2>/dev/null; then
+              n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "move $rp → 下载/$nm"
+            fi
+          else
+            rm -rf "$rp" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del $rp"; }
+          fi
+        done < "$ADR/.clean.tmp"
+        rm -f "$ADR/.clean.tmp"
       done
+      i=$((i+1))
     done
   done
   prog 100 "完成: 删除$n_del项 释放$(human $freed)"

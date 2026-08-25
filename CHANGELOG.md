@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.5 (2026-08-25)
+- 🔀 清理规则每条路径独立双开关：子目录 recurse（默认关）/ 完整性 no-integrity（默认开）
+- 🔍 完整性检测：跳过 .part/.crdownload/.tmp/.partial/.downloading/.!q/.aria2
+- ⚠️ 清理清单分类卡片：每条规则路径一行 + 双开关（点击切换写回）+ 不存在红色标注
+- 🆕 cleand /api/check 路径存在性端点
+- 🐛 修复：while read 管道计数丢失（改临时文件读行）、RFLAGS 前导|导致标志解析错
+
 ## v2.0.4 (2026-08-25)
 - 🗜 压缩包独立分类（zip/rar/7z/tar/gz/xz 单独分类，与安装包拆分）
 - 📁 文件分类重构：@src 指定源目录（默认 /sdcard，可自定义）+ @dest 指定目标根（默认 /sdcard/下载）

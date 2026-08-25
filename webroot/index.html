@@ -146,6 +146,17 @@ select,input[type=text],textarea{width:100%;background:var(--card2);color:var(--
   font-family:inherit;margin:6px 0}
 textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;font-size:13px}
 
+/* ===== 规则路径行（卡片下） ===== */
+.rulelist{padding:10px 12px 2px;border-top:1px solid var(--line);margin-top:10px}
+.ruleline{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ruleline:last-child{border-bottom:none}
+.rulepath{font-size:12px;color:var(--sub);word-break:break-all;font-family:ui-monospace,monospace}
+.rulemiss{color:var(--danger);margin-left:6px;font-weight:600}
+.rulesw{display:flex;gap:8px;margin-top:5px}
+.sw{font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card2);color:var(--sub);cursor:pointer;transition:all .2s}
+.sw.on{background:var(--acc);color:#062e27;border-color:var(--acc)}
+
 /* ===== Toast ===== */
 .toast{position:fixed;top:calc(var(--window-inset-top,16px) + 8px);left:50%;transform:translate(-50%,-150%);
   background:var(--card2);color:var(--txt);padding:11px 20px;border-radius:999px;font-size:14px;
@@ -179,7 +190,7 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
   </div>
   <div class="herobtn">
     <button class="btn" id="btn-scan" onclick="startScan()">🔍 开始扫描垃圾</button>
-    <div class="lastscan" id="lastscan"></div>
+    <div class="lastscan" id="lastscan" style="cursor:pointer" onclick="viewLastResult()"></div>
   </div>
 </div>
 
@@ -411,7 +422,7 @@ const API='http://127.0.0.1:46780';
 const CATS={cache:['应用缓存','缓存'],junk:['系统垃圾','垃圾'],apk:['安装包','安装包'],zip:['压缩包','压缩包'],
   empty:['空文件夹','空夹'],social:['社交专项','社交'],sqlite:['SQLite 优化','SQLite']};
 const CAT_ORDER=['cache','junk','apk','zip','empty','social','sqlite'];
-let scan=null, sel={}, cleaning=false, cfg={}, L=null;
+let scan=null, lastScan=null, sel={}, cleaning=false, cfg={}, L=null;
 const I18N={zh:{free:'可用空间',scan:'扫描垃圾',scanning:'扫描中…',done:'扫描完成',
   start:'开始扫描垃圾',last:'上次扫描',clean:'一键清理',confirm:'确认清理',cancel:'取消',
   release:'释放',clear:'清理',freed:'释放',classify:'文件分类',dup:'重复归档',
@@ -484,6 +495,7 @@ async function loadHome(){
   if(s&&s.daemon) {
     // 加载上次 scan
     const sc=await api('/api/scan');
+    lastScan=sc;
     if(sc&&sc.ts){
       let tot=0; for(const c of Object.keys(sc.cats||{})) tot+=(+sc.cats[c].kb||0);
       daemonEl.textContent=T('last')+' '+sc.ts+' · '+fmtKB(tot);
@@ -494,6 +506,11 @@ async function loadHome(){
   } else {
     daemonEl.textContent=T('stopped');
   }
+}
+
+function viewLastResult(){
+  if(!lastScan||!lastScan.ts){ toast('暂无扫描结果'); return; }
+  scan=lastScan; renderReview(); showPage('page-review');
 }
 
 /* ===== 扫描流程 ===== */
@@ -549,6 +566,8 @@ function renderReview(){
   });
   renderBig();
   updateSel();
+  // 异步加载每分类规则路径行
+  CAT_ORDER.forEach(id=>renderRules(id));
 }
 function updateSel(){
   let sum=0, cnt=0;
@@ -610,9 +629,15 @@ async function pollClean(){
       clearInterval(cleanTimer); cleanTimer=null;
       let freed=0;
       const sc=await api('/api/scan');
-      if(sc&&sc.ts){ for(const id of Object.keys(sel)){ if(sel[id]) freed+=(+(scan.cats?.[id]?.kb)||0); } }
+      let detailHtml='';
+      if(sc&&sc.ts){ for(const id of Object.keys(sel)){ if(!sel[id]) continue;
+        let kb=+(scan.cats?.[id]?.kb||0);
+        if(id==='big'){ (scan.big||[]).forEach(b=>kb+=(+b.kb||0)); }
+        freed+=kb;
+        detailHtml+=`<div class="muted" style="font-size:13px;margin-top:4px">${CATS[id]?.[0]||'大文件'}: ${fmtKB(kb)}</div>`;
+      } }
       $('done-size').textContent=fmtKB(freed);
-      $('done-msg').textContent=T('freed')+' '+items.split(',').length+' '+T('files');
+      $('done-msg').innerHTML=T('freed')+' '+items.split(',').length+' '+T('files')+detailHtml;
       showPage('page-done');
       sel={};
     }
@@ -768,6 +793,79 @@ function renderBig(){
     <div class="sz">${fmtKB(total)}</div>`;
   el.onclick=()=>{ sel.big=!sel.big; el.classList.toggle('on',!!sel.big); updateSel(); };
   $('catlist').appendChild(el);
+  // 展开明细：点击名称行切换显示文件列表
+  const detail=document.createElement('div');
+  detail.className='hidden';
+  detail.style.cssText='padding:10px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)';
+  detail.innerHTML=big.slice(0,10).map(b=>`<div style="padding:3px 0;word-break:break-all">${fmtKB(b.kb)} · ${b.p}</div>`).join('')+(big.length>10?`<div style="padding:3px 0;color:var(--sub)">…还有 ${big.length-10} 个</div>`:'');
+  el.appendChild(detail);
+  el.querySelector('.nm').style.cursor='pointer';
+  el.querySelector('.nm').onclick=(e)=>{ e.stopPropagation(); detail.classList.toggle('hidden'); };
+}
+
+/* ===== 清理清单：每条规则路径 + 双开关 + 不存在标注 ===== */
+const rulesStore={}; // cat → {content, lines:[{path,flags}]}
+async function renderRules(catId){
+  if(catId==='big'||catId==='empty'||catId==='sqlite') return; // 无规则文件
+  const r=await api('/api/rules?type='+catId);
+  if(!r||!r.content) return;
+  const content=r.content;
+  const lines=content.split('\n').map(l=>l.trimEnd());
+  // 提取路径做存在性检查
+  const paths=[];
+  lines.forEach(l=>{
+    const t=l.trim(); if(!t||t.startsWith('#')||t.startsWith('@')) return;
+    const p=t.split(/\s+/)[0]; if(p.startsWith('/')) paths.push(p);
+  });
+  let exists={};
+  if(paths.length){
+    const chk=await api('/api/check',{method:'POST',body:JSON.stringify({paths})});
+    exists=(chk&&chk.exists)||{};
+  }
+  // 渲染路径行
+  let box=document.querySelector('#catlist .catcard[data-cat="'+catId+'"] .rulelist');
+  if(!box){ // 首次：创建 rulelist 容器
+    const card=document.querySelector('#catlist .catcard[data-cat="'+catId+'"]');
+    if(!card) return;
+    box=document.createElement('div'); box.className='rulelist';
+    card.appendChild(box);
+  }
+  box.innerHTML='';
+  lines.forEach((l,idx)=>{
+    const t=l.trim(); if(!t||t.startsWith('#')||t.startsWith('@')) return;
+    const parts=t.split(/\s+/); const path=parts[0];
+    if(!path.startsWith('/')) return;
+    const flags=parts.slice(1);
+    const recurse=flags.includes('recurse');
+    const noInt=flags.includes('no-integrity');
+    const row=document.createElement('div');
+    row.className='ruleline';
+    row.innerHTML=`<div class="rulepath">${path}${exists[path]?'':'<span class="rulemiss">⚠️ 不存在</span>'}</div>
+      <div class="rulesw">
+        <button class="sw ${recurse?'on':''}" data-k="recurse" data-i="${idx}">子目录</button>
+        <button class="sw ${noInt?'':'on'}" data-k="integrity" data-i="${idx}">完整性</button>
+      </div>`;
+    box.appendChild(row);
+    // 开关切换 → 更新 flags → 写回
+    const cur=flags;
+    row.querySelector('[data-k=recurse]').onclick=()=>toggleRuleFlag(catId,idx,'recurse',cur,content,row);
+    row.querySelector('[data-k=integrity]').onclick=()=>toggleRuleFlag(catId,idx,'no-integrity',cur,content,row);
+  });
+}
+async function toggleRuleFlag(cat,idx,flag,cur,content,row){
+  const parts=content.split('\n');
+  let line=parts[idx]||'';
+  // 切换 flag
+  if(flag==='recurse'){
+    if(cur.includes('recurse')) line=line.replace(/\s*recurse/,'');
+    else line+=' recurse';
+  } else {
+    if(cur.includes('no-integrity')) line=line.replace(/\s*no-integrity/,'');
+    else line+=' no-integrity';
+  }
+  parts[idx]=line;
+  const rr=await api('/api/rules?type='+cat,{method:'POST',body:parts.join('\n')});
+  if(rr.ok){ toast(T('saved')); renderRules(cat); }
 }
 
 /* ===== 初始化 ===== */

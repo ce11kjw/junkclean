@@ -391,6 +391,25 @@ static int wl_block(const char *path){
     }
     fclose(f); return block;
 }
+/* ---- check path existence: POST {"paths":["/a","/b"]} → {"exists":{"/a":1,"/b":0}} ---- */
+static void api_check(int fd, const char* body){
+    /* 提取所有 / 开头到 " , ] } 结束的路径段，检查存在性 */
+    if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
+    char out[4096]; int o=snprintf(out,sizeof(out),"{\"exists\":{");
+    int first=1; const char *p=body;
+    while(*p && o < 3800){
+        if(*p=='/'){
+            const char *e=p; while(*e && *e!='"' && *e!=',' && *e!=']' && *e!='}') e++;
+            int len=(int)(e-p); if(len>500)len=500;
+            char buf[512]; memcpy(buf,p,len); buf[len]=0;
+            int ex=access(buf,F_OK)==0;
+            o += snprintf(out+o,sizeof(out)-o,"%s\"%.*s\":%d",first?"":",",len,p,ex);
+            first=0; p=e;
+        } else p++;
+    }
+    o += snprintf(out+o,sizeof(out)-o,"}}");
+    http_json(fd,out);
+}
 /* ---- delete user-confirmed big files (argv-safe rm, prefix guard) ---- */
 static void api_delbig(int fd, const char* body){
     if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
@@ -591,6 +610,7 @@ static void handle(int fd){
         pthread_t t; pthread_create(&t,NULL,(void*(*)(void*))api_ai_threaded,(void*)(long)fd); pthread_detach(t);
         return; /* api_ai_threaded closes fd */
     }
+    else if(!strncmp(base,"/api/check",10) && !strcmp(method,"POST")) api_check(fd,(char*)body);
     else if(!strncmp(base,"/api/delbig",11) && !strcmp(method,"POST")) api_delbig(fd,(char*)body);
     else if(!strncmp(base,"/api/classify",13)){ char *c=strdup("classify"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup("duplicate"); bg(c); http_json(fd,"{\"ok\":1}"); }
