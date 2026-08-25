@@ -193,10 +193,11 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
     i=$((i+1))
     f=$RULES/$c.list; [ -f "$f" ] || f=""; load_rules "$f"
     n=0; sz=0
-    sz=$(du -sk $RUL 2>/dev/null | awk 'END{print $1}')
-    [ -z "$sz" ] && sz=0
-    # 性能优化：一次 find 合并所有规则路径（v2.0.1）
-    n=$(find $RUL -type f 2>/dev/null | wc -l)
+    # 性能+正确性：规则转目录级（去尾部 /*），find/du 对目录内部遍历
+    # 避免 glob 展开数万路径超 ARG_MAX（此前大目录 count=0）
+    dirs=$(echo "$RUL" | tr ' ' '\n' | sed 's|/\*$||' | grep '^/')
+    sz=$(du -sk $dirs 2>/dev/null | awk 'END{print $1}'); [ -z "$sz" ] && sz=0
+    n=$(find $dirs -type f 2>/dev/null | wc -l)
     total_kb=$((total_kb+sz))
     sc="$sc\"$c\":{\"count\":$n,\"kb\":\"$sz\"},"
     prog $((5+i*15)) "统计中 $c ($(human $sz))"
