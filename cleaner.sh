@@ -45,8 +45,7 @@ load_rules() { # load_rules <file> -> RULES_LINES (norm+red separated)
   RUL='' REDR=''
   [ -f "$1" ] || return 0
   while IFS= read -r l; do
-    case "$l" in \#*|"") continue;; esac
-    case "$l" in '#RED '*) REDR="$REDR ${l#\#RED }";; *) RUL="$RUL $l";; esac
+    case "$l" in '#RED '*) REDR="$REDR ${l#\#RED }";; \#*|"") continue;; *) RUL="$RUL $l";; esac
   done < "$1"
 }
 do_clean() { # do_clean <cats_csv> [force]

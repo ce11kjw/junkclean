@@ -26,7 +26,7 @@
 /data/data/org.telegram.messenger/files/Telegram/thumbnails/*
 /data/data/com.ss.android.ugc.aweme/cache/*
 /data/data/com.ss.android.ugc.aweme/files/image_pipeline_cache/*
-#RED 聊天媒体（红线：误勾将删除聊天图片/语音/视频）
+# 聊天媒体（红线：误勾将删除聊天图片/语音/视频）
 #RED /data/data/com.tencent.mm/MicroMsg/*/image2/*
 #RED /data/data/com.tencent.mm/MicroMsg/*/video/*
 #RED /data/data/com.tencent.mm/MicroMsg/*/voice2/*
@@ -54,7 +54,7 @@
 /sdcard/Android/data/com.tencent.mobileqq/Tencent/MobileQQ/ad/*
 /sdcard/tencent/MobileQQ/diskcache/*
 /sdcard/tencent/MobileQQ/ad/*
-#RED 微信/QQ 聊天媒体（红线：误勾将删除聊天图片/视频/语音）
+# 微信/QQ 聊天媒体（红线：误勾将删除聊天图片/视频/语音）
 #RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/image2/*
 #RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/video/*
 #RED /sdcard/Android/data/com.tencent.mm/MicroMsg/*/voice2/*
