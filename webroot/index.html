@@ -590,7 +590,20 @@ animateCards(t){
     ease:'power3.out',clearProps:'all',overwrite:'auto'
   });
 },
-async $f(p,o){if(p.startsWith('/api'))p='http://127.0.0.1:46780'+p;let r=await fetch(p,o);return r.json().catch(()=>({}));},
+async $f(p,o){
+  if(p.startsWith('/api'))p='http://127.0.0.1:46780'+p;
+  /* 管理器 WebView (APatch/KSU)：页面是 https://mui.kernelsu.org，fetch http 会被混合内容拦截。
+     用注入的 ksu.exec() JS 桥执行 curl 绕过。浏览器场景走 fetch。 */
+  if(window.ksu&&typeof window.ksu.exec==='function'){
+    try{
+      let cmd='curl -s -m 8 '+JSON.stringify(p)+(o&&o.method==='POST'?" -X POST -d '{}'":'');
+      let r=await window.ksu.exec(cmd);
+      let txt=typeof r==='string'?r:(r&&(r.stdout||r.result)||'');
+      let j=JSON.parse(txt);return j;
+    }catch(e){return {};}
+  }
+  let r=await fetch(p,o);return r.json().catch(()=>({}));
+},
 async loadAll(){let [s,cfg]=await Promise.all([this.$f('/api/status'),this.$f('/api/config')]);
  this.daemon=!!s.daemon;this.ver=s.version||this.ver;this.author=s.author||this.author;
  if(cfg&&cfg.cfg){let c=cfg.cfg.split('\n');for(let l of c){let i=l.indexOf('=');if(i>0){

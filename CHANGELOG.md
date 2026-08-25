@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.8 (2026-08-25)
+- 🔴 修复管理器 WebUI 按钮失效：APatch/KSU WebView 页面为 https://mui.kernelsu.org，fetch http://127.0.0.1 被混合内容拦截
+- ✅ $f 加 JS 桥适配：window.ksu.exec() 执行 curl 绕过（浏览器场景仍走 fetch）
+
 ## v1.5.7 (2026-08-25)
 - ✏️ 文案用户视角：'存储体检'→'垃圾扫描'（scan 按钮/页签），'开始体检'→'扫描垃圾'
 
