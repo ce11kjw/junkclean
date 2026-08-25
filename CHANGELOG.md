@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.5.8 (2026-08-25)
+- 🧹 Code Review 修复：删除 importRules 里 prompt() 死代码（弹窗导入更干净）
+
 ## v2.5.7 (2026-08-25)
 - 🖼 缩略图分类：Pictures/DCIM/.thumbnails + App 缓存缩略图（删除自动重建）
 - 📋 崩溃日志分类：Download/*.log + tencent 日志 + App 缓存日志
