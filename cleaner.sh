@@ -432,9 +432,10 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
   fi
 }
 do_duplicate() { # 重复文件（>10M 哈希分组；preview=列出 / delete=全部删除 / 默认归档到 Duplicates）
-  preview=0; delmode=0
+  preview=0; delmode=0; keepspec=''
   [ "$1" = "preview" ] && preview=1
   [ "$1" = "delete" ] && delmode=1
+  [ "$1" = "keep" ] && [ -n "$2" ] && { keepspec="$2"; delmode=1; }
   dest=/sdcard/Duplicates; mkdir -p "$dest" 2>/dev/null
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
@@ -442,12 +443,27 @@ do_duplicate() { # 重复文件（>10M 哈希分组；preview=列出 / delete=�
   find /sdcard -type f -size +10M ! -path "$dest/*" -print0 2>/dev/null | \
     xargs -0 -P5 -I{} md5sum {} 2>/dev/null | \
     while read -r h sf; do [ -n "$h" ] || continue
-      echo "$h|$sf" >> "$tmp"
+      sz=$(du -sk "$sf" 2>/dev/null | awk '{print $1}'); [ -z "$sz" ] && sz=0
+      echo "$h|$sz|$sf" >> "$tmp"
     done
   prog 60 "发现重复项，归档中…"
-  # 原始（第一份）+ 其余副本
-  awk -F'|' '!seen[$1]++ {keep[$1]=$2; next} {print $2}' "$tmp" > "$tmp.mv"
-  awk -F'|' '!seen[$1]++ {print $2}' "$tmp" > "$tmp.keep"
+  # 分组选最大体积为"保留"，其余为副本（mv/delete 目标）
+  sort -t'|' -k1,1 -k2,2nr "$tmp" | awk -F'|' -v kf="$tmp.keep" -v mf="$tmp.mv" '{
+    if($1==last){ cnt[last]++; print $3 > mf }
+    else { if(last!="" && cnt[last]>=2) print keepline > kf; cnt[$1]=1; keepline=$3; last=$1 }
+  } END{ if(last!="" && cnt[last]>=2) print keepline > kf }'
+  touch "$tmp.keep" "$tmp.mv"
+  # 用户指定保留：从处理列表移除
+  if [ -n "$keepspec" ] && [ -f "$tmp.mv" ]; then
+    grep -v -F "$keepspec" "$tmp.mv" > "$tmp.mv2" 2>/dev/null && mv -f "$tmp.mv2" "$tmp.mv"
+    echo "$keepspec" >> "$tmp.keep"
+  fi
+  # 指定保留：只保留指定的，其余全部删除（含 awk 默认保留的）
+  if [ -n "$keepspec" ]; then
+    cat "$tmp.keep" >> "$tmp.mv" 2>/dev/null
+    grep -v -F "$keepspec" "$tmp.mv" > "$tmp.mv.t" 2>/dev/null && mv "$tmp.mv.t" "$tmp.mv"
+    echo "$keepspec" > "$tmp.keep"
+  fi
   if [ "$preview" = "1" ]; then
     # 预览：副本(keep:0 将处理) + 原始(keep:1 保留)
     out=''
@@ -568,7 +584,7 @@ case "$1" in
   classify)  do_classify "$2" ;;
   cleanapp)  do_cleanapp "$2" ;;
   history)   do_history ;;
-  duplicate) do_duplicate "$2" ;;
+  duplicate) do_duplicate "$2" "$3" ;;
   fstrim)    do_fstrim ;;
   rescan)    do_rescan ;;
   ai)        do_ai ;;

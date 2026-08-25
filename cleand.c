@@ -699,7 +699,19 @@ static void handle(int fd){
         char *txt=malloc(32768); int n=fread(txt,1,32767,f); fclose(f); txt[n]=0;
         http_json(fd,txt); free(txt);
     }
-    else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup(body&&strstr(body,"delete")?"duplicate delete":(body&&strstr(body,"preview")?"duplicate preview":"duplicate")); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/duplicate",14)){
+        char *cmd=0;
+        if(body&&strstr(body,"preview")) cmd=strdup("duplicate preview");
+        else if(body&&strstr(body,"keep")){
+            const char *kp=strstr(body,"\"keep\":\"");
+            if(kp){ kp+=8; const char *ke=strchr(kp,'"'); char kpath[600]=""; if(ke){ int kl=(int)(ke-kp); if(kl>590)kl=590; snprintf(kpath,sizeof(kpath),"%.*s",kl,kp); }
+                char tmp[700]; snprintf(tmp,sizeof(tmp),"duplicate keep %s",kpath); cmd=strdup(tmp); }
+            else cmd=strdup("duplicate delete");
+        }
+        else if(body&&strstr(body,"delete")) cmd=strdup("duplicate delete");
+        else cmd=strdup("duplicate");
+        bg(cmd); http_json(fd,"{\"ok\":1}");
+    }
     else if(!strncmp(base,"/api/fstrim",11)){ char *c=strdup("fstrim"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/rescan",11)){ char *c=strdup("rescan"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else serve_file(fd, base);
