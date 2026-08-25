@@ -79,7 +79,7 @@ rule_flag() { echo "$RFLAGS" | cut -d'|' -f$(( $1 + 1 )); }
 do_clean() { # do_clean <cats_csv> [force]
   check_rules_sha
   FORCE=0; [ "$2" = "force" ] && FORCE=1
-  [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats=$(echo "$1" | tr ',' ' ')
+  [ "$1" = "all" ] && cats="cache junk apk zip empty zero social sqlite" || cats=$(echo "$1" | tr ',' ' ')
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
   free_before=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_before" ] && free_before=0
   for c in $cats; do total_jobs=$((total_jobs+1)); done
@@ -92,6 +92,7 @@ do_clean() { # do_clean <cats_csv> [force]
       zip)     [ "$(get_cfg cat_zip 1)" = "1" ] || continue; f="$RULES/zip.list"; nm="压缩包"; mode=move;;
       social)  [ "$(get_cfg cat_social 1)" = "1" ] || continue; f="$RULES/social.list"; nm="社交专项";;
       empty)   [ "$(get_cfg cat_empty 1)" = "1" ] || continue; f=""; nm="空文件夹";;
+      zero)    [ "$(get_cfg cat_zero 1)" = "1" ] || continue; f=""; nm="空文件";;
       sqlite)  [ "$(get_cfg cat_sqlite 1)" = "1" ] || continue; f=""; nm="SQLite优化";;
       temp)    [ "$(get_cfg cat_temp 1)" = "1" ] || continue; f=""; nm="临时文件";;
       uninst)  [ "$(get_cfg cat_uninst 0)" = "1" ] || continue; f=""; nm="卸载残留";;
@@ -108,6 +109,24 @@ do_clean() { # do_clean <cats_csv> [force]
         find "$d" -type d -empty -delete 2>/dev/null
       done
       log INFO "empty-clean done"
+      continue
+    fi
+    if [ "$c" = "zero" ]; then
+      # 0 字节文件清理（进回收站可反悔）
+      find /sdcard -type f -size 0 ! -path "*/.junkclean_trash/*" 2>/dev/null > "$ADR/.zero.tmp"
+      zn=0
+      while IFS= read -r zf; do
+        [ -n "$zf" ] || continue
+        bj "$zf" || continue
+        if [ "$(get_cfg trash 1)" = "1" ]; then
+          mkdir -p /sdcard/.junkclean_trash 2>/dev/null
+          mv -f "$zf" "/sdcard/.junkclean_trash/zero_$(basename "$zf")_$(date +%s)" 2>/dev/null && zn=$((zn+1))
+        else
+          rm -f "$zf" 2>/dev/null && zn=$((zn+1))
+        fi
+      done < "$ADR/.zero.tmp"
+      rm -f "$ADR/.zero.tmp"
+      n_del=$((n_del+zn)); log INFO "zero-clean deleted=$zn"
       continue
     fi
     if [ "$c" = "sqlite" ]; then
@@ -322,6 +341,9 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   health=green
   [ "$free_kb" -lt 3145728 ] && health=yellow   # <3GB
   [ "$free_kb" -lt 1048576 ] && health=red      # <1GB
+  # 0 字节空文件统计
+  zn=$(find /sdcard -type f -size 0 2>/dev/null | wc -l)
+  sc="$sc\"zero\":{\"count\":$zn,\"kb\":\"0\",\"old\":\"0\",\"new\":\"0\"},"
   sc=${sc%,}
   # 应用级缓存统计（/sdcard/Android/data/<pkg>/cache）
   apps=''
