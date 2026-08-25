@@ -31,19 +31,18 @@ get_cfg() { # get_cfg <key> <default>
   v=$(sed -n "s/^$1=//p" "$CFG" 2>/dev/null | tail -1)
   [ -n "$v" ] && echo "$v" || echo "$2"
 }
-check_rules_sha() { # 规则 SHA 校验：损坏自动恢复默认（customize 生成的 rules.sha）
-  [ -f "$ADR/rules.sha" ] || return 0
-  while read -r rf expect; do
-    [ -f "$RULES/$rf" ] || continue
-    cur=$(sha256sum "$RULES/$rf" 2>/dev/null | awk '{print $1}')
-    [ "$cur" = "$expect" ] || {
-      if [ -f "$ADR/rules.bak/$rf" ]; then
-        cp -f "$ADR/rules.bak/$rf" "$RULES/$rf" && log WARN "规则 $rf 损坏，已恢复默认"
+check_rules_sha() { # 规则损坏检测：空文件/被截断 → 恢复默认（用户正常修改不受影响）
+  for rf in "$RULES"/*.list; do
+    [ -f "$rf" ] || continue
+    b=$(basename "$rf")
+    if [ ! -s "$rf" ]; then
+      if [ -f "$ADR/rules.bak/$b" ]; then
+        cp -f "$ADR/rules.bak/$b" "$rf" && log WARN "规则 $b 为空/损坏，已恢复默认"
       else
-        log WARN "规则 $rf 损坏且无备份"
+        log WARN "规则 $b 为空且无备份"
       fi
-    }
-  done < "$ADR/rules.sha"
+    fi
+  done
 }
 bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏感，统一转小写比较）
   p=$1; [ -n "$p" ] || return 1
