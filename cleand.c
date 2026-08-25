@@ -489,7 +489,12 @@ static void timer_loop(void){
                 /* daily: match HH:MM */
                 if(*daily){
                     char hhmm[8]; snprintf(hhmm,sizeof(hhmm),"%02d:%02d",tmv->tm_hour,tmv->tm_min);
-                    if(strcmp(hhmm,daily)==0) run=1;
+                    /* 防抖：同一 HH:MM 只触发一次（记录上次触发时间） */
+                    char lastd[600]; snprintf(lastd,sizeof(lastd),"%s/.daily_stamp",ADR);
+                    int lastm=-1;
+                    FILE *lf=fopen(lastd,"r"); if(lf){ fscanf(lf,"%d",&lastm); fclose(lf); }
+                    int curm=tmv->tm_hour*60+tmv->tm_min;
+                    if(strcmp(hhmm,daily)==0 && curm!=lastm){ run=1; lf=fopen(lastd,"w"); if(lf){ fprintf(lf,"%d",curm); fclose(lf); } }
                 } else {
                     /* every=12h -> interval check via stamp */
                     int h=atoi(every); if(h<=0) h=12;
