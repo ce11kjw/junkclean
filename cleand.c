@@ -2,6 +2,7 @@
  * 静态编译：aarch64-linux-gnu-gcc -O2 -static -o bin/cleand cleand.c -pthread
  */
 #include <stdio.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -275,7 +276,7 @@ static void api_log(int fd, const char *q){
 
 /* ponytail: AI 响应用 strstr 粗解析 content（不引 JSON 库）。天花板：响应含嵌套转义/非标准格式时解析可能不准。升级路径：引入最小 JSON 解析器或捆绑 cJSON。 */
 /* ---- AI: fork bundled curl, 15s timeout, POST /chat/completions ---- */
-static void api_ai(int fd){
+static void api_ai(int fd, const char* body){
     log_msg("INFO","AI request");
     int now=(int)time(NULL); if(now-ai_last<30){ http_err(fd,429,"{\"e\":\"AI 请求频率过高，请30秒后再试\"}"); return; } ai_last=now;
     char base[512]="", key[512]="", model[128]="";
@@ -472,7 +473,7 @@ static void api_progress(int fd){
 /* ---- status ---- */
 /* 同步执行 cleaner.sh 命令并返回 stdout（设置环境变量） */
 static char* run_sync(const char* args){
-    static char cmd[1024]; snprintf(cmd,sizeof(cmd),"ADR='%s' RULES='%s/rules' CFG='%s/config.conf' SCAN='%s/scan.json' LOG='%s/cleaner.log' sh '%s/cleaner.sh' %s 2>/dev/null", ADR, ADR, ADR, ADR, ADR, MODDIR, args);
+    static char cmd[1024]; snprintf(cmd,sizeof(cmd),"JC_ADR='%s' RULES='%s/rules' CFG='%s/config.conf' SCAN='%s/scan.json' LOG='%s/cleaner.log' sh '%s/cleaner.sh' %s 2>/dev/null", ADR, ADR, ADR, ADR, ADR, MODDIR, args);
     FILE *f=popen(cmd,"r"); if(!f) return NULL;
     char *out=malloc(8192); int n=fread(out,1,8191,f); out[n]=0; pclose(f);
     return out;
@@ -520,6 +521,26 @@ static void api_tasks(int fd, const char *method, const char *body){
 }
 
 /* ---- timer loop: every 60s check tasks.conf; run authorized cats when due ---- */
+static int battery_charging(void){
+    DIR *d=opendir("/sys/class/power_supply"); if(!d) return 0;
+    struct dirent *e; int ok=0;
+    while((e=readdir(d))){
+        if(e->d_name[0]=='.') continue;
+        char p[256]; snprintf(p,sizeof(p),"/sys/class/power_supply/%s/status",e->d_name);
+        FILE *f=fopen(p,"r"); if(!f) continue;
+        char s[32]; if(fgets(s,sizeof(s),f)){ if(!strncmp(s,"Charging",8)||!strncmp(s,"Full",4)) ok=1; }
+        fclose(f);
+    }
+    closedir(d); return ok;
+}
+static int wifi_up(void){
+    FILE *f=fopen("/sys/class/net/wlan0/operstate","r"); if(!f) return 0;
+    char s[16]; int ok=0; if(fgets(s,sizeof(s),f)){ if(!strncmp(s,"up",2)) ok=1; } fclose(f); return ok;
+}
+static int idle_low(void){
+    FILE *f=fopen("/proc/loadavg","r"); if(!f) return 1;
+    float l=99; fscanf(f,"%f",&l); fclose(f); return l<1.5;
+}
 static void timer_loop(void){
     char p[600]; snprintf(p,sizeof(p),"%s/tasks.conf",ADR);
     struct stat stt;
@@ -563,6 +584,12 @@ static void timer_loop(void){
                         if(now-last >= h*3600) { run=1; sf=fopen(stamp,"w"); if(sf){fprintf(sf,"%ld",(long)now); fclose(sf);} }
                     }
                 }
+                /* 条件：charge=1 仅充电 / wifi=1 仅WiFi / idle=1 仅空闲 */
+                if(run){
+                    if(strstr(line,"charge=1") && !battery_charging()) run=0;
+                    if(strstr(line,"wifi=1") && !wifi_up()) run=0;
+                    if(strstr(line,"idle=1") && !idle_low()) run=0;
+                }
                 if(run){
                     char *cmd=malloc(256);
                     snprintf(cmd,256,"clean %s",cats);
@@ -577,7 +604,7 @@ static void timer_loop(void){
     }
 }
 
-void *api_ai_threaded(void *p);
+/* void *api_ai_threaded(void *p); */
 void *handle_threaded(void *p);
 void *timer_thread_wrap(void *p);
 
@@ -622,6 +649,7 @@ static void handle(int fd){
     if(have>cl) body[cl]=0;
     char *q=strchr(base,'?');
     /* route */
+    if(!strncmp(base,"/api/stats-history",18)){ char *out=run_sync("history"); http_json(fd,out?out:"{\"history\":[]}"); free(out); }
     if(!strncmp(base,"/api/status",11)) api_status(fd);
     else if(!strncmp(base,"/api/config",11)) api_config(fd, method, (char*)body);
     else if(!strncmp(base,"/api/rules",10)) api_rules(fd, method, q?q:"", (char*)body);
@@ -653,8 +681,7 @@ static void handle(int fd){
     }
     else if(!strncmp(base,"/api/ai",7)){
         /* run in thread to not block server */
-        pthread_t t; pthread_create(&t,NULL,(void*(*)(void*))api_ai_threaded,(void*)(long)fd); pthread_detach(t);
-        return; /* api_ai_threaded closes fd */
+        api_ai(fd,(char*)body); close(fd); return;
     }
     else if(!strncmp(base,"/api/check",10) && !strcmp(method,"POST")) api_check(fd,(char*)body);
     else if(!strncmp(base,"/api/delbig",11) && !strcmp(method,"POST")) api_delbig(fd,(char*)body);
@@ -679,7 +706,7 @@ static void handle(int fd){
     close(fd);
 }
 /* wrapper for AI in its own thread */
-void *api_ai_threaded(void *p){ long fd=(long)p; api_ai((int)fd); close((int)fd); return NULL; }
+/* ai 同步调用，不再线程化（body 支持多轮对话） */
 
 int main(int argc, char**argv){
     for(int i=1;i<argc;i++){

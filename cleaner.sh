@@ -31,6 +31,20 @@ get_cfg() { # get_cfg <key> <default>
   v=$(sed -n "s/^$1=//p" "$CFG" 2>/dev/null | tail -1)
   [ -n "$v" ] && echo "$v" || echo "$2"
 }
+check_rules_sha() { # 规则 SHA 校验：损坏自动恢复默认（customize 生成的 rules.sha）
+  [ -f "$ADR/rules.sha" ] || return 0
+  while read -r rf expect; do
+    [ -f "$RULES/$rf" ] || continue
+    cur=$(sha256sum "$RULES/$rf" 2>/dev/null | awk '{print $1}')
+    [ "$cur" = "$expect" ] || {
+      if [ -f "$ADR/rules.bak/$rf" ]; then
+        cp -f "$ADR/rules.bak/$rf" "$RULES/$rf" && log WARN "规则 $rf 损坏，已恢复默认"
+      else
+        log WARN "规则 $rf 损坏且无备份"
+      fi
+    }
+  done < "$ADR/rules.sha"
+}
 bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏感，统一转小写比较）
   p=$1; [ -n "$p" ] || return 1
   p=$(printf '%s' "$p" | tr 'A-Z' 'a-z')
@@ -64,6 +78,7 @@ load_rules() { # load_rules <file> -> RUL(路径) + RFLAGS(|分隔标志)
 # rule_flag <N>: 取第 N 条路径的标志
 rule_flag() { echo "$RFLAGS" | cut -d'|' -f$(( $1 + 1 )); }
 do_clean() { # do_clean <cats_csv> [force]
+  check_rules_sha
   FORCE=0; [ "$2" = "force" ] && FORCE=1
   [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats=$(echo "$1" | tr ',' ' ')
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
@@ -227,6 +242,11 @@ do_clean() { # do_clean <cats_csv> [force]
     sed -i "s|^description=.*|description=${desc} · 累计清理 ${tdel} 项/释放 $(human $tfreed)|" "$MP" 2>/dev/null
   fi
   free_after=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_after" ] && free_after=0
+  # 清理历史（趋势图表）：date freed_kb，保留最近 60 条
+  [ "$freed" -gt 0 ] 2>/dev/null && {
+    echo "$(date '+%F') $freed" >> "$ADR/stats.history"
+    tail -60 "$ADR/stats.history" > "$ADR/stats.history.tmp" && mv -f "$ADR/stats.history.tmp" "$ADR/stats.history"
+  }
   echo "{\"deleted\":$n_del,\"skipped\":$n_skip,\"freed_kb\":$freed,\"before\":$free_before,\"after\":$free_after}"
 }
 # ponytail: shell 引擎的天花板是高频操作性能（每次操作 fork 子进程）。
@@ -255,6 +275,7 @@ sqlite_opt() {
 }
 
 do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
+  check_rules_sha
   # 增量缓存：60 秒内不重扫（force 参数强制重扫）
   if [ "$1" != "force" ] && [ -f "$SCAN" ]; then
     if [ $(( $(date +%s) - $(stat -c %Y "$SCAN") )) -lt 60 ] 2>/dev/null; then
@@ -317,6 +338,16 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
     "$(date '+%F %T')" "$free_kb" "$health" "$sc" "$big" "$red" "$apps" > "$SCAN"
   prog 100 "体检完成，可释放约 $(human $total_kb)"
   cat "$SCAN"
+}
+do_history() { # 清理历史（趋势图表）
+  [ -f "$ADR/stats.history" ] || { echo '{"history":[]}'; exit 0; }
+  out=''
+  while read -r d kb; do
+    [ -n "$d" ] || continue
+    out="$out{\"d\":\"$d\",\"kb\":\"$kb\"},"
+  done < "$ADR/stats.history"
+  out=${out%,}
+  echo "{\"history\":[$out]}"
 }
 do_cleanapp() { # 清单个应用缓存（/sdcard/Android/data/<pkg>/cache）
   pkg="$1"; [ -n "$pkg" ] || { echo '{"ok":0,"e":"nopkg"}'; exit 0; }
@@ -516,6 +547,7 @@ case "$1" in
   scan)      do_scan ;;
   classify)  do_classify "$2" ;;
   cleanapp)  do_cleanapp "$2" ;;
+  history)   do_history ;;
   duplicate) do_duplicate "$2" ;;
   fstrim)    do_fstrim ;;
   rescan)    do_rescan ;;

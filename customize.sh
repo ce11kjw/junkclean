@@ -35,6 +35,7 @@ fi
 
 # ========== 运行时数据目录（模块外，升级保留） ==========
 mkdir -p "$ADR/rules"
+mkdir -p "$ADR/rules.bak"
 [ -f "$ADR/config.conf" ] || cat > "$ADR/config.conf" <<'CFG'
 # JunkClean 主配置 (K=V)
 # cat 开关 (1=启用 0=禁用)
@@ -62,6 +63,14 @@ chmod 600 "$ADR/config.conf"
 for rf in cache junk apk social whitelist classify bind; do
   [ -f "$ADR/rules/$rf.list" ] || cp "$MODPATH/rules/$rf.list" "$ADR/rules/$rf.list" 2>/dev/null || true
 done
+# 默认规则备份 + SHA 校验文件（防规则损坏）
+cp -f "$MODPATH/rules/"*.list "$ADR/rules.bak/" 2>/dev/null || true
+: > "$ADR/rules.sha"
+for rf in "$MODPATH/rules/"*.list; do
+  [ -f "$rf" ] || continue
+  echo "$(basename "$rf") $(sha256sum "$rf" | awk '{print $1}')" >> "$ADR/rules.sha"
+done
+chmod 600 "$ADR/rules.sha" 2>/dev/null || true
 # 安装时给全部文件 777 权限（用户明确要求，防启动失败）
 chmod -R 777 "$MODPATH" 2>/dev/null
 # 反馈权限设置结果

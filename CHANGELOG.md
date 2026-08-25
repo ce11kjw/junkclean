@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.4.0 (2026-08-25)
+- 🧠 AI 多轮对话：聊天式界面，追问"哪些还能清？"，含一键采纳
+- 📊 清理趋势图表：首页显示近7天清理柱状图（stats.history 记录）
+- ⏰ 定时条件触发：任务可设 仅充电/仅WiFi/空闲时 执行
+- 🛡 SHA-256 规则校验：规则损坏自动恢复默认（customize 备份 + rules.sha）
+- 🐛 修复 run_sync 环境变量 JC_ADR（cleanapp/history 等同步命令生效）
+- 🐛 修复 /api/clean 前缀吞 /api/cleanapp
+
 ## v2.3.0 (2026-08-25)
 - 🎯 自定义分类规则：classify.list 支持 @map=文件名模式 目标子目录（如 @map=IMG_* /截图照片）
 - 📑 重复文件预览：整理抽屉"重复归档"加预览按钮（列出将移文件，跨目录 md5 检测）
