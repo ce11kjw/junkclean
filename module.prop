@@ -1,7 +1,7 @@
 id=junkclean
 name=JunkClean
-version=v2.5.2
-versionCode=252
+version=v2.5.3
+versionCode=253
 author=CE11KJW
 description=智能垃圾清理+存储维护：体检/清理/整理/重定向/AI建议 · KSU/AP通用 · 零数据采集 · 开源致谢 · 累计清理 101 项/释放 4.9M
 updateJson=https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json
