@@ -235,6 +235,24 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
 .done .released{font-size:44px;font-weight:800;margin:16px 0 4px;font-variant-numeric:tabular-nums;
   background:linear-gradient(90deg,#00e5c8,#7c5cff);-webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;color:transparent;filter:drop-shadow(0 0 18px rgba(0,229,200,.35))}
+async function bigArchive(p){ const r=await api('/api/bigmove',{method:'POST',body:p}); toast(r.moved?'✔ 已归档':'✗'); renderReview(); }
+function bigDelete(p){ showDialog('📁 删除大文件','<div style="font-size:13px;color:var(--sub)">确认删除？<br><span style="word-break:break-all">'+escapeHtml(p)+'</span></div><div style="margin-top:8px;text-align:center"><button class="sw on" onclick="bigDeleteGo(\''+escapeHtml(p)+'\')">删除</button></div>'); }
+async function bigDeleteGo(p){ const r=await api('/api/delbig',{method:'POST',body:p}); toast(r.deleted?'✔ 已删除':'✗'); const d=document.querySelector('div[style]'); if(d) d.remove(); renderReview(); }
+async function renderApps(){
+  if(!scan.apps||!scan.apps.length) return;
+  const items=scan.apps.filter(a=>(+a.kb||0)>0).sort((a,b)=>+b.kb-+a.kb);
+  const card=document.createElement('div'); card.className='card';
+  card.innerHTML='<div class="card-h"><span class="ico">📱</span>按应用清理<span style="font-size:10px;color:var(--sub);font-weight:400">'+items.length+' 个</span></div><div class="card-b">'+
+    items.slice(0,15).map(a=>'<div class="setrow" style="padding:9px 2px"><span class="lbl" style="font-size:12px">'+escapeHtml(a.p)+'</span><span class="val" style="display:flex;gap:6px;align-items:center">'+fmtKB((+a.kb)*1024)+' <button class="sw on" style="padding:2px 8px" data-pkg="'+escapeHtml(a.p)+'">清理</button></span></div>').join('')+'</div>';
+  card.querySelectorAll('button[data-pkg]').forEach(b=>b.onclick=async()=>{
+    b.textContent='…'; b.disabled=1;
+    const r=await api('/api/cleanapp',{method:'POST',body:b.dataset.pkg});
+    toast(r.ok?('✓ '+fmtKB((r.freed||0)*1024)):('✗ '+(r.e||'err')));
+    b.textContent='清理'; b.disabled=0;
+    if(r.ok&&r.freed){ b.closest('.setrow').remove(); }
+  });
+  $('catlist').appendChild(card);
+}
 /* ===== 规则路径行 ===== */
 .rulelist{padding:2px 16px 12px}
 .ruleline{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -611,6 +629,7 @@ function cancelScan(){ clearInterval(scanTimer); gotoHome(); }
 let scan=null,lastScan=null,sel={},rulesStore={};
 function renderReview(){
   scan=lastScan; sel={};
+  if(!window.big_min){ api('/api/config').then(cfg=>{ const m=(cfg&&cfg.cfg||'').match(/big_min=(\d+)/); window.big_min=m?Math.round(parseInt(m[1])/1024):100; }); }
   const box=$('catlist'); box.innerHTML='';
   CAT_ORDER.forEach(id=>{
     const v=scan.cats&&scan.cats[id]; if(!v||!(+v.kb||+v.count)) return;
@@ -627,6 +646,7 @@ function renderReview(){
     renderRules(id,el);
   });
   renderBig();
+  renderApps();
   showTab('clean'); showView('review');
   updateSel();
 }
@@ -656,7 +676,7 @@ function renderBig(){
   detail.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'+
     '<span class="sw on" style="padding:2px 8px" data-ext="">所有</span>'+
     extSet.map(e=>'<span class="sw" style="padding:2px 8px" data-ext="'+e+'">.'+e+'</span>').join('')+'</div>'+
-    big.slice(0,15).map(b=>'<div class="bigitem" data-ext="'+((b.p.match(/\.(\w+)$/)||['',''])[1])+'">'+fmtKB(b.kb)+' · '+escapeHtml(b.p)+'</div>').join('')+
+    big.slice(0,15).map(b=>'<div class="bigitem" data-ext="'+((b.p.match(/\.(\w+)$/)||['',''])[1])+'" style="display:flex;justify-content:space-between;gap:6px;padding:3px 0"><span style="word-break:break-all">'+fmtKB(b.kb)+' · '+escapeHtml(b.p)+'</span><span style="flex-shrink:0"><button class="sw" style="padding:1px 6px;font-size:10px" onclick="bigArchive(\''+escapeHtml(b.p)+'\')">归档</button> <button class="sw" style="padding:1px 6px;font-size:10px;color:var(--danger)" onclick="bigDelete(\''+escapeHtml(b.p)+'\')">删除</button></span></div>').join('')+
     (big.length>15?'<div style="padding:3px 0;color:var(--sub)">…还有 '+ (big.length-15)+' 个</div>':'');
   el.appendChild(detail);
   el.querySelector('.nm').style.cursor='pointer';
