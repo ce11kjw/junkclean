@@ -2,697 +2,668 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>JunkClean</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>JunkClean v2</title>
+<link rel="stylesheet" href="https://mui.kernelsu.org/internal/insets.css">
 <style>
-/* ============ JunkClean v1.3 Premium (Ethereal Glass) ============ */
+/* ===== 主题 ===== */
 :root{
-  --bg:#050505; --card:rgba(255,255,255,0.04); --card2:rgba(255,255,255,0.07);
-  --acc:#2DD4BF; --acc2:#14B8A6; --ok:#34D399; --warn:#F59E0B; --bad:#F87171;
-  --txt:#F5F5F7; --sub:rgba(245,245,247,0.55); --line:rgba(255,255,255,0.08);
-  --purple:#A78BFA; --blue:#60A5FA;
-  --spring:cubic-bezier(0.32,0.72,0,1);
+  --bg:#0b0d12; --card:#14171f; --card2:#1a1e28;
+  --line:rgba(255,255,255,.07); --txt:#e8eaf0; --sub:#8b93a7;
+  --acc:#2dd4bf; --acc-dim:rgba(45,212,191,.14);
+  --warn:#f59e0b; --danger:#f87171; --ok:#34d399;
+  --r:14px; --spring:cubic-bezier(.32,.72,0,1);
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{background:var(--bg)}
+[data-theme="light"]{ --bg:#f5f6f8; --card:#fff; --card2:#eef0f4; --line:rgba(0,0,0,.08); --txt:#1a1d24; --sub:#5b6270; }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none}
+html,body{margin:0;padding:0}
 body{
-  background:var(--bg);color:var(--txt);
-  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
-  min-height:100dvh; overflow-x:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--txt);min-height:100vh;
+  padding:calc(var(--window-inset-top,16px) + 8px) 14px calc(var(--window-inset-bottom,0px) + 20px);
+  user-select:none;overflow-x:hidden;
+  transition:background .3s;
 }
-/* ---- 背景光晕（Ethereal Glass）---- */
-body::before{
-  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:
-    radial-gradient(600px at 15% 8%, rgba(45,212,191,.14), transparent 60%),
-    radial-gradient(520px at 88% 20%, rgba(167,139,250,.11), transparent 60%),
-    radial-gradient(700px at 50% 100%, rgba(45,212,191,.07), transparent 60%);
-}
-/* ---- 噪点颗粒（fixed 覆盖层）---- */
-body::after{
-  content:"";position:fixed;inset:0;z-index:999;pointer-events:none;opacity:.028;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.num{font-variant-numeric:tabular-nums}
-.muted{color:var(--sub);font-size:13px;line-height:1.6}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ============ 浮岛 Header（Fluid Island） ============ */
-header{
-  position:fixed;top:14px;left:14px;right:14px;z-index:40;
-  height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;
-  background:rgba(10,10,14,.72);border:1px solid var(--line);
-  border-radius:999px;backdrop-filter:blur(18px);
-  box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
-  transition:transform .5s var(--spring);
-}
-header .logo{font-weight:700;font-size:16px;letter-spacing:.2px;white-space:nowrap}
-.logo b{background:linear-gradient(135deg,var(--acc),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 2s infinite;box-shadow:0 0 10px var(--ok)}
-.dot.down{background:var(--bad);animation:none;box-shadow:none}
-@keyframes pulse{50%{opacity:.35}}
-header .grow{flex:1}
-.iconbtn{
-  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);
-  width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;flex:none;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .4s var(--spring);
-}
-.iconbtn:active{transform:scale(.88);opacity:.6}
-
-/* ============ 进度条 ============ */
-#topbar{position:fixed;top:0;left:0;height:3px;width:0%;z-index:100;display:none;
-  background:linear-gradient(90deg,var(--acc),var(--blue));border-radius:0 2px 2px 0;
-  box-shadow:0 0 12px rgba(45,212,191,.5);
-  transition:width .5s var(--spring)}
-#topbar.busy{display:block}
-#topbar.moving{animation:flow 1.4s linear infinite}
-@keyframes flow{0%{background-position:0 0}100%{background-position:200% 0}}
-#msgline{position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:100;
-  font-size:12px;color:var(--acc);background:rgba(5,5,5,.85);padding:4px 14px;border-radius:999px;
-  border:1px solid var(--line);display:none;backdrop-filter:blur(8px)}
-
-/* ============ 布局 ============ */
-main{position:relative;z-index:1;max-width:640px;margin:0 auto;padding:84px 16px 120px}
-/* Asymmetrical Bento: 手机单列 + 平板双列 */
-@media(min-width:560px){
-  .bento{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .bento .span2{grid-column:span 2}
-  .bento .spanfull{grid-column:1/-1}
-}
-.card{
-  background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;
-  margin:12px 0;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 40px rgba(0,0,0,.4);
-  transition:transform .5s var(--spring),border-color .5s var(--spring),background .5s var(--spring);
-}
-.card:active{transform:scale(.985)}
-.card h3{font-size:11px;color:var(--sub);font-weight:600;margin-bottom:14px;
-  display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.16em}
-.card h3::before{content:"";width:18px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--acc),transparent)}
+/* ===== 通用 ===== */
+.hidden{display:none!important}
 .row{display:flex;align-items:center;gap:10px}
 .grow{flex:1}
+.muted{color:var(--sub);font-size:13px}
+.iconbtn{background:none;border:none;color:var(--sub);font-size:20px;padding:10px;border-radius:50%;cursor:pointer}
+.iconbtn:active{background:var(--line)}
+/* 水波纹 */
+.btn{position:relative;overflow:hidden;border:none;border-radius:999px;
+  font-size:16px;font-weight:600;color:var(--txt);cursor:pointer;
+  padding:15px 24px;background:var(--card2);transition:transform .15s var(--spring);}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--acc);color:#062e27}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--sub)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.ripple-ink{position:absolute;border-radius:50%;background:currentColor;opacity:.22;
+  transform:scale(0);pointer-events:none;animation:rip .55s ease-out forwards}
+@keyframes rip{to{transform:scale(1);opacity:0}}
 
-/* ============ 体检摘要（巨型数字） ============ */
-.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 2px}
-.sum-card{
-  background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;
-  padding:16px 10px;text-align:center;position:relative;overflow:hidden;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
-}
-.sum-card::after{content:"";position:absolute;top:-30px;right:-30px;width:70px;height:70px;
-  background:radial-gradient(circle,rgba(45,212,191,.12),transparent 70%)}
-.sum-card .v{font-size:26px;font-weight:750;letter-spacing:-.03em;line-height:1.1}
-.sum-card .l{font-size:10px;color:var(--sub);margin-top:4px;text-transform:uppercase;letter-spacing:.14em}
-.badge{padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em}
-.b-green{background:rgba(52,211,153,.15);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(52,211,153,.2)}
-.b-yellow{background:rgba(245,158,11,.15);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(245,158,11,.2)}
-.b-red{background:rgba(248,113,113,.15);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(248,113,113,.2)}
+/* ===== 页面容器 ===== */
+.page{display:none;animation:pg .3s var(--spring)}
+.page.show{display:block}
+@keyframes pg{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.topbar{display:flex;align-items:center;gap:8px;padding:4px 2px 14px}
+.topbar h1{font-size:18px;margin:0;font-weight:700}
 
-/* ============ 按钮（Island + Button-in-Button） ============ */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;cursor:pointer;
-  border-radius:999px;font-size:14px;font-weight:600;padding:12px 22px;
-  background:linear-gradient(135deg,var(--acc),var(--acc2));color:#052e29;
-  transition:transform .4s var(--spring),opacity .4s var(--spring),box-shadow .4s var(--spring);
-  box-shadow:0 4px 20px rgba(45,212,191,.25);
-}
-.btn:active{transform:scale(.96);opacity:.85}
-.btn.ghost{background:rgba(255,255,255,.04);color:var(--acc);border:1px solid rgba(45,212,191,.3);
-  box-shadow:none}
-.btn.danger{background:linear-gradient(135deg,var(--bad),#EF4444);color:#fff}
-.btn.block{width:100%}
-.btns{display:flex;gap:10px;margin-top:14px}
-.btns .btn{flex:1}
-.btn.primary-bar{
-  position:sticky;bottom:88px;width:calc(100% - 40px);margin:0 auto;display:flex;
-  border-radius:999px;font-size:15px;padding:14px 18px;
-  background:linear-gradient(135deg,var(--acc),var(--acc2));
-  box-shadow:0 10px 40px rgba(45,212,191,.35),inset 0 1px 0 rgba(255,255,255,.3);
-}
-/* Button-in-Button 尾图标圈 */
-.btn.primary-bar::after{
-  content:"✓";width:28px;height:28px;border-radius:50%;flex:none;
-  background:rgba(5,5,5,.18);display:inline-flex;align-items:center;justify-content:center;
-  font-size:13px;margin-left:4px;transition:transform .4s var(--spring);
-}
-.btn.primary-bar:active::after{transform:translateX(2px) scale(1.08)}
-
-/* ============ 清理项 ============ */
-.cleanitem{display:flex;align-items:center;gap:14px;padding:14px 4px;
-  border-bottom:1px solid rgba(255,255,255,.05);transition:background .4s var(--spring)}
-.cleanitem:last-child{border-bottom:none}
-.cleanitem .ic{
-  width:42px;height:42px;border-radius:14px;flex:none;
-  background:rgba(255,255,255,.05);border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;font-size:19px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
-}
-.cleanitem .t{font-weight:600;font-size:14px}
-.cleanitem .s{font-size:12px;color:var(--sub)}
-.chk{
-  width:24px;height:24px;border-radius:8px;flex:none;cursor:pointer;
-  border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.03);
+/* ===== 首页 ===== */
+.ringwrap{display:flex;flex-direction:column;align-items:center;padding:18px 0 6px}
+.ring{position:relative;width:170px;height:170px;border-radius:50%;
+  background:conic-gradient(var(--acc) calc(var(--pct)*1%),rgba(255,255,255,.06) 0);
   display:flex;align-items:center;justify-content:center;
-  transition:all .35s var(--spring);
-}
-.chk.on{background:var(--acc);border-color:var(--acc);color:#052e29;transform:scale(1.06);
-  box-shadow:0 0 14px rgba(45,212,191,.4)}
+  box-shadow:0 0 40px rgba(45,212,191,.15)}
+.ring::before{content:'';position:absolute;inset:10px;border-radius:50%;background:var(--bg)}
+.ring>div{position:relative;text-align:center}
+.ring .num{font-size:38px;font-weight:800;letter-spacing:-1px}
+.ring .lbl{font-size:12px;color:var(--sub)}
+.herobtn{display:flex;flex-direction:column;align-items:center;margin:26px 0 8px}
+.herobtn .btn{width:82%;max-width:340px;padding:19px;font-size:18px;border-radius:18px;background:var(--acc);color:#062e27;box-shadow:0 10px 30px rgba(45,212,191,.25)}
+.lastscan{text-align:center;color:var(--sub);font-size:13px;margin-top:10px}
 
-/* ============ 大文件列表 ============ */
-.bigitem{display:flex;align-items:center;gap:12px;padding:11px 4px;
-  border-bottom:1px solid rgba(255,255,255,.045);font-size:13px;
-  transition:background .35s var(--spring)}
-.bigitem:last-child{border-bottom:none}
-.bigitem:active{background:rgba(255,255,255,.05);border-radius:12px}
-.bigitem .p{flex:1;word-break:break-all;color:var(--sub);font-size:12px}
-.redtag{color:var(--bad);font-size:11px;border:1px solid rgba(248,113,113,.4);border-radius:6px;padding:1px 7px;flex:none}
+/* ===== 扫描页 ===== */
+.scanring{position:relative;width:150px;height:150px;margin:60px auto 30px}
+.scanring svg{transform:rotate(-90deg)}
+.scanring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800}
+.scancur{text-align:center;margin:8px 0}
+.scanstat{text-align:center;color:var(--sub);font-size:13px;margin-top:6px}
 
-/* ============ 环形进度（清理中） ============ */
-.ringwrap{display:none;position:fixed;inset:0;z-index:90;background:rgba(5,5,5,.85);
-  backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;gap:18px}
-.ringwrap.show{display:flex}
-.ring{width:120px;height:120px;border-radius:50%;
-  background:conic-gradient(var(--acc) calc(var(--p)*1%),rgba(255,255,255,.06) 0);
-  display:flex;align-items:center;justify-content:center;position:relative;
-  filter:drop-shadow(0 0 30px rgba(45,212,191,.25))}
-.ring::before{content:"";position:absolute;inset:10px;border-radius:50%;background:#0a0a0e}
-.ring .pctval{position:relative;font-size:28px;font-weight:800;letter-spacing:-.02em}
-.ring .rmsg{position:fixed;margin-top:150px;font-size:14px;color:var(--acc);letter-spacing:.02em}
+/* ===== 清单 ===== */
+.listhead{padding:6px 2px 12px}
+.listhead h2{margin:0;font-size:20px}
+.catcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:15px;margin-bottom:10px;display:flex;align-items:center;gap:12px;
+  transition:border-color .2s,transform .15s var(--spring);cursor:pointer}
+.catcard:active{transform:scale(.99)}
+.catcard.on{border-color:rgba(45,212,191,.4)}
+.catcard.redline{border-color:rgba(248,113,113,.4)}
+.chk{width:24px;height:24px;border-radius:7px;border:2px solid var(--sub);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;transition:all .15s}
+.catcard.on .chk{background:var(--acc);border-color:var(--acc)}
+.catcard.redline.on .chk{background:var(--danger);border-color:var(--danger)}
+.catcard .nm{font-weight:600;flex:1}
+.catcard .sz{font-weight:700;font-size:15px}
+.catcard .cnt{font-size:12px;color:var(--sub);margin-top:2px}
+.redbadge{font-size:11px;color:var(--danger);border:1px solid rgba(248,113,113,.4);
+  border-radius:999px;padding:2px 8px;margin-left:6px}
+.bottombar{position:fixed;left:0;right:0;bottom:0;
+  padding:10px 14px calc(var(--window-inset-bottom,0px) + 10px);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;z-index:10}
+.bottombar .sum{flex:1}
+.bottombar .sum b{font-size:17px}
 
-/* ============ 底部 Tab 浮岛 ============ */
-nav{position:fixed;bottom:14px;left:14px;right:14px;z-index:40;
-  background:rgba(10,10,14,.72);border:1px solid var(--line);border-radius:999px;
-  backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
-nav .tabrow{max-width:640px;margin:0 auto;display:flex;padding:4px}
-nav button{
-  flex:1;background:none;border:none;color:var(--sub);padding:8px 0 9px;font-size:10px;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:999px;position:relative;
-  transition:color .4s var(--spring),background .4s var(--spring)}
-nav button .em{font-size:18px;filter:grayscale(1);opacity:.55;transition:filter .4s var(--spring),opacity .4s var(--spring)}
-nav button.act{color:var(--acc);background:rgba(45,212,191,.08)}
-nav button.act .em{filter:none;opacity:1}
-nav button.act::after{content:"";position:absolute;bottom:2px;left:38%;right:38%;height:3px;
-  border-radius:99px;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+/* ===== 确认页 ===== */
+.confirm{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.65);
+  display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.confirm.show{opacity:1;pointer-events:auto}
+.confirm .sheet{width:100%;background:var(--card);border-radius:22px 22px 0 0;
+  padding:22px 18px calc(var(--window-inset-bottom,0px) + 18px);
+  transform:translateY(100%);transition:transform .3s var(--spring)}
+.confirm.show .sheet{transform:none}
+.confirm h3{margin:0 0 4px;font-size:19px}
+.confirm .big{font-size:34px;font-weight:800;margin:10px 0 2px}
+.confirm .clist{margin:14px 0;background:var(--card2);border-radius:12px;padding:6px 14px}
+.confirm .clist .row{padding:10px 0;border-bottom:1px solid var(--line)}
+.confirm .clist .row:last-child{border-bottom:none}
+.confirm .warn{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);
+  color:var(--danger);border-radius:10px;padding:10px 12px;font-size:13px;margin:10px 0}
+.confirm .btns{display:flex;gap:10px;margin-top:16px}
+.confirm .btns .btn{flex:1;padding:15px}
 
-/* ============ 开关/输入 ============ */
-.toggle{width:46px;height:28px;border-radius:999px;background:rgba(255,255,255,.1);
-  position:relative;cursor:pointer;transition:background .4s var(--spring);flex:none}
-.toggle::after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;
-  top:3px;left:3px;transition:left .4s var(--spring);box-shadow:0 2px 6px rgba(0,0,0,.4)}
-.toggle.on{background:var(--acc)}
-.toggle.on::after{left:21px}
-input[type=text],input[type=password],textarea,select{
-  width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--txt);
-  border-radius:14px;padding:12px 14px;font-size:14px;outline:none;margin:4px 0;
-  transition:border-color .4s var(--spring),box-shadow .4s var(--spring)}
-textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical;
-  line-height:1.6}
-input:focus,textarea:focus,select:focus{border-color:var(--acc);
-  box-shadow:0 0 0 3px rgba(45,212,191,.12)}
-label.f{display:block;font-size:11px;color:var(--sub);margin-top:10px;
-  text-transform:uppercase;letter-spacing:.12em}
+/* ===== 完成页 ===== */
+.done{display:flex;flex-direction:column;align-items:center;padding-top:70px;text-align:center}
+.done .emo{font-size:64px;animation:bounce .6s var(--spring) .2s}
+@keyframes bounce{from{transform:scale(0)}to{transform:scale(1)}}
+.done .released{font-size:44px;font-weight:800;margin:18px 0 4px;color:var(--acc)}
+.done .btns{display:flex;gap:10px;margin-top:36px}
 
-/* ============ AI 输出 ============ */
-.aiout{white-space:pre-wrap;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.18);
-  border-radius:16px;padding:16px;font-size:13.5px;margin-top:12px;line-height:1.7;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+/* ===== 设置 ===== */
+.setgroup{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  margin-bottom:12px;overflow:hidden}
+.setgroup .sg-title{padding:12px 15px 6px;font-size:13px;color:var(--sub);font-weight:600}
+.setrow{display:flex;align-items:center;gap:10px;padding:13px 15px;
+  border-bottom:1px solid var(--line);cursor:pointer}
+.setrow:last-child{border-bottom:none}
+.setrow:active{background:var(--card2)}
+.setrow .lbl{flex:1}
+.setrow .val{color:var(--sub);font-size:14px}
+.switch{width:48px;height:28px;border-radius:999px;background:var(--line);position:relative;
+  transition:background .2s;flex:none}
+.switch::after{content:'';position:absolute;width:22px;height:22px;border-radius:50%;
+  background:#fff;top:3px;left:3px;transition:left .2s var(--spring)}
+.switch.on{background:var(--acc)}
+.switch.on::after{left:23px}
+select,input[type=text],textarea{width:100%;background:var(--card2);color:var(--txt);
+  border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;
+  font-family:inherit;margin:6px 0}
+textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;font-size:13px}
 
-/* ============ 日志浮层 ============ */
-#logpage{position:fixed;inset:0;z-index:60;background:rgba(5,5,5,.92);display:none;
-  flex-direction:column;padding:78px 16px 30px;backdrop-filter:blur(20px)}
-#logpage.show{display:flex}
-.logtab{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--sub);
-  font-size:12px;padding:6px 12px;border-radius:999px;cursor:pointer;
-  transition:all .4s var(--spring)}
-.logtab.on{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.35);color:var(--acc)}
-#logbox{flex:1;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--line);
-  border-radius:18px;padding:14px;font:12px/1.6 ui-monospace,Menlo,monospace;
-  white-space:pre-wrap;color:#7DD3FC}
-.err{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}
+/* ===== Toast ===== */
+.toast{position:fixed;top:calc(var(--window-inset-top,16px) + 8px);left:50%;transform:translate(-50%,-150%);
+  background:var(--card2);color:var(--txt);padding:11px 20px;border-radius:999px;font-size:14px;
+  border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:99;transition:transform .3s var(--spring)}
+.toast.show{transform:translate(-50%,0)}
 
-/* ============ 确认弹窗 ============ */
-.modal{position:fixed;inset:0;z-index:80;background:rgba(5,5,5,.8);display:none;
-  align-items:center;justify-content:center;padding:28px;backdrop-filter:blur(16px)}
-.modal.show{display:flex}
-.modal .box{
-  background:#101014;border:1px solid var(--line);border-radius:24px;padding:24px;
-  max-width:360px;width:100%;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 24px 80px rgba(0,0,0,.7)}
-.modal .q{font-size:17px;font-weight:700;margin-bottom:8px}
-.modal .d{font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.7}
-
-/* ============ 设置页 ============ */
-.about-banner{
-  background:linear-gradient(135deg,rgba(45,212,191,.12),rgba(20,184,166,.04) 60%);
-  border:1px solid rgba(45,212,191,.2);border-radius:24px;padding:28px 18px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-.about-banner .author{font-size:22px;font-weight:800;letter-spacing:-.02em}
-.credits{font-size:12.5px;color:var(--sub);line-height:1.7}
-.credits li{margin:8px 0;list-style:none;padding-left:16px;position:relative}
-.credits li::before{content:"•";position:absolute;left:0;color:var(--acc)}
-.credits b{color:var(--acc)}
-details{border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin:10px 0;
-  background:var(--card);transition:border-color .4s var(--spring)}
-details summary{cursor:pointer;font-weight:600;font-size:14px;opacity:.85}
-details[open] summary{opacity:1}
-.task{display:flex;align-items:center;gap:12px;padding:12px 4px;
-  border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
-.task:last-child{border:none}
-.tag{font-size:11px;background:rgba(255,255,255,.05);color:var(--acc);border-radius:8px;
-  padding:3px 9px;border:1px solid rgba(45,212,191,.15)}
-.footer-note{text-align:center;color:var(--sub);font-size:11px;margin:32px 0 8px;
-  letter-spacing:.05em}
-
-/* 入口动画（滚动进入） */
-.jc-enter{transition:transform .8s var(--spring),opacity .8s var(--spring)}
-.jc-enter-start{transform:translateY(18px);opacity:0}
-.jc-enter-end{transform:translateY(0);opacity:1}
-
-/* ===== v1.5 美化层（纯 CSS，零依赖）===== */
-/* ① 健康度数字发光 + 呼吸 */
-.ring{filter:drop-shadow(0 0 10px rgba(45,212,191,.30))}
-@keyframes jc-glow{0%,100%{text-shadow:0 0 14px rgba(45,212,191,.22)}50%{text-shadow:0 0 34px rgba(45,212,191,.55)}}
-.ring>div,.ring>span{animation:jc-glow 3.5s ease-in-out infinite}
-/* ② 卡片毛玻璃 */
-.card,.sum-card{
-  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  border:1px solid rgba(255,255,255,.07);box-shadow:0 8px 32px rgba(0,0,0,.35)}
-/* ⑤ 卡片 hover 上浮 */
-.card{transition:transform .35s var(--spring),box-shadow .35s}
-.card:active{transform:scale(.985)}
-@media(hover:hover){.card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.45)}}
-/* ③ 按钮光晕扫过 */
-.btn,.iconbtn{position:relative;overflow:hidden}
-.btn::after,.iconbtn::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
-  background:linear-gradient(100deg,transparent,rgba(255,255,255,.08),transparent);transform:skewX(-20deg)}
-@keyframes jc-sheen{0%{left:-60%}60%,100%{left:130%}}
-.btn:hover::after,.iconbtn:hover::after{animation:jc-sheen .8s ease}
-/* 全局背景微光 */
-body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:radial-gradient(1200px 500px at 50% -10%,rgba(45,212,191,.06),transparent 60%),
-  radial-gradient(900px 400px at 85% 110%,rgba(167,139,250,.05),transparent 60%)}
-/* reduced-motion 尊重 */
-@media(prefers-reduced-motion:reduce){.ring>div,.ring>span,.btn::after,.iconbtn::after{animation:none}}
+/* ===== 子页面抽屉 ===== */
+.drawer{position:fixed;inset:0;z-index:40;background:var(--bg);
+  transform:translateX(100%);transition:transform .3s var(--spring);
+  padding:calc(var(--window-inset-top,16px) + 8px) 14px calc(var(--window-inset-bottom,0px) + 20px);
+  overflow-y:auto}
+.drawer.show{transform:none}
 </style>
 </head>
-<body x-data="app()" x-init="init()">
-<div id="topbar" :class="pb.busy?'busy':''" :style="'width:'+(pb.moving?30:pb.pct)+'%'"></div>
-<div id="msgline" x-show="pb.busy" x-text="pb.msg"></div>
-
-<header>
-  <div class="logo"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> <b>Junk</b>Clean</div>
-  <span class="dot" :class="!daemon&&'down'"></span>
-  <span class="muted" style="font-size:12px" x-text="daemon?t('running'):t('stopped')"></span>
-  <div class="grow"></div>
-  <button class="iconbtn" @click="openLog()" title="日志"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></button>
-</header>
-
-<main>
-  <!-- ============ 体检 ============ -->
-  <section x-show="tab=='health'" data-tab="health" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
-    <div class="card summary spanfull">
-      <div class="sum-card"><div class="v num" x-text="fmtK(freeK)"></div><div class="l" x-text="t('free')"></div></div>
-      <div class="sum-card"><div class="v num" x-text="fmtK(junkK)"></div><div class="l" x-text="t('junk')"></div></div>
-      <div class="sum-card"><div class="v"><span class="badge" :class="'b-'+health" x-text="healthText"></span></div><div class="l" x-text="t('health')"></div></div>
-    </div>
-    <div class="card spanfull">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> <span x-text="t('healthcheck')"></span></h3>
-      <div class="btns">
-        <button class="btn block" @click="runScan()" :disabled="pb.busy" x-text="t('scan')"></button>
-      </div>
-      <div class="muted" style="margin-top:8px" x-text="scanTs"></div>
-      <div id="rec" x-show="recs.length">
-        <div class="cleanitem" style="padding-top:10px" x-for="r in recs" :key="r.cat">
-          <div class="ic"></div>
-          <div class="grow"><div class="t" x-text="catName(r.cat)"></div><div class="s" x-text="r.desc"></div></div>
-          <span class="badge b-yellow" x-text="fmtK(r.kb)"></span>
-        </div>
-        <div class="btns"><button class="btn" @click="cleanSel(recs.map(r=>r.cat).join(','),'force')" x-text="t('cleanrec')"></button></div>
+<body x-init>
+<!-- ============ 首页 ============ -->
+<div id="page-home" class="page show">
+  <div class="topbar">
+    <h1>JunkClean</h1>
+    <div class="grow"></div>
+    <button class="iconbtn" onclick="openDrawer('drawer-organize')" title="整理">🗂</button>
+    <button class="iconbtn" onclick="openDrawer('drawer-settings')" title="设置">⚙️</button>
+  </div>
+  <div class="ringwrap">
+    <div class="ring" id="home-ring" style="--pct:0">
+      <div>
+        <div class="num" id="home-free">--</div>
+        <div class="lbl" id="home-free-lbl">可用空间</div>
       </div>
     </div>
-    <div class="card spanfull">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> <span x-text="t('bigfiles')"></span></h3>
-      <div class="bigitem" x-for="b in big" :key="b.p">
-        <span class="chk" @click="toggleBig(b.p)" :class="selBig[b.p]&&'on'"><span x-text="selBig[b.p]?'✓':''"></span></span>
-        <div class="grow"><div class="t" x-text="base(b.p)"></div><div class="p" x-text="b.p"></div></div>
-        <span class="num muted" x-text="fmtK(b.kb)"></span>
-      </div>
-      <div x-show="!big.length" class="muted" x-text="t('nobig')"></div>
-      <div class="btns" x-show="big.length">
-        <button class="btn ghost" @click="delBig()" x-text="t('delSel',[bigSelN])"></button>
-      </div>
-    </div>
-    <div class="card spanfull">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg> <span x-text="t('aiadv')"></span></h3>
-      <button class="btn ghost block" @click="runAI()" :disabled="ai.run" x-text="ai.run?t('aithink'):t('aigo')"></button>
-      <div class="aiout" x-show="ai.out" x-text="ai.out"></div>
-      <div class="muted" style="margin-top:6px" x-show="ai.err" x-text="ai.err"></div>
-    </div>
-  </section>
+  </div>
+  <div class="herobtn">
+    <button class="btn" id="btn-scan" onclick="startScan()">🔍 开始扫描垃圾</button>
+    <div class="lastscan" id="lastscan"></div>
+  </div>
+</div>
 
-  <!-- ============ 清理 ============ -->
-  <section x-show="tab=='clean'" data-tab="clean" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
-    <div class="card">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> <span x-text="t('cleanx')"></span></h3>
-      <div class="cleanitem" x-for="c in cats" :key="c.id">
-        <span class="chk" @click="toggleCat(c.id)" :class="selCat[c.id]&&'on'"><span x-text="selCat[c.id]?'✓':''"></span></span>
-        <div class="ic"><span x-text="c.ic"></span></div>
-        <div class="grow"><div class="t" x-text="c.name"></div><div class="s" x-text="c.desc"></div></div>
-        <span class="num muted" x-text="catSize(c.id)"></span>
-      </div>
-      <div class="muted" style="margin-top:10px;font-size:12px" x-text="t('cleanwarn')"></div>
-    </div>
-    <button class="btn primary-bar" @click="doClean()" :disabled="!selN" x-text="t('delSel',[selN])"></button>
-  </section>
+<!-- ============ 扫描页 ============ -->
+<div id="page-scan" class="page">
+  <div class="topbar">
+    <button class="iconbtn" onclick="cancelScan()">✕</button>
+    <h1>扫描中…</h1>
+  </div>
+  <div class="scanring">
+    <svg width="150" height="150">
+      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.07)" stroke-width="9" fill="none"/>
+      <circle id="scan-arc" cx="75" cy="75" r="66" stroke="var(--acc)" stroke-width="9" fill="none"
+        stroke-linecap="round" stroke-dasharray="415" stroke-dashoffset="415" style="transition:stroke-dashoffset .3s"/>
+    </svg>
+    <div class="pct" id="scan-pct">0%</div>
+  </div>
+  <div class="scancur" id="scan-cur">准备中…</div>
+  <div class="scanstat" id="scan-stat"></div>
+</div>
 
-  <!-- ============ 整理 ============ -->
-  <section x-show="tab=='organize'" data-tab="organize" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
-    <div class="card">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg> <span x-text="t('classify')"></span></h3>
-      <div class="muted" x-text="t('classifydesc')"></div>
-      <div class="btns"><button class="btn" @click="postRun('/api/classify',t('classify'))" :disabled="pb.busy" x-text="t('run')"></button></div>
-    </div>
-    <div class="card">
-      <h3>♻️ <span x-text="t('duplicate')"></span></h3>
-      <div class="muted" x-text="t('dupdesc')"></div>
-      <div class="btns"><button class="btn" @click="postRun('/api/duplicate',t('duplicate'))" :disabled="pb.busy" x-text="t('run')"></button></div>
-    </div>
-  </section>
+<!-- ============ 清单页 ============ -->
+<div id="page-review" class="page">
+  <div class="listhead">
+    <h2>扫描完成</h2>
+    <div class="muted" id="review-sum"></div>
+  </div>
+  <div id="catlist"></div>
+  <div style="height:90px"></div>
+  <div class="bottombar">
+    <div class="sum">已选 <b id="sel-count">0</b> 项 · 释放 <b id="sel-size">0</b></div>
+    <button class="btn primary" id="btn-clean" onclick="openConfirm()">一键清理</button>
+  </div>
+</div>
 
-  <!-- ============ 维护 ============ -->
-  <section x-show="tab=='maintain'" data-tab="maintain" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
-    <div class="card">
-      <h3>💽 <span x-text="t('disk')"></span></h3>
-      <div class="muted" x-text="t('diskdesc')"></div>
-      <div class="btns"><button class="btn" @click="postRun('/api/fstrim',t('disk'))" :disabled="pb.busy" x-text="t('run')"></button></div>
+<!-- ============ 确认页（全屏底部弹层） ============ -->
+<div class="confirm" id="confirm">
+  <div class="sheet">
+    <h3>确认清理</h3>
+    <div class="muted">将删除的文件清单</div>
+    <div class="big" id="confirm-size">0</div>
+    <div class="clist" id="confirm-list"></div>
+    <div class="warn hidden" id="confirm-warn">⚠️ 部分选中项含聊天媒体（红线），请谨慎</div>
+    <div class="btns">
+      <button class="btn ghost" onclick="closeConfirm()">取消</button>
+      <button class="btn danger" onclick="doClean()">确认清理</button>
     </div>
-    <div class="card">
-      <h3>🔗 <span x-text="t('bind')"></span></h3>
-      <div class="muted" x-text="t('binddesc')"></div>
-      <textarea x-model="bindTxt" rows="4"></textarea>
-      <div class="btns"><button class="btn ghost" @click="saveRule('bind',bindTxt)" x-text="t('save')"></button></div>
-    </div>
-    <div class="card">
-      <h3>🔄 <span x-text="t('rescan')"></span></h3>
-      <div class="muted" x-text="t('rescandesc')"></div>
-      <div class="btns"><button class="btn" @click="postRun('/api/rescan',t('rescan'))" x-text="t('run')"></button></div>
-    </div>
-  </section>
+  </div>
+</div>
 
-  <!-- ============ 设置 ============ -->
-  <section x-show="tab=='setting'" data-tab="setting" x-transition:enter="jc-enter" x-transition:enter-start="jc-enter-start" x-transition:enter-end="jc-enter-end">
-    <div class="card about-banner" style="text-align:center">
-      <div class="author"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> JunkClean <span class="badge b-green" x-text="ver"></span></div>
-      <div class="muted" style="margin-top:4px">👤 <span x-text="author"></span> · <span x-text="t('localonly')"></span></div>
-      <div class="muted" style="margin-top:2px" x-text="t('slogan')"></div>
-    </div>
+<!-- ============ 清理/完成页 ============ -->
+<div id="page-cleaning" class="page">
+  <div class="topbar"><h1>正在清理…</h1></div>
+  <div class="scanring">
+    <svg width="150" height="150">
+      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.07)" stroke-width="9" fill="none"/>
+      <circle id="clean-arc" cx="75" cy="75" r="66" stroke="var(--acc)" stroke-width="9" fill="none"
+        stroke-linecap="round" stroke-dasharray="415" stroke-dashoffset="415" style="transition:stroke-dashoffset .3s"/>
+    </svg>
+    <div class="pct" id="clean-pct">0%</div>
+  </div>
+  <div class="scancur" id="clean-cur">准备中…</div>
+</div>
 
-    <div class="card">
-      <h3>⏰ <span x-text="t('tasks')"></span></h3>
-      <div class="task" x-for="tk in tasks" :key="tk.line">
-        <span class="toggle" :class="tk.on&&'on'" @click="toggleTask(i=tasks.indexOf(tk))"></span>
-        <div class="grow"><div class="t" x-text="tk.when"></div><div class="s muted"><span class="tag" x-for="c in tk.cats" x-text="c"></span></div></div>
-        <button class="iconbtn" style="font-size:13px" @click="delTask(i=tasks.indexOf(tk))">✕</button>
-      </div>
-      <div x-show="!tasks.length" class="muted" x-text="t('notask')"></div>
-      <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
-        <select x-model="newTaskType">
-          <option value="every">🕒 <span x-text="t('everyx')"></span></option>
-          <option value="daily">📅 <span x-text="t('dailyx')"></span></option>
-        </select>
-        <div x-show="newTaskType=='every'"><label class="f" x-text="t('intervalh')"></label><input type="text" x-model="newTaskEvery"></div>
-        <div x-show="newTaskType=='daily'"><label class="f" x-text="t('timeat')"></label><input type="text" x-model="newTaskTime" placeholder="03:00"></div>
-        <label class="f" x-text="t('cats')"></label>
-        <div class="row" style="flex-wrap:wrap;gap:6px" x-for="c in cats" :key="c.id">
-          <span class="tag" style="cursor:pointer;background:newCat[c.id]?'var(--acc)':'var(--card2)'" @click="newCat[c.id]=!newCat[c.id]"><span x-text="c.name"></span></span>
-        </div>
-        <button class="btn block" style="margin-top:10px" @click="addTask()" x-text="t('addtask')"></button>
-      </div>
+<div id="page-done" class="page">
+  <div class="done">
+    <div class="emo">🎉</div>
+    <div class="released" id="done-size">0</div>
+    <div class="muted" id="done-msg"></div>
+    <div class="btns">
+      <button class="btn ghost" onclick="toHome()">完成</button>
+      <button class="btn primary" onclick="startScan()">再扫一次</button>
     </div>
-    <div class="card">
-      <h3><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg> <span x-text="t('ai')"></span></h3>
-      <label class="f" x-text="t('aibase')"></label><input type="text" x-model="ai.base" placeholder="https://api.example.com/v1">
-      <label class="f" x-text="t('aikey')"></label><input type="password" x-model="ai.key" placeholder="sk-...">
-      <label class="f" x-text="t('aimodel')"></label><input type="text" x-model="ai.model" placeholder="model-id">
-      <div class="btns"><button class="btn" @click="saveAISettings()" x-text="t('save')"></button>
-      <button class="btn ghost" @click="testAI()" x-text="t('test')"></button></div>
-    </div>
-    <div class="card">
-      <h3>📝 <span x-text="t('rules')"></span></h3>
-      <select x-model="ruleType" @change="loadRule()">
-        <option value="cache">cache.list</option><option value="junk">junk.list</option>
-        <option value="apk">apk.list</option><option value="social">social.list</option>
-        <option value="whitelist">whitelist.list</option><option value="classify">classify.list</option>
+  </div>
+</div>
+
+<!-- ============ 设置抽屉 ============ -->
+<div class="drawer" id="drawer-settings">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('drawer-settings')">←</button>
+    <h1>设置</h1>
+  </div>
+  <div class="setgroup">
+    <div class="sg-title">清理项</div>
+    <div id="cat-switches"></div>
+  </div>
+  <div class="setgroup">
+    <div class="sg-title">AI 配置</div>
+    <div class="setrow" onclick="openSub('sub-ai')"><span class="lbl">AI 建议</span><span class="val">配置</span></div>
+  </div>
+  <div class="setgroup">
+    <div class="sg-title">规则 / 白名单</div>
+    <div class="setrow" onclick="openSub('sub-rules')"><span class="lbl">规则编辑</span><span class="val">cache/junk/social…</span></div>
+    <div class="setrow" onclick="openSub('sub-whitelist')"><span class="lbl">白名单</span><span class="val">保护路径</span></div>
+  </div>
+  <div class="setgroup">
+    <div class="sg-title">外观</div>
+    <div class="setrow"><span class="lbl">主题</span>
+      <select id="sel-theme" onchange="setTheme(this.value)">
+        <option value="dark">深色</option>
+        <option value="light">浅色</option>
       </select>
-      <textarea x-model="ruleTxt" rows="8"></textarea>
-      <div class="btns"><button class="btn" @click="saveRule(ruleType,ruleTxt)" x-text="t('save')"></button></div>
     </div>
-    <div class="card">
-      <h3>🌐 <span x-text="t('lang')"></span></h3>
-      <select x-model="lang" @change="saveLang()">
-        <option value="zh">中文</option><option value="en">English</option>
+    <div class="setrow"><span class="lbl">语言</span>
+      <select id="sel-lang" onchange="setLang(this.value)">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
       </select>
-      <div class="muted" style="margin-top:8px" x-text="t('privnote')"></div>
     </div>
-    <div class="card" style="margin-top:0">
-      <h3>📚 <span x-text="t('credits')"></span></h3>
-      <ul class="credits" style="margin-top:6px;padding-left:0;list-style:none">
-        <li><b x-text="t('c1')"></b><br><span class="muted" x-text="t('c1s')"></span></li>
-        <li><b x-text="t('c2')"></b><br><span class="muted" x-text="t('c2s')"></span></li>
-        <li><b x-text="t('c3')"></b><br><span class="muted" x-text="t('c3s')"></span></li>
-        <li><b x-text="t('c4')"></b><br><span class="muted" x-text="t('c4s')"></span></li>
-        <li><b x-text="t('c5')"></b><br><span class="muted" x-text="t('c5s')"></span></li>
-        <li><b x-text="t('c6')"></b><br><span class="muted" x-text="t('c6s')"></span></li>
-        <li><b x-text="t('c7')"></b><br><span class="muted" x-text="t('c7s')"></span></li>
-      </ul>
-    </div>
-        <div class="footer-note">JunkClean · <span x-text="t('footer')"></span></div>
-  </section>
-</main>
-
-<nav>
-  <div class="tabrow">
-    <button @click="tab='health'" :class="tab=='health'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span><span x-text="t('health')"></span></button>
-    <button @click="tab='clean'" :class="tab=='clean'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span><span x-text="t('clean')"></span></button>
-    <button @click="tab='organize'" :class="tab=='organize'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span><span x-text="t('organize')"></span></button>
-    <button @click="tab='maintain'" :class="tab=='maintain'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span><span x-text="t('maintain')"></span></button>
-    <button @click="tab='setting'" :class="tab=='setting'&&'act'"><span class="em"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg></span><span x-text="t('setting')"></span></button>
   </div>
-</nav>
-
-<div id="logpage">
-  <div class="row" style="padding:4px 2px 8px">
-    <div class="grow" style="font-weight:700"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> <span x-text="t('logs')"></span></div>
-    <div class="row" style="gap:6px">
-      <button class="logtab" :class="logType=='cleaner'&&'on'" @click="switchLog('cleaner')"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 清理</button>
-      <button class="logtab" :class="logType=='daemon'&&'on'" @click="switchLog('daemon')">🛡️ 守护</button>
-    </div>
-    <button class="iconbtn" @click="closeLog()" style="font-size:13px">✕</button>
-  </div>
-  <div id="logbox" x-text="logs" style="font-size:12px"></div>
-</div>
-
-<div class="modal" id="confirmM" :class="confirm.show&&'show'">
-  <div class="box" x-show="confirm.show">
-    <div class="q" x-text="confirm.title"></div>
-    <div class="d" x-text="confirm.desc"></div>
-    <div class="row" style="gap:10px">
-      <button class="btn ghost grow" @click="confirm.show=false" x-text="t('cancel')"></button>
-      <button class="btn danger grow" @click="confirm.ok()" x-text="t('confirm')"></button>
-    </div>
+  <div class="setgroup">
+    <div class="sg-title">日志</div>
+    <div class="setrow" onclick="openSub('sub-log')"><span class="lbl">运行日志</span><span class="val">查看</span></div>
   </div>
 </div>
 
-<div class="ringwrap" id="ringwrap" :class="pb.ring&&'show'">
-  <div class="ring" :style="'--p:'+pb.pct"><div class="pctval num" x-text="pb.pct+'%'"></div></div>
-  <div class="rmsg" x-text="pb.msg"></div>
+<!-- ============ 整理抽屉 ============ -->
+<div class="drawer" id="drawer-organize">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('drawer-organize')">←</button>
+    <h1>整理</h1>
+  </div>
+  <div class="setgroup">
+    <div class="setrow" onclick="postRun('classify')"><span class="lbl">🗂 文件分类</span><span class="val">按类型归档</span></div>
+    <div class="setrow" onclick="postRun('duplicate')"><span class="lbl">📑 重复归档</span><span class="val">移到 Duplicates</span></div>
+  </div>
+  <div class="setgroup">
+    <div class="sg-title">维护</div>
+    <div class="setrow" onclick="postRun('fstrim')"><span class="lbl">🛠 磁盘维护</span><span class="val">fstrim / GC</span></div>
+    <div class="setrow" onclick="postRun('rescan')"><span class="lbl">🔄 媒体库刷新</span></div>
+  </div>
 </div>
+
+<!-- ============ 子页（AI 配置/规则/白名单/日志） ============ -->
+<div class="drawer" id="sub-ai">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('sub-ai')">←</button>
+    <h1>AI 配置</h1>
+  </div>
+  <div class="muted">OpenAI 兼容端点，仅发送聚合统计</div>
+  <input type="text" id="ai-base" placeholder="API 地址 (https://…/v1)">
+  <input type="text" id="ai-key" placeholder="API Key">
+  <input type="text" id="ai-model" placeholder="模型名">
+  <button class="btn primary" style="width:100%" onclick="saveAI()">保存</button>
+  <div style="height:12px"></div>
+  <button class="btn" style="width:100%" onclick="runAI()">🧠 分析并给建议</button>
+  <div id="ai-out" style="margin-top:12px;font-size:13px;color:var(--sub);white-space:pre-wrap"></div>
+</div>
+
+<div class="drawer" id="sub-rules">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('sub-rules')">←</button>
+    <h1>规则编辑</h1>
+  </div>
+  <select id="sel-rule" onchange="loadRule(this.value)">
+    <option value="cache">应用缓存</option>
+    <option value="junk">系统垃圾</option>
+    <option value="apk">安装包</option>
+    <option value="social">社交专项</option>
+    <option value="classify">文件分类</option>
+  </select>
+  <textarea id="rule-text"></textarea>
+  <button class="btn primary" style="width:100%" onclick="saveRule()">保存规则</button>
+</div>
+
+<div class="drawer" id="sub-whitelist">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('sub-whitelist')">←</button>
+    <h1>白名单</h1>
+  </div>
+  <div class="muted">每行一个路径前缀，命中即保护</div>
+  <textarea id="wl-text"></textarea>
+  <button class="btn primary" style="width:100%" onclick="saveWhitelist()">保存白名单</button>
+</div>
+
+<div class="drawer" id="sub-log">
+  <div class="topbar">
+    <button class="iconbtn" onclick="closeDrawer('sub-log')">←</button>
+    <h1>日志</h1>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn ghost" style="flex:1" onclick="loadLog('cleaner')">🧹 清理</button>
+    <button class="btn ghost" style="flex:1" onclick="loadLog('daemon')">🛡️ 守护</button>
+  </div>
+  <pre id="log-box" style="font-size:11px;color:var(--sub);white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:70vh;overflow-y:auto"></pre>
+</div>
+
+<div class="toast" id="toast"></div>
 <script>
-const I18N={
-zh:{running:'运行中',stopped:'守护未启动',free:'剩余空间',junk:'可清理',health:'健康度',scan:'扫描垃圾',
-healthcheck:'垃圾扫描',cleanrec:'一键清理推荐',bigfiles:'大文件 Top20',nobig:'✨ 空间清爽，没有超大文件',
-delSel:'删除选中({0})',aiadv:'AI 深度建议',aigo:'开始 AI 分析',aithink:'AI 分析中…',cleanx:'清理项目',
-cleanwarn:'勾选后删除即不可恢复；🔴标记为用户数据，强烈建议保留；定时自动清理受白名单保护。',
-classify:'文件分类',classifydesc:'按扩展名把散乱文件归入对应文件夹；自动跳过未下载完成文件。',
-run:'执行',duplicate:'重复文件归档',dupdesc:'大文件哈希比对，重复项移至 Duplicates/ 文件夹（不删除）。',
-disk:'磁盘维护',diskdesc:'EXT4 执行 fstrim；F2FS 按脏段阈值智能 GC（灭屏/充电时执行）。',
-bind:'目录重定向',binddesc:'源目录 目标路径（每行一条，相对 /sdcard）。挂载在开机阶段执行。',
-save:'保存',rescan:'媒体库刷新',rescandesc:'清理/移动后刷新 MediaStore，清除图库死条目。',
-localonly:'本地运行 · 零数据采集',slogan:'智能垃圾清理 · 存储维护 · 开源致谢',credits:'功能致谢（默认展开）',
-c1:'清理/整理/重定向/自动化架构','c1s':'→ ClearBox · FLYCOM-E (GPL-3.0)；F2FS-GC 方案 → 酷安@Amktiao',
-c2:'文件分类/下载完整性/重复归档','c2s':'→ Sortify · xCaptaiN09 (MIT)',
-c3:'fstrim/F2FS-GC 智能感知','c3s':'→ F2FS-Optimizer · 酷安乄代号9527 (Coolapk-Code9527, MIT)',
-c4:'清理规则思路（综合）','c4s':'→ Clear-Optimization(DEMONNICA)· SmartClear(S123123sd)·Cache Cleaner(taamarin)· 小玖清理(Axiaosanjiu)· BasicCleaner(WeirdMidas)',
-c5:'整理·清理·重定向三位一体','c5s':'→ 苏柚 SUU · 回忆溢出工作组 OOM-WG（@梦璃酱 发起 / @白彩恋 维护）；分类规则 → @GunRain / 酷安@Luxus_ / 酷安@爱生活的土豆子',
-c6:'per-app 存储隔离参考','c6s':'→ 存储空间隔离 · RikkaW & Xingchen (RikkaApps)',
-c7:'守护进程 + WebUI 架构','c7s':'→ 自家 ChargeControl (battd) 经验复用',
-tasks:'定时任务',notask:'暂无定时任务',everyx:'每 N 小时',dailyx:'每天固定时间',
-intervalh:'间隔小时数',timeat:'执行时间 (HH:MM)',cats:'选择类别',addtask:'添加定时任务',
-ai:'AI 设置（OpenAI 兼容）',aibase:'API 地址',aikey:'API Key',aimodel:'模型 ID',test:'测试',
-rules:'规则编辑器',lang:'语言',privnote:'隐私：本模块不采集任何数据；AI 分析仅发送聚合统计，路径清单不出设备。',
-footer:'本地优先 · 删除需确认 · 开源致谢',logs:'运行日志',cancel:'取消',confirm:'确认删除',
-tab_h:'体检',tab_c:'清理',tab_o:'整理',tab_m:'维护',tab_s:'设置'},
-en:{running:'running',stopped:'daemon down',free:'Free',junk:'Junk',health:'Health',scan:'Scan junk',
-healthcheck:'Junk scan',cleanrec:'Clean recommended',bigfiles:'Big files Top20',nobig:'✨ Clean — no oversized files',
-delSel:'Delete selected ({0})',aiadv:'AI advice',aigo:'Ask AI',aithink:'AI thinking…',cleanx:'Clean',
-cleanwarn:'Deletion is irreversible. 🔴 = user data, keep it. Timed clean is whitelist-protected.',
-classify:'Classify',classifydesc:'Sort loose files by extension; skips in-progress downloads.',
-run:'Run',duplicate:'Dedup',dupdesc:'Hash big files, move dups to Duplicates/ (not delete).',
-disk:'Disk maint',diskdesc:'fstrim for EXT4; smart F2FS GC by dirty threshold (screen-off/charging).',
-bind:'Bind redirect',binddesc:'source dest (one per line, relative /sdcard). Mounted at boot.',
-save:'Save',rescan:'Media rescan',rescandesc:'Refresh MediaStore after clean/move.',
-localonly:'Local · zero telemetry',slogan:'Smart cleaning · storage care · credits',credits:'Credits (open)',
-c1:'Clean/organize/redirect architecture','c1s':'→ ClearBox · FLYCOM-E (GPL-3.0); F2FS-GC → CoolAPK @Amktiao',
-c2:'Classify/integrity/dedup','c2s':'→ Sortify · xCaptaiN09 (MIT)',
-c3:'fstrim/F2FS-GC sensing','c3s':'→ F2FS-Optimizer · Coolapk-Code9527 (MIT)',
-c4:'Cleanup rules (multi)','c4s':'→ Clear-Optimization(DEMONNICA)·SmartClear(S123123sd)·Cache Cleaner(taamarin)·xiaojiu(Axiaosanjiu)·BasicCleaner(WeirdMidas)',
-c5:'Organize+clean+redirect trio','c5s':'→ SUU · OOM-WG (@YumeYuka / @ShIroRRen); rules → @GunRain / CoolAPK@Luxus_ / @Aishdtdz',
-c6:'per-app storage isolation','c6s':'→ Storage Redirect · RikkaW & Xingchen (RikkaApps)',
-c7:'Daemon + WebUI architecture','c7s':'→ our ChargeControl (battd) reuse',
-tasks:'Scheduled tasks',notask:'No tasks',everyx:'Every N hours',dailyx:'Daily at',
-intervalh:'Interval (hours)',timeat:'Time (HH:MM)',cats:'Categories',addtask:'Add task',
-ai:'AI settings (OpenAI-compatible)',aibase:'API base',aikey:'API key',aimodel:'Model',test:'Test',
-rules:'Rule editor',lang:'Language',privnote:'Privacy: no telemetry; AI sends aggregates only, paths stay on device.',
-footer:'local-first · confirm before delete · credits',logs:'Logs',cancel:'Cancel',confirm:'Delete',
-tab_h:'Health',tab_c:'Clean',tab_o:'Organize',tab_m:'Maintain',tab_s:'Settings'}};
-function app(){
-return{
-tab:'health',lang:(localStorage.getItem('jc_lang')||(navigator.language||'zh').startsWith('zh')?'zh':'en'),
-dict:I18N.zh,daemon:false,ver:'',author:'',freeK:'0',junkK:0,health:'green',scanTs:'',
-cats:[
- {id:'cache',ic:'<svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>️',name:()=>T('cn_cache'),desc:()=>T('cn_cached')},
- {id:'junk',ic:'🧾',name:()=>T('cn_junk'),desc:()=>T('cn_junkd')},
- {id:'apk',ic:'📦',name:()=>T('cn_apk'),desc:()=>T('cn_apkd')},
- {id:'empty',ic:'📂',name:()=>T('cn_empty'),desc:()=>T('cn_emptyd')},
- {id:'social',ic:'💬',name:()=>T('cn_social'),desc:()=>T('cn_sociald')},
- {id:'sqlite',ic:'🗄️',name:()=>T('cn_sqlite'),desc:()=>T('cn_sqlited')}],
-selCat:{},selBig:{},scan:null,recs:[],big:[],
-ai:{run:false,out:'',err:'',base:'',key:'',model:''},
-tasks:[],newTaskType:'every',newTaskEvery:'12',newTaskTime:'03:00',newCat:{},
-ruleType:'cache',ruleTxt:'',bindTxt:'',logs:'',
-confirm:{show:false,title:'',desc:'',ok:null},
-  logType:'cleaner',
-pb:{busy:false,pct:0,msg:'',moving:false,ring:false},_timer:null,
-t(k,a){let s=this.dict[k]||k;if(a!==undefined)s=s.replace('{0}',a);return s},
-init(){this.dict=I18N[this.lang]||I18N.zh;this.newCat={cache:1,junk:1,apk:1,empty:0,social:1,sqlite:1};
- this.loadAll();this._timer=setInterval(()=>this.poll(),600);
- /* GSAP 卡片 stagger 入场（尊重 prefers-reduced-motion） */
- if(window.gsap&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-   this.$watch('tab',v=>this.animateCards(v));
-   this.$nextTick(()=>this.animateCards('health'));
- }},
-animateCards(t){
-  const sec=document.querySelector('main section[data-tab="'+t+'"]');
-  if(!sec)return;
-  gsap.from(sec.querySelectorAll('.card'),{
-    y:26,autoAlpha:0,duration:0.7,stagger:0.08,
-    ease:'power3.out',clearProps:'all',overwrite:'auto'
-  });
-},
-async $f(p,o){
-  if(p.startsWith('/api'))p='http://127.0.0.1:46780'+p;
-  /* 管理器 WebView (APatch/KSU)：页面是 https://mui.kernelsu.org，fetch http 会被混合内容拦截。
-     用注入的 ksu.exec() JS 桥执行 curl 绕过。浏览器场景走 fetch。 */
-  if(window.ksu&&typeof window.ksu.exec==='function'){
-    try{
-      /* Android 系统无 curl，用模块自带的静态 curl */
-      let CURL='/data/adb/modules/junkclean/bin/curl';
-      let body=(o&&o.body)?o.body:'';
-      let cmd=CURL+' -s -m 8 '+JSON.stringify(p)
+'use strict';
+/* ===== 常量/状态 ===== */
+const API='http://127.0.0.1:46780';
+const CATS={cache:['应用缓存','缓存'],junk:['系统垃圾','垃圾'],apk:['安装包','安装包'],
+  empty:['空文件夹','空夹'],social:['社交专项','社交'],sqlite:['SQLite 优化','SQLite']};
+const CAT_ORDER=['cache','junk','apk','empty','social','sqlite'];
+let scan=null, sel={}, cleaning=false, cfg={}, L=null;
+const I18N={zh:{free:'可用空间',scan:'扫描垃圾',scanning:'扫描中…',done:'扫描完成',
+  start:'开始扫描垃圾',last:'上次扫描',clean:'一键清理',confirm:'确认清理',cancel:'取消',
+  release:'释放',clear:'清理',freed:'释放',classify:'文件分类',dup:'重复归档',
+  fstrim:'磁盘维护',rescan:'媒体库刷新',saved:'已保存',running:'守护运行中',stopped:'守护未启动',
+  red:'含聊天媒体',files:'个文件',confirmClean:'将删除'},
+  en:{free:'Free',scan:'Scan',scanning:'Scanning…',done:'Scan done',
+  start:'Scan junk',last:'Last scan',clean:'Clean',confirm:'Confirm',cancel:'Cancel',
+  release:'Free',clear:'Clean',freed:'Freed',classify:'Classify',dup:'Duplicates',
+  fstrim:'Disk maint',rescan:'Rescan',saved:'Saved',running:'Daemon running',stopped:'Daemon stopped',
+  red:'chat media',files:'files',confirmClean:'Will delete'}};
+
+/* ===== api 双通道（管理器 ksu.exec / 浏览器 fetch） ===== */
+async function api(p, o){
+  const url = p.startsWith('/api') ? API+p : p;
+  if (window.ksu && typeof window.ksu.exec === 'function') {
+    try {
+      const CURL='/data/adb/modules/junkclean/bin/curl';
+      const body=(o&&o.body)?o.body:'';
+      const cmd=CURL+' -s -m 20 '+JSON.stringify(url)
         +(o&&o.method==='POST'?' -X POST -H "Content-Type: application/json" --data '+JSON.stringify(body):'');
-      let r=await window.ksu.exec(cmd);
-      let txt=typeof r==='string'?r:(r&&(r.stdout||r.result)||'');
-      let j=JSON.parse(txt);return j;
-    }catch(e){return {};}
+      const r=await window.ksu.exec(cmd);
+      const txt=typeof r==='string'?r:(r&&(r.stdout||r.result)||'');
+      return JSON.parse(txt);
+    } catch(e){ return {}; }
   }
-  let r=await fetch(p,o);return r.json().catch(()=>({}));
-},
-async loadAll(){let [s,cfg]=await Promise.all([this.$f('/api/status'),this.$f('/api/config')]);
- this.daemon=!!s.daemon;this.ver=s.version||this.ver;this.author=s.author||this.author;
- if(cfg&&cfg.cfg){let c=cfg.cfg.split('\n');for(let l of c){let i=l.indexOf('=');if(i>0){
-  let k=l.slice(0,i),v=l.slice(i+1);
-  if(k.startsWith('ai_'))this.ai[k.slice(3)]=v;}}}
- this.loadRule();this.loadLog();this.loadScan();this.loadTasks();},
-async loadScan(){let sc=await this.$f('/api/scan');if(!sc||sc.ts){this.scan=sc;
- this.freeK=sc.free_kb||0;this.health=sc.health||'green';this.scanTs=T('scan')+': '+(sc.ts||'');
- let j=0;for(let c of this.cats){let v=sc&&sc.cats?.[c.id];j+=v?+v.kb:0;}this.junkK=j;
- this.recs=[];if(sc&&sc.cats){for(let c of this.cats){let v=sc.cats[c.id];if(v&&+v.kb>512000)this.recs.push({cat:c.id,kb:v.kb,desc:T('cn_'+c.id)+(+v.kb>=1048576?' ≥1G':'')});}}
- this.big=(sc&&sc.big||[]).map(b=>({p:b.p,kb:b.kb}));}},
-async runScan(){this.pb.busy=true;this.pb.ring=false;await this.$f('/api/scan',{method:'POST'});},
-async poll(){let [p,s]=await Promise.all([this.$f('/api/progress'),this.$f('/api/status')]);if(!p)return;
- this.daemon=!!s.daemon;
- this.pb.busy=!!p.running;this.pb.pct=p.pct||0;this.pb.msg=p.msg||'';
- this.pb.moving=p.running&&!p.pct;this.pb.ring=p.running&&(this._ring||false);
- if(!p.running&&this._ring){this._ring=false;this.loadScan();setTimeout(()=>{this.pb.ring=false;this.pb.busy=false;},800);}},
-async postRun(ep,name){this._ring=true;this.pb.busy=true;this.pb.msg=name;await this.$f(ep,{method:'POST'});},
-async runAI(){this.ai.run=true;this.ai.err='';this.ai.out='';let r=await this.$f('/api/ai',{method:'POST',body:'{}'});this.ai.run=false;
- if(r.ai!==undefined)this.ai.out=r.ai;else this.ai.err=r.e||'AI error';},
-async testAI(){this.ai.out='';this.ai.err='';let r=await this.$f('/api/ai',{method:'POST',body:'{}'});
- this.ai.err=r.e||'';this.ai.out=r.ai||'';},
-async saveAISettings(){
-  /* 读现有 config，替换 ai_* 行，保留 cat_* 等其他设置（避免整文件覆盖丢配置） */
-  let r=await this.$f('/api/config');
-  let cfg=(r&&r.cfg)||'';
-  let lines=cfg.split('\n').filter(l=>l&&!l.startsWith('ai_'));
-  lines.push('ai_base='+this.ai.base,'ai_key='+this.ai.key,'ai_model='+this.ai.model);
-  await this.$f('/api/config',{method:'POST',body:lines.join('\n')+'\n'});
-  this.toast=T('save')+' ✓';},
-toggleCat(id){this.selCat[id]=!this.selCat[id];},toggleBig(p){this.selBig[p]=!this.selBig[p];},
-get selN(){return Object.values(this.selCat).filter(Boolean).length},
-get bigSelN(){return Object.values(this.selBig).filter(Boolean).length},
-async doClean(){let ids=this.cats.filter(c=>this.selCat[c.id]).map(c=>c.id);
- if(!ids.length)return;this._ring=true;
- this.confirm={show:true,title:T('confirm'),desc:T('cleanwarn'),ok:()=>{this.confirm.show=false;
-  this.pb.busy=true;this.$f('/api/clean',{method:'POST',body:JSON.stringify({cats:ids.join(','),force:1})});
-  this.selCat={};}};},
-cleanSel(cats){this._ring=true;this.confirm={show:true,title:T('confirm'),desc:T('cleanwarn'),ok:()=>{this.confirm.show=false;
- this.pb.busy=true;this.$f('/api/clean',{method:'POST',body:JSON.stringify({cats:cats,force:1})});}};},
-async delBig(){let ps=this.big.filter(b=>this.selBig[b.p]);if(!ps.length)return;
- this._ring=true;this.confirm={show:true,title:T('confirm'),desc:ps.length+' files, '+T('cleanwarn'),
-  ok:()=>{this.confirm.show=false;this.$f('/api/delbig',{method:'POST',body:ps.map(x=>x.p).join(',')});this.selBig={};this.loadScan();}};},
-async openLog(){document.getElementById('logpage').classList.add('show');this.loadLog();},
-closeLog(){document.getElementById('logpage').classList.remove('show');},
-switchLog(t){this.logType=t;this.loadLog();},
-async loadLog(){let r=await this.$f('/api/log?type='+this.logType);if(r.log!==undefined)this.logs=r.log;},
-async loadRule(){let r=await this.$f('/api/rules?type='+this.ruleType);
- if(r.content!==undefined){if(this.ruleType==='bind')this.bindTxt=r.content;else this.ruleTxt=r.content;}},
-async saveRule(tp,txt){let r=await this.$f('/api/rules?type='+tp,{method:'POST',body:txt});
- if(r.ok)this.toast(T('save')+' ✓');},
-async loadTasks(){let r=await this.$f('/api/tasks');if(!r.tasks)return;
- this.tasks=r.tasks.split('\n').filter(Boolean).map(l=>{let on=l.indexOf('enable=1')===0||l.indexOf('enable=1,')===0;
-  let e=l.match(/every=(\d+)/),d=l.match(/daily=([\d:]+)/),c=l.match(/cats=([^,]*)/);
-  let cs=c?c[1].split(','):[];
-  let when=e?'every '+e[1]+'h':(d?d[1]:'?');
-  return{line:l,on:l.indexOf('enable=1')>-1,when:when,cats:cs};});},
-async addTask(){let cs=Object.keys(this.newCat).filter(k=>this.newCat[k]);
- if(this.newTaskType==='daily')this.tasks.push('enable=1,daily='+(this.newTaskTime||'03:00')+',cats='+cs.join(','));
- else this.tasks.push('enable=1,every='+(this.newTaskEvery||12)+',cats='+cs.join(','));
- await this.saveTasks();},
-async delTask(i){this.tasks.splice(i,1);await this.saveTasks();},
-async toggleTask(i){let t=this.tasks[i];t.line=t.line.replace(/^enable=[01]/,'enable='+(t.on?'0':'1'));t.on=!t.on;await this.saveTasks();},
-async saveTasks(){await this.$f('/api/tasks',{method:'POST',body:this.tasks.map(t=>t.line).join('\n')+'\n'});},
-saveLang(){localStorage.setItem('jc_lang',this.lang);this.dict=I18N[this.lang]||I18N.zh;},
-fmtK(kb){kb=+kb;if(!kb)return'0K';if(kb>=1048576)return (kb/1048576).toFixed(1)+'G';if(kb>=1024)return (kb/1024).toFixed(1)+'M';return kb+'K';},
-base(p){p=p||'';let i=p.lastIndexOf('/');return i>=0?p.slice(i+1):p;},
-catName(id){return this.cats.find(c=>c.id===id)?this.cats.find(c=>c.id===id).name():id;},
-catSize(id){return this.scan&&this.scan.cats&&this.scan.cats[id]?this.fmtK(this.scan.cats[id].kb):'';},
-get healthText(){return {green:T('h_ok'),yellow:T('h_yellow'),red:T('h_red')}[this.health]||this.health;},
-};
+  try { const r=await fetch(url,o); return r.json(); } catch(e){ return {}; }
 }
-const T=(k)=>I18N[localStorage.getItem('jc_lang')||((navigator.language||'zh').startsWith('zh')?'zh':'en')][k]||k;
-Object.assign(I18N.zh,{cn_cache:'应用缓存',cn_cached:'临时文件，删了自动重建',cn_junk:'系统垃圾',cn_junkd:'日志/缩略图/SDK残留',
-cn_apk:'安装包压缩包',cn_apkd:'安装包/压缩包残留',cn_empty:'空文件夹',cn_emptyd:'清掉占位的空文件夹',
-cn_social:'社交专项',cn_sociald:'微信QQ抖音TG 缓存',cn_sqlite:'SQLite 优化',cn_sqlited:'压缩数据库文件',
-h_ok:'健康',h_yellow:'建议清理',h_red:'空间告急'});
-Object.assign(I18N.en,{cn_cache:'App cache',cn_cached:'temp files, rebuilt automatically',cn_junk:'System junk',cn_junkd:'logs/thumbs/SDK',
-cn_apk:'APK/archives',cn_apkd:'installer/archive leftovers',cn_empty:'Empty dirs',cn_emptyd:'remove placeholder empty folders',
-cn_social:'Social apps',cn_sociald:'WeChat/QQ/Douyin/TG caches',cn_sqlite:'SQLite',cn_sqlited:'compact database files',
-h_ok:'Healthy',h_yellow:'Clean advised',h_red:'Low space'});
-</script><script>(()=>{var nt=!1,it=!1,W=[],ot=-1;function Ut(e){Rn(e)}function Rn(e){W.includes(e)||W.push(e),Mn()}function Wt(e){let t=W.indexOf(e);t!==-1&&t>ot&&W.splice(t,1)}function Mn(){!it&&!nt&&(nt=!0,queueMicrotask(Nn))}function Nn(){nt=!1,it=!0;for(let e=0;e<W.length;e++)W[e](),ot=e;W.length=0,ot=-1,it=!1}var T,N,$,at,st=!0;function Gt(e){st=!1,e(),st=!0}function Jt(e){T=e.reactive,$=e.release,N=t=>e.effect(t,{scheduler:r=>{st?Ut(r):r()}}),at=e.raw}function ct(e){N=e}function Yt(e){let t=()=>{};return[n=>{let i=N(n);return e._x_effects||(e._x_effects=new Set,e._x_runEffects=()=>{e._x_effects.forEach(o=>o())}),e._x_effects.add(i),t=()=>{i!==void 0&&(e._x_effects.delete(i),$(i))},i},()=>{t()}]}function ve(e,t){let r=!0,n,i=N(()=>{let o=e();JSON.stringify(o),r?n=o:queueMicrotask(()=>{t(o,n),n=o}),r=!1});return()=>$(i)}var Xt=[],Zt=[],Qt=[];function er(e){Qt.push(e)}function te(e,t){typeof t=="function"?(e._x_cleanups||(e._x_cleanups=[]),e._x_cleanups.push(t)):(t=e,Zt.push(t))}function Ae(e){Xt.push(e)}function Oe(e,t,r){e._x_attributeCleanups||(e._x_attributeCleanups={}),e._x_attributeCleanups[t]||(e._x_attributeCleanups[t]=[]),e._x_attributeCleanups[t].push(r)}function lt(e,t){e._x_attributeCleanups&&Object.entries(e._x_attributeCleanups).forEach(([r,n])=>{(t===void 0||t.includes(r))&&(n.forEach(i=>i()),delete e._x_attributeCleanups[r])})}function tr(e){for(e._x_effects?.forEach(Wt);e._x_cleanups?.length;)e._x_cleanups.pop()()}var ut=new MutationObserver(mt),ft=!1;function ue(){ut.observe(document,{subtree:!0,childList:!0,attributes:!0,attributeOldValue:!0}),ft=!0}function dt(){kn(),ut.disconnect(),ft=!1}var le=[];function kn(){let e=ut.takeRecords();le.push(()=>e.length>0&&mt(e));let t=le.length;queueMicrotask(()=>{if(le.length===t)for(;le.length>0;)le.shift()()})}function m(e){if(!ft)return e();dt();let t=e();return ue(),t}var pt=!1,Se=[];function rr(){pt=!0}function nr(){pt=!1,mt(Se),Se=[]}function mt(e){if(pt){Se=Se.concat(e);return}let t=[],r=new Set,n=new Map,i=new Map;for(let o=0;o<e.length;o++)if(!e[o].target._x_ignoreMutationObserver&&(e[o].type==="childList"&&(e[o].removedNodes.forEach(s=>{s.nodeType===1&&s._x_marker&&r.add(s)}),e[o].addedNodes.forEach(s=>{if(s.nodeType===1){if(r.has(s)){r.delete(s);return}s._x_marker||t.push(s)}})),e[o].type==="attributes")){let s=e[o].target,a=e[o].attributeName,c=e[o].oldValue,l=()=>{n.has(s)||n.set(s,[]),n.get(s).push({name:a,value:s.getAttribute(a)})},u=()=>{i.has(s)||i.set(s,[]),i.get(s).push(a)};s.hasAttribute(a)&&c===null?l():s.hasAttribute(a)?(u(),l()):u()}i.forEach((o,s)=>{lt(s,o)}),n.forEach((o,s)=>{Xt.forEach(a=>a(s,o))});for(let o of r)t.some(s=>s.contains(o))||Zt.forEach(s=>s(o));for(let o of t)o.isConnected&&Qt.forEach(s=>s(o));t=null,r=null,n=null,i=null}function Ce(e){return z(B(e))}function k(e,t,r){return e._x_dataStack=[t,...B(r||e)],()=>{e._x_dataStack=e._x_dataStack.filter(n=>n!==t)}}function B(e){return e._x_dataStack?e._x_dataStack:typeof ShadowRoot=="function"&&e instanceof ShadowRoot?B(e.host):e.parentNode?B(e.parentNode):[]}function z(e){return new Proxy({objects:e},Dn)}var Dn={ownKeys({objects:e}){return Array.from(new Set(e.flatMap(t=>Object.keys(t))))},has({objects:e},t){return t==Symbol.unscopables?!1:e.some(r=>Object.prototype.hasOwnProperty.call(r,t)||Reflect.has(r,t))},get({objects:e},t,r){return t=="toJSON"?Pn:Reflect.get(e.find(n=>Reflect.has(n,t))||{},t,r)},set({objects:e},t,r,n){let i=e.find(s=>Object.prototype.hasOwnProperty.call(s,t))||e[e.length-1],o=Object.getOwnPropertyDescriptor(i,t);return o?.set&&o?.get?o.set.call(n,r)||!0:Reflect.set(i,t,r)}};function Pn(){return Reflect.ownKeys(this).reduce((t,r)=>(t[r]=Reflect.get(this,r),t),{})}function Te(e){let t=n=>typeof n=="object"&&!Array.isArray(n)&&n!==null,r=(n,i="")=>{Object.entries(Object.getOwnPropertyDescriptors(n)).forEach(([o,{value:s,enumerable:a}])=>{if(a===!1||s===void 0||typeof s=="object"&&s!==null&&s.__v_skip)return;let c=i===""?o:`${i}.${o}`;typeof s=="object"&&s!==null&&s._x_interceptor?n[o]=s.initialize(e,c,o):t(s)&&s!==n&&!(s instanceof Element)&&r(s,c)})};return r(e)}function Re(e,t=()=>{}){let r={initialValue:void 0,_x_interceptor:!0,initialize(n,i,o){return e(this.initialValue,()=>In(n,i),s=>ht(n,i,s),i,o)}};return t(r),n=>{if(typeof n=="object"&&n!==null&&n._x_interceptor){let i=r.initialize.bind(r);r.initialize=(o,s,a)=>{let c=n.initialize(o,s,a);return r.initialValue=c,i(o,s,a)}}else r.initialValue=n;return r}}function In(e,t){return t.split(".").reduce((r,n)=>r[n],e)}function ht(e,t,r){if(typeof t=="string"&&(t=t.split(".")),t.length===1)e[t[0]]=r;else{if(t.length===0)throw error;return e[t[0]]||(e[t[0]]={}),ht(e[t[0]],t.slice(1),r)}}var ir={};function y(e,t){ir[e]=t}function fe(e,t){let r=Ln(t);return Object.entries(ir).forEach(([n,i])=>{Object.defineProperty(e,`$${n}`,{get(){return i(t,r)},enumerable:!1})}),e}function Ln(e){let[t,r]=_t(e),n={interceptor:Re,...t};return te(e,r),n}function or(e,t,r,...n){try{return r(...n)}catch(i){re(i,e,t)}}function re(e,t,r=void 0){e=Object.assign(e??{message:"No error message given."},{el:t,expression:r}),console.warn(`Alpine Expression Error: ${e.message}
 
-${r?'Expression: "'+r+`"
+/* ===== 水波纹（事件委托） ===== */
+document.addEventListener('pointerdown', e=>{
+  const btn=e.target.closest('.btn'); if(!btn) return;
+  const r=btn.getBoundingClientRect(), d=Math.max(r.width,r.height)*2;
+  const ink=document.createElement('span');
+  ink.className='ripple-ink';
+  ink.style.cssText=`left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px;width:${d}px;height:${d}px`;
+  btn.appendChild(ink);
+  ink.addEventListener('animationend',()=>ink.remove());
+},{passive:true});
 
-`:""}`,t),setTimeout(()=>{throw e},0)}var Me=!0;function ke(e){let t=Me;Me=!1;let r=e();return Me=t,r}function R(e,t,r={}){let n;return x(e,t)(i=>n=i,r),n}function x(...e){return sr(...e)}var sr=xt;function ar(e){sr=e}function xt(e,t){let r={};fe(r,e);let n=[r,...B(e)],i=typeof t=="function"?$n(n,t):Fn(n,t,e);return or.bind(null,e,t,i)}function $n(e,t){return(r=()=>{},{scope:n={},params:i=[]}={})=>{let o=t.apply(z([n,...e]),i);Ne(r,o)}}var gt={};function jn(e,t){if(gt[e])return gt[e];let r=Object.getPrototypeOf(async function(){}).constructor,n=/^[\n\s]*if.*\(.*\)/.test(e.trim())||/^(let|const)\s/.test(e.trim())?`(async()=>{ ${e} })()`:e,o=(()=>{try{let s=new r(["__self","scope"],`with (scope) { __self.result = ${n} }; __self.finished = true; return __self.result;`);return Object.defineProperty(s,"name",{value:`[Alpine] ${e}`}),s}catch(s){return re(s,t,e),Promise.resolve()}})();return gt[e]=o,o}function Fn(e,t,r){let n=jn(t,r);return(i=()=>{},{scope:o={},params:s=[]}={})=>{n.result=void 0,n.finished=!1;let a=z([o,...e]);if(typeof n=="function"){let c=n(n,a).catch(l=>re(l,r,t));n.finished?(Ne(i,n.result,a,s,r),n.result=void 0):c.then(l=>{Ne(i,l,a,s,r)}).catch(l=>re(l,r,t)).finally(()=>n.result=void 0)}}}function Ne(e,t,r,n,i){if(Me&&typeof t=="function"){let o=t.apply(r,n);o instanceof Promise?o.then(s=>Ne(e,s,r,n)).catch(s=>re(s,i,t)):e(o)}else typeof t=="object"&&t instanceof Promise?t.then(o=>e(o)):e(t)}var wt="x-";function C(e=""){return wt+e}function cr(e){wt=e}var De={};function d(e,t){return De[e]=t,{before(r){if(!De[r]){console.warn(String.raw`Cannot find directive \`${r}\`. \`${e}\` will use the default order of execution`);return}let n=G.indexOf(r);G.splice(n>=0?n:G.indexOf("DEFAULT"),0,e)}}}function lr(e){return Object.keys(De).includes(e)}function pe(e,t,r){if(t=Array.from(t),e._x_virtualDirectives){let o=Object.entries(e._x_virtualDirectives).map(([a,c])=>({name:a,value:c})),s=Et(o);o=o.map(a=>s.find(c=>c.name===a.name)?{name:`x-bind:${a.name}`,value:`"${a.value}"`}:a),t=t.concat(o)}let n={};return t.map(dr((o,s)=>n[o]=s)).filter(mr).map(zn(n,r)).sort(Kn).map(o=>Bn(e,o))}function Et(e){return Array.from(e).map(dr()).filter(t=>!mr(t))}var yt=!1,de=new Map,ur=Symbol();function fr(e){yt=!0;let t=Symbol();ur=t,de.set(t,[]);let r=()=>{for(;de.get(t).length;)de.get(t).shift()();de.delete(t)},n=()=>{yt=!1,r()};e(r),n()}function _t(e){let t=[],r=a=>t.push(a),[n,i]=Yt(e);return t.push(i),[{Alpine:K,effect:n,cleanup:r,evaluateLater:x.bind(x,e),evaluate:R.bind(R,e)},()=>t.forEach(a=>a())]}function Bn(e,t){let r=()=>{},n=De[t.type]||r,[i,o]=_t(e);Oe(e,t.original,o);let s=()=>{e._x_ignore||e._x_ignoreSelf||(n.inline&&n.inline(e,t,i),n=n.bind(n,e,t,i),yt?de.get(ur).push(n):n())};return s.runCleanups=o,s}var Pe=(e,t)=>({name:r,value:n})=>(r.startsWith(e)&&(r=r.replace(e,t)),{name:r,value:n}),Ie=e=>e;function dr(e=()=>{}){return({name:t,value:r})=>{let{name:n,value:i}=pr.reduce((o,s)=>s(o),{name:t,value:r});return n!==t&&e(n,t),{name:n,value:i}}}var pr=[];function ne(e){pr.push(e)}function mr({name:e}){return hr().test(e)}var hr=()=>new RegExp(`^${wt}([^:^.]+)\\b`);function zn(e,t){return({name:r,value:n})=>{let i=r.match(hr()),o=r.match(/:([a-zA-Z0-9\-_:]+)/),s=r.match(/\.[^.\]]+(?=[^\]]*$)/g)||[],a=t||e[r]||r;return{type:i?i[1]:null,value:o?o[1]:null,modifiers:s.map(c=>c.replace(".","")),expression:n,original:a}}}var bt="DEFAULT",G=["ignore","ref","data","id","anchor","bind","init","for","model","modelable","transition","show","if",bt,"teleport"];function Kn(e,t){let r=G.indexOf(e.type)===-1?bt:e.type,n=G.indexOf(t.type)===-1?bt:t.type;return G.indexOf(r)-G.indexOf(n)}function J(e,t,r={}){e.dispatchEvent(new CustomEvent(t,{detail:r,bubbles:!0,composed:!0,cancelable:!0}))}function D(e,t){if(typeof ShadowRoot=="function"&&e instanceof ShadowRoot){Array.from(e.children).forEach(i=>D(i,t));return}let r=!1;if(t(e,()=>r=!0),r)return;let n=e.firstElementChild;for(;n;)D(n,t,!1),n=n.nextElementSibling}function E(e,...t){console.warn(`Alpine Warning: ${e}`,...t)}var _r=!1;function gr(){_r&&E("Alpine has already been initialized on this page. Calling Alpine.start() more than once can cause problems."),_r=!0,document.body||E("Unable to initialize. Trying to load Alpine before `<body>` is available. Did you forget to add `defer` in Alpine's `<script>` tag?"),J(document,"alpine:init"),J(document,"alpine:initializing"),ue(),er(t=>S(t,D)),te(t=>P(t)),Ae((t,r)=>{pe(t,r).forEach(n=>n())});let e=t=>!Y(t.parentElement,!0);Array.from(document.querySelectorAll(br().join(","))).filter(e).forEach(t=>{S(t)}),J(document,"alpine:initialized"),setTimeout(()=>{Vn()})}var vt=[],xr=[];function yr(){return vt.map(e=>e())}function br(){return vt.concat(xr).map(e=>e())}function Le(e){vt.push(e)}function $e(e){xr.push(e)}function Y(e,t=!1){return j(e,r=>{if((t?br():yr()).some(i=>r.matches(i)))return!0})}function j(e,t){if(e){if(t(e))return e;if(e._x_teleportBack&&(e=e._x_teleportBack),!!e.parentElement)return j(e.parentElement,t)}}function wr(e){return yr().some(t=>e.matches(t))}var Er=[];function vr(e){Er.push(e)}var Hn=1;function S(e,t=D,r=()=>{}){j(e,n=>n._x_ignore)||fr(()=>{t(e,(n,i)=>{n._x_marker||(r(n,i),Er.forEach(o=>o(n,i)),pe(n,n.attributes).forEach(o=>o()),n._x_ignore||(n._x_marker=Hn++),n._x_ignore&&i())})})}function P(e,t=D){t(e,r=>{tr(r),lt(r),delete r._x_marker})}function Vn(){[["ui","dialog",["[x-dialog], [x-popover]"]],["anchor","anchor",["[x-anchor]"]],["sort","sort",["[x-sort]"]]].forEach(([t,r,n])=>{lr(r)||n.some(i=>{if(document.querySelector(i))return E(`found "${i}", but missing ${t} plugin`),!0})})}var St=[],At=!1;function ie(e=()=>{}){return queueMicrotask(()=>{At||setTimeout(()=>{je()})}),new Promise(t=>{St.push(()=>{e(),t()})})}function je(){for(At=!1;St.length;)St.shift()()}function Sr(){At=!0}function me(e,t){return Array.isArray(t)?Ar(e,t.join(" ")):typeof t=="object"&&t!==null?qn(e,t):typeof t=="function"?me(e,t()):Ar(e,t)}function Ar(e,t){let r=o=>o.split(" ").filter(Boolean),n=o=>o.split(" ").filter(s=>!e.classList.contains(s)).filter(Boolean),i=o=>(e.classList.add(...o),()=>{e.classList.remove(...o)});return t=t===!0?t="":t||"",i(n(t))}function qn(e,t){let r=a=>a.split(" ").filter(Boolean),n=Object.entries(t).flatMap(([a,c])=>c?r(a):!1).filter(Boolean),i=Object.entries(t).flatMap(([a,c])=>c?!1:r(a)).filter(Boolean),o=[],s=[];return i.forEach(a=>{e.classList.contains(a)&&(e.classList.remove(a),s.push(a))}),n.forEach(a=>{e.classList.contains(a)||(e.classList.add(a),o.push(a))}),()=>{s.forEach(a=>e.classList.add(a)),o.forEach(a=>e.classList.remove(a))}}function X(e,t){return typeof t=="object"&&t!==null?Un(e,t):Wn(e,t)}function Un(e,t){let r={};return Object.entries(t).forEach(([n,i])=>{r[n]=e.style[n],n.startsWith("--")||(n=Gn(n)),e.style.setProperty(n,i)}),setTimeout(()=>{e.style.length===0&&e.removeAttribute("style")}),()=>{X(e,r)}}function Wn(e,t){let r=e.getAttribute("style",t);return e.setAttribute("style",t),()=>{e.setAttribute("style",r||"")}}function Gn(e){return e.replace(/([a-z])([A-Z])/g,"$1-$2").toLowerCase()}function he(e,t=()=>{}){let r=!1;return function(){r?t.apply(this,arguments):(r=!0,e.apply(this,arguments))}}d("transition",(e,{value:t,modifiers:r,expression:n},{evaluate:i})=>{typeof n=="function"&&(n=i(n)),n!==!1&&(!n||typeof n=="boolean"?Yn(e,r,t):Jn(e,n,t))});function Jn(e,t,r){Or(e,me,""),{enter:i=>{e._x_transition.enter.during=i},"enter-start":i=>{e._x_transition.enter.start=i},"enter-end":i=>{e._x_transition.enter.end=i},leave:i=>{e._x_transition.leave.during=i},"leave-start":i=>{e._x_transition.leave.start=i},"leave-end":i=>{e._x_transition.leave.end=i}}[r](t)}function Yn(e,t,r){Or(e,X);let n=!t.includes("in")&&!t.includes("out")&&!r,i=n||t.includes("in")||["enter"].includes(r),o=n||t.includes("out")||["leave"].includes(r);t.includes("in")&&!n&&(t=t.filter((g,b)=>b<t.indexOf("out"))),t.includes("out")&&!n&&(t=t.filter((g,b)=>b>t.indexOf("out")));let s=!t.includes("opacity")&&!t.includes("scale"),a=s||t.includes("opacity"),c=s||t.includes("scale"),l=a?0:1,u=c?_e(t,"scale",95)/100:1,p=_e(t,"delay",0)/1e3,h=_e(t,"origin","center"),w="opacity, transform",F=_e(t,"duration",150)/1e3,Ee=_e(t,"duration",75)/1e3,f="cubic-bezier(0.4, 0.0, 0.2, 1)";i&&(e._x_transition.enter.during={transformOrigin:h,transitionDelay:`${p}s`,transitionProperty:w,transitionDuration:`${F}s`,transitionTimingFunction:f},e._x_transition.enter.start={opacity:l,transform:`scale(${u})`},e._x_transition.enter.end={opacity:1,transform:"scale(1)"}),o&&(e._x_transition.leave.during={transformOrigin:h,transitionDelay:`${p}s`,transitionProperty:w,transitionDuration:`${Ee}s`,transitionTimingFunction:f},e._x_transition.leave.start={opacity:1,transform:"scale(1)"},e._x_transition.leave.end={opacity:l,transform:`scale(${u})`})}function Or(e,t,r={}){e._x_transition||(e._x_transition={enter:{during:r,start:r,end:r},leave:{during:r,start:r,end:r},in(n=()=>{},i=()=>{}){Fe(e,t,{during:this.enter.during,start:this.enter.start,end:this.enter.end},n,i)},out(n=()=>{},i=()=>{}){Fe(e,t,{during:this.leave.during,start:this.leave.start,end:this.leave.end},n,i)}})}window.Element.prototype._x_toggleAndCascadeWithTransitions=function(e,t,r,n){let i=document.visibilityState==="visible"?requestAnimationFrame:setTimeout,o=()=>i(r);if(t){e._x_transition&&(e._x_transition.enter||e._x_transition.leave)?e._x_transition.enter&&(Object.entries(e._x_transition.enter.during).length||Object.entries(e._x_transition.enter.start).length||Object.entries(e._x_transition.enter.end).length)?e._x_transition.in(r):o():e._x_transition?e._x_transition.in(r):o();return}e._x_hidePromise=e._x_transition?new Promise((s,a)=>{e._x_transition.out(()=>{},()=>s(n)),e._x_transitioning&&e._x_transitioning.beforeCancel(()=>a({isFromCancelledTransition:!0}))}):Promise.resolve(n),queueMicrotask(()=>{let s=Cr(e);s?(s._x_hideChildren||(s._x_hideChildren=[]),s._x_hideChildren.push(e)):i(()=>{let a=c=>{let l=Promise.all([c._x_hidePromise,...(c._x_hideChildren||[]).map(a)]).then(([u])=>u?.());return delete c._x_hidePromise,delete c._x_hideChildren,l};a(e).catch(c=>{if(!c.isFromCancelledTransition)throw c})})})};function Cr(e){let t=e.parentNode;if(t)return t._x_hidePromise?t:Cr(t)}function Fe(e,t,{during:r,start:n,end:i}={},o=()=>{},s=()=>{}){if(e._x_transitioning&&e._x_transitioning.cancel(),Object.keys(r).length===0&&Object.keys(n).length===0&&Object.keys(i).length===0){o(),s();return}let a,c,l;Xn(e,{start(){a=t(e,n)},during(){c=t(e,r)},before:o,end(){a(),l=t(e,i)},after:s,cleanup(){c(),l()}})}function Xn(e,t){let r,n,i,o=he(()=>{m(()=>{r=!0,n||t.before(),i||(t.end(),je()),t.after(),e.isConnected&&t.cleanup(),delete e._x_transitioning})});e._x_transitioning={beforeCancels:[],beforeCancel(s){this.beforeCancels.push(s)},cancel:he(function(){for(;this.beforeCancels.length;)this.beforeCancels.shift()();o()}),finish:o},m(()=>{t.start(),t.during()}),Sr(),requestAnimationFrame(()=>{if(r)return;let s=Number(getComputedStyle(e).transitionDuration.replace(/,.*/,"").replace("s",""))*1e3,a=Number(getComputedStyle(e).transitionDelay.replace(/,.*/,"").replace("s",""))*1e3;s===0&&(s=Number(getComputedStyle(e).animationDuration.replace("s",""))*1e3),m(()=>{t.before()}),n=!0,requestAnimationFrame(()=>{r||(m(()=>{t.end()}),je(),setTimeout(e._x_transitioning.finish,s+a),i=!0)})})}function _e(e,t,r){if(e.indexOf(t)===-1)return r;let n=e[e.indexOf(t)+1];if(!n||t==="scale"&&isNaN(n))return r;if(t==="duration"||t==="delay"){let i=n.match(/([0-9]+)ms/);if(i)return i[1]}return t==="origin"&&["top","right","left","center","bottom"].includes(e[e.indexOf(t)+2])?[n,e[e.indexOf(t)+2]].join(" "):n}var I=!1;function A(e,t=()=>{}){return(...r)=>I?t(...r):e(...r)}function Tr(e){return(...t)=>I&&e(...t)}var Rr=[];function H(e){Rr.push(e)}function Mr(e,t){Rr.forEach(r=>r(e,t)),I=!0,kr(()=>{S(t,(r,n)=>{n(r,()=>{})})}),I=!1}var Be=!1;function Nr(e,t){t._x_dataStack||(t._x_dataStack=e._x_dataStack),I=!0,Be=!0,kr(()=>{Zn(t)}),I=!1,Be=!1}function Zn(e){let t=!1;S(e,(n,i)=>{D(n,(o,s)=>{if(t&&wr(o))return s();t=!0,i(o,s)})})}function kr(e){let t=N;ct((r,n)=>{let i=t(r);return $(i),()=>{}}),e(),ct(t)}function ge(e,t,r,n=[]){switch(e._x_bindings||(e._x_bindings=T({})),e._x_bindings[t]=r,t=n.includes("camel")?si(t):t,t){case"value":Qn(e,r);break;case"style":ti(e,r);break;case"class":ei(e,r);break;case"selected":case"checked":ri(e,t,r);break;default:Pr(e,t,r);break}}function Qn(e,t){if(Ot(e))e.attributes.value===void 0&&(e.value=t),window.fromModel&&(typeof t=="boolean"?e.checked=xe(e.value)===t:e.checked=Dr(e.value,t));else if(ze(e))Number.isInteger(t)?e.value=t:!Array.isArray(t)&&typeof t!="boolean"&&![null,void 0].includes(t)?e.value=String(t):Array.isArray(t)?e.checked=t.some(r=>Dr(r,e.value)):e.checked=!!t;else if(e.tagName==="SELECT")oi(e,t);else{if(e.value===t)return;e.value=t===void 0?"":t}}function ei(e,t){e._x_undoAddedClasses&&e._x_undoAddedClasses(),e._x_undoAddedClasses=me(e,t)}function ti(e,t){e._x_undoAddedStyles&&e._x_undoAddedStyles(),e._x_undoAddedStyles=X(e,t)}function ri(e,t,r){Pr(e,t,r),ii(e,t,r)}function Pr(e,t,r){[null,void 0,!1].includes(r)&&ci(t)?e.removeAttribute(t):(Ir(t)&&(r=t),ni(e,t,r))}function ni(e,t,r){e.getAttribute(t)!=r&&e.setAttribute(t,r)}function ii(e,t,r){e[t]!==r&&(e[t]=r)}function oi(e,t){let r=[].concat(t).map(n=>n+"");Array.from(e.options).forEach(n=>{n.selected=r.includes(n.value)})}function si(e){return e.toLowerCase().replace(/-(\w)/g,(t,r)=>r.toUpperCase())}function Dr(e,t){return e==t}function xe(e){return[1,"1","true","on","yes",!0].includes(e)?!0:[0,"0","false","off","no",!1].includes(e)?!1:e?Boolean(e):null}var ai=new Set(["allowfullscreen","async","autofocus","autoplay","checked","controls","default","defer","disabled","formnovalidate","inert","ismap","itemscope","loop","multiple","muted","nomodule","novalidate","open","playsinline","readonly","required","reversed","selected","shadowrootclonable","shadowrootdelegatesfocus","shadowrootserializable"]);function Ir(e){return ai.has(e)}function ci(e){return!["aria-pressed","aria-checked","aria-expanded","aria-selected"].includes(e)}function Lr(e,t,r){return e._x_bindings&&e._x_bindings[t]!==void 0?e._x_bindings[t]:jr(e,t,r)}function $r(e,t,r,n=!0){if(e._x_bindings&&e._x_bindings[t]!==void 0)return e._x_bindings[t];if(e._x_inlineBindings&&e._x_inlineBindings[t]!==void 0){let i=e._x_inlineBindings[t];return i.extract=n,ke(()=>R(e,i.expression))}return jr(e,t,r)}function jr(e,t,r){let n=e.getAttribute(t);return n===null?typeof r=="function"?r():r:n===""?!0:Ir(t)?!![t,"true"].includes(n):n}function ze(e){return e.type==="checkbox"||e.localName==="ui-checkbox"||e.localName==="ui-switch"}function Ot(e){return e.type==="radio"||e.localName==="ui-radio"}function Ke(e,t){var r;return function(){var n=this,i=arguments,o=function(){r=null,e.apply(n,i)};clearTimeout(r),r=setTimeout(o,t)}}function He(e,t){let r;return function(){let n=this,i=arguments;r||(e.apply(n,i),r=!0,setTimeout(()=>r=!1,t))}}function Ve({get:e,set:t},{get:r,set:n}){let i=!0,o,s,a=N(()=>{let c=e(),l=r();if(i)n(Ct(c)),i=!1;else{let u=JSON.stringify(c),p=JSON.stringify(l);u!==o?n(Ct(c)):u!==p&&t(Ct(l))}o=JSON.stringify(e()),s=JSON.stringify(r())});return()=>{$(a)}}function Ct(e){return typeof e=="object"?JSON.parse(JSON.stringify(e)):e}function Fr(e){(Array.isArray(e)?e:[e]).forEach(r=>r(K))}var Z={},Br=!1;function zr(e,t){if(Br||(Z=T(Z),Br=!0),t===void 0)return Z[e];Z[e]=t,Te(Z[e]),typeof t=="object"&&t!==null&&t.hasOwnProperty("init")&&typeof t.init=="function"&&Z[e].init()}function Kr(){return Z}var Hr={};function Vr(e,t){let r=typeof t!="function"?()=>t:t;return e instanceof Element?Tt(e,r()):(Hr[e]=r,()=>{})}function qr(e){return Object.entries(Hr).forEach(([t,r])=>{Object.defineProperty(e,t,{get(){return(...n)=>r(...n)}})}),e}function Tt(e,t,r){let n=[];for(;n.length;)n.pop()();let i=Object.entries(t).map(([s,a])=>({name:s,value:a})),o=Et(i);return i=i.map(s=>o.find(a=>a.name===s.name)?{name:`x-bind:${s.name}`,value:`"${s.value}"`}:s),pe(e,i,r).map(s=>{n.push(s.runCleanups),s()}),()=>{for(;n.length;)n.pop()()}}var Ur={};function Wr(e,t){Ur[e]=t}function Gr(e,t){return Object.entries(Ur).forEach(([r,n])=>{Object.defineProperty(e,r,{get(){return(...i)=>n.bind(t)(...i)},enumerable:!1})}),e}var li={get reactive(){return T},get release(){return $},get effect(){return N},get raw(){return at},version:"3.14.9",flushAndStopDeferringMutations:nr,dontAutoEvaluateFunctions:ke,disableEffectScheduling:Gt,startObservingMutations:ue,stopObservingMutations:dt,setReactivityEngine:Jt,onAttributeRemoved:Oe,onAttributesAdded:Ae,closestDataStack:B,skipDuringClone:A,onlyDuringClone:Tr,addRootSelector:Le,addInitSelector:$e,interceptClone:H,addScopeToNode:k,deferMutations:rr,mapAttributes:ne,evaluateLater:x,interceptInit:vr,setEvaluator:ar,mergeProxies:z,extractProp:$r,findClosest:j,onElRemoved:te,closestRoot:Y,destroyTree:P,interceptor:Re,transition:Fe,setStyles:X,mutateDom:m,directive:d,entangle:Ve,throttle:He,debounce:Ke,evaluate:R,initTree:S,nextTick:ie,prefixed:C,prefix:cr,plugin:Fr,magic:y,store:zr,start:gr,clone:Nr,cloneNode:Mr,bound:Lr,$data:Ce,watch:ve,walk:D,data:Wr,bind:Vr},K=li;function Rt(e,t){let r=Object.create(null),n=e.split(",");for(let i=0;i<n.length;i++)r[n[i]]=!0;return t?i=>!!r[i.toLowerCase()]:i=>!!r[i]}var ui="itemscope,allowfullscreen,formnovalidate,ismap,nomodule,novalidate,readonly";var Ls=Rt(ui+",async,autofocus,autoplay,controls,default,defer,disabled,hidden,loop,open,required,reversed,scoped,seamless,checked,muted,multiple,selected");var Jr=Object.freeze({}),$s=Object.freeze([]);var fi=Object.prototype.hasOwnProperty,ye=(e,t)=>fi.call(e,t),V=Array.isArray,oe=e=>Yr(e)==="[object Map]";var di=e=>typeof e=="string",qe=e=>typeof e=="symbol",be=e=>e!==null&&typeof e=="object";var pi=Object.prototype.toString,Yr=e=>pi.call(e),Mt=e=>Yr(e).slice(8,-1);var Ue=e=>di(e)&&e!=="NaN"&&e[0]!=="-"&&""+parseInt(e,10)===e;var We=e=>{let t=Object.create(null);return r=>t[r]||(t[r]=e(r))},mi=/-(\w)/g,js=We(e=>e.replace(mi,(t,r)=>r?r.toUpperCase():"")),hi=/\B([A-Z])/g,Fs=We(e=>e.replace(hi,"-$1").toLowerCase()),Nt=We(e=>e.charAt(0).toUpperCase()+e.slice(1)),Bs=We(e=>e?`on${Nt(e)}`:""),kt=(e,t)=>e!==t&&(e===e||t===t);var Dt=new WeakMap,we=[],L,Q=Symbol("iterate"),Pt=Symbol("Map key iterate");function _i(e){return e&&e._isEffect===!0}function rn(e,t=Jr){_i(e)&&(e=e.raw);let r=xi(e,t);return t.lazy||r(),r}function nn(e){e.active&&(on(e),e.options.onStop&&e.options.onStop(),e.active=!1)}var gi=0;function xi(e,t){let r=function(){if(!r.active)return e();if(!we.includes(r)){on(r);try{return bi(),we.push(r),L=r,e()}finally{we.pop(),sn(),L=we[we.length-1]}}};return r.id=gi++,r.allowRecurse=!!t.allowRecurse,r._isEffect=!0,r.active=!0,r.raw=e,r.deps=[],r.options=t,r}function on(e){let{deps:t}=e;if(t.length){for(let r=0;r<t.length;r++)t[r].delete(e);t.length=0}}var se=!0,Lt=[];function yi(){Lt.push(se),se=!1}function bi(){Lt.push(se),se=!0}function sn(){let e=Lt.pop();se=e===void 0?!0:e}function M(e,t,r){if(!se||L===void 0)return;let n=Dt.get(e);n||Dt.set(e,n=new Map);let i=n.get(r);i||n.set(r,i=new Set),i.has(L)||(i.add(L),L.deps.push(i),L.options.onTrack&&L.options.onTrack({effect:L,target:e,type:t,key:r}))}function U(e,t,r,n,i,o){let s=Dt.get(e);if(!s)return;let a=new Set,c=u=>{u&&u.forEach(p=>{(p!==L||p.allowRecurse)&&a.add(p)})};if(t==="clear")s.forEach(c);else if(r==="length"&&V(e))s.forEach((u,p)=>{(p==="length"||p>=n)&&c(u)});else switch(r!==void 0&&c(s.get(r)),t){case"add":V(e)?Ue(r)&&c(s.get("length")):(c(s.get(Q)),oe(e)&&c(s.get(Pt)));break;case"delete":V(e)||(c(s.get(Q)),oe(e)&&c(s.get(Pt)));break;case"set":oe(e)&&c(s.get(Q));break}let l=u=>{u.options.onTrigger&&u.options.onTrigger({effect:u,target:e,key:r,type:t,newValue:n,oldValue:i,oldTarget:o}),u.options.scheduler?u.options.scheduler(u):u()};a.forEach(l)}var wi=Rt("__proto__,__v_isRef,__isVue"),an=new Set(Object.getOwnPropertyNames(Symbol).map(e=>Symbol[e]).filter(qe)),Ei=cn();var vi=cn(!0);var Xr=Si();function Si(){let e={};return["includes","indexOf","lastIndexOf"].forEach(t=>{e[t]=function(...r){let n=_(this);for(let o=0,s=this.length;o<s;o++)M(n,"get",o+"");let i=n[t](...r);return i===-1||i===!1?n[t](...r.map(_)):i}}),["push","pop","shift","unshift","splice"].forEach(t=>{e[t]=function(...r){yi();let n=_(this)[t].apply(this,r);return sn(),n}}),e}function cn(e=!1,t=!1){return function(n,i,o){if(i==="__v_isReactive")return!e;if(i==="__v_isReadonly")return e;if(i==="__v_raw"&&o===(e?t?Bi:dn:t?Fi:fn).get(n))return n;let s=V(n);if(!e&&s&&ye(Xr,i))return Reflect.get(Xr,i,o);let a=Reflect.get(n,i,o);return(qe(i)?an.has(i):wi(i))||(e||M(n,"get",i),t)?a:It(a)?!s||!Ue(i)?a.value:a:be(a)?e?pn(a):et(a):a}}var Ai=Oi();function Oi(e=!1){return function(r,n,i,o){let s=r[n];if(!e&&(i=_(i),s=_(s),!V(r)&&It(s)&&!It(i)))return s.value=i,!0;let a=V(r)&&Ue(n)?Number(n)<r.length:ye(r,n),c=Reflect.set(r,n,i,o);return r===_(o)&&(a?kt(i,s)&&U(r,"set",n,i,s):U(r,"add",n,i)),c}}function Ci(e,t){let r=ye(e,t),n=e[t],i=Reflect.deleteProperty(e,t);return i&&r&&U(e,"delete",t,void 0,n),i}function Ti(e,t){let r=Reflect.has(e,t);return(!qe(t)||!an.has(t))&&M(e,"has",t),r}function Ri(e){return M(e,"iterate",V(e)?"length":Q),Reflect.ownKeys(e)}var Mi={get:Ei,set:Ai,deleteProperty:Ci,has:Ti,ownKeys:Ri},Ni={get:vi,set(e,t){return console.warn(`Set operation on key "${String(t)}" failed: target is readonly.`,e),!0},deleteProperty(e,t){return console.warn(`Delete operation on key "${String(t)}" failed: target is readonly.`,e),!0}};var $t=e=>be(e)?et(e):e,jt=e=>be(e)?pn(e):e,Ft=e=>e,Qe=e=>Reflect.getPrototypeOf(e);function Ge(e,t,r=!1,n=!1){e=e.__v_raw;let i=_(e),o=_(t);t!==o&&!r&&M(i,"get",t),!r&&M(i,"get",o);let{has:s}=Qe(i),a=n?Ft:r?jt:$t;if(s.call(i,t))return a(e.get(t));if(s.call(i,o))return a(e.get(o));e!==i&&e.get(t)}function Je(e,t=!1){let r=this.__v_raw,n=_(r),i=_(e);return e!==i&&!t&&M(n,"has",e),!t&&M(n,"has",i),e===i?r.has(e):r.has(e)||r.has(i)}function Ye(e,t=!1){return e=e.__v_raw,!t&&M(_(e),"iterate",Q),Reflect.get(e,"size",e)}function Zr(e){e=_(e);let t=_(this);return Qe(t).has.call(t,e)||(t.add(e),U(t,"add",e,e)),this}function Qr(e,t){t=_(t);let r=_(this),{has:n,get:i}=Qe(r),o=n.call(r,e);o?un(r,n,e):(e=_(e),o=n.call(r,e));let s=i.call(r,e);return r.set(e,t),o?kt(t,s)&&U(r,"set",e,t,s):U(r,"add",e,t),this}function en(e){let t=_(this),{has:r,get:n}=Qe(t),i=r.call(t,e);i?un(t,r,e):(e=_(e),i=r.call(t,e));let o=n?n.call(t,e):void 0,s=t.delete(e);return i&&U(t,"delete",e,void 0,o),s}function tn(){let e=_(this),t=e.size!==0,r=oe(e)?new Map(e):new Set(e),n=e.clear();return t&&U(e,"clear",void 0,void 0,r),n}function Xe(e,t){return function(n,i){let o=this,s=o.__v_raw,a=_(s),c=t?Ft:e?jt:$t;return!e&&M(a,"iterate",Q),s.forEach((l,u)=>n.call(i,c(l),c(u),o))}}function Ze(e,t,r){return function(...n){let i=this.__v_raw,o=_(i),s=oe(o),a=e==="entries"||e===Symbol.iterator&&s,c=e==="keys"&&s,l=i[e](...n),u=r?Ft:t?jt:$t;return!t&&M(o,"iterate",c?Pt:Q),{next(){let{value:p,done:h}=l.next();return h?{value:p,done:h}:{value:a?[u(p[0]),u(p[1])]:u(p),done:h}},[Symbol.iterator](){return this}}}}function q(e){return function(...t){{let r=t[0]?`on key "${t[0]}" `:"";console.warn(`${Nt(e)} operation ${r}failed: target is readonly.`,_(this))}return e==="delete"?!1:this}}function ki(){let e={get(o){return Ge(this,o)},get size(){return Ye(this)},has:Je,add:Zr,set:Qr,delete:en,clear:tn,forEach:Xe(!1,!1)},t={get(o){return Ge(this,o,!1,!0)},get size(){return Ye(this)},has:Je,add:Zr,set:Qr,delete:en,clear:tn,forEach:Xe(!1,!0)},r={get(o){return Ge(this,o,!0)},get size(){return Ye(this,!0)},has(o){return Je.call(this,o,!0)},add:q("add"),set:q("set"),delete:q("delete"),clear:q("clear"),forEach:Xe(!0,!1)},n={get(o){return Ge(this,o,!0,!0)},get size(){return Ye(this,!0)},has(o){return Je.call(this,o,!0)},add:q("add"),set:q("set"),delete:q("delete"),clear:q("clear"),forEach:Xe(!0,!0)};return["keys","values","entries",Symbol.iterator].forEach(o=>{e[o]=Ze(o,!1,!1),r[o]=Ze(o,!0,!1),t[o]=Ze(o,!1,!0),n[o]=Ze(o,!0,!0)}),[e,r,t,n]}var[Di,Pi,Ii,Li]=ki();function ln(e,t){let r=t?e?Li:Ii:e?Pi:Di;return(n,i,o)=>i==="__v_isReactive"?!e:i==="__v_isReadonly"?e:i==="__v_raw"?n:Reflect.get(ye(r,i)&&i in n?r:n,i,o)}var $i={get:ln(!1,!1)};var ji={get:ln(!0,!1)};function un(e,t,r){let n=_(r);if(n!==r&&t.call(e,n)){let i=Mt(e);console.warn(`Reactive ${i} contains both the raw and reactive versions of the same object${i==="Map"?" as keys":""}, which can lead to inconsistencies. Avoid differentiating between the raw and reactive versions of an object and only use the reactive version if possible.`)}}var fn=new WeakMap,Fi=new WeakMap,dn=new WeakMap,Bi=new WeakMap;function zi(e){switch(e){case"Object":case"Array":return 1;case"Map":case"Set":case"WeakMap":case"WeakSet":return 2;default:return 0}}function Ki(e){return e.__v_skip||!Object.isExtensible(e)?0:zi(Mt(e))}function et(e){return e&&e.__v_isReadonly?e:mn(e,!1,Mi,$i,fn)}function pn(e){return mn(e,!0,Ni,ji,dn)}function mn(e,t,r,n,i){if(!be(e))return console.warn(`value cannot be made reactive: ${String(e)}`),e;if(e.__v_raw&&!(t&&e.__v_isReactive))return e;let o=i.get(e);if(o)return o;let s=Ki(e);if(s===0)return e;let a=new Proxy(e,s===2?n:r);return i.set(e,a),a}function _(e){return e&&_(e.__v_raw)||e}function It(e){return Boolean(e&&e.__v_isRef===!0)}y("nextTick",()=>ie);y("dispatch",e=>J.bind(J,e));y("watch",(e,{evaluateLater:t,cleanup:r})=>(n,i)=>{let o=t(n),a=ve(()=>{let c;return o(l=>c=l),c},i);r(a)});y("store",Kr);y("data",e=>Ce(e));y("root",e=>Y(e));y("refs",e=>(e._x_refs_proxy||(e._x_refs_proxy=z(Hi(e))),e._x_refs_proxy));function Hi(e){let t=[];return j(e,r=>{r._x_refs&&t.push(r._x_refs)}),t}var Bt={};function zt(e){return Bt[e]||(Bt[e]=0),++Bt[e]}function hn(e,t){return j(e,r=>{if(r._x_ids&&r._x_ids[t])return!0})}function _n(e,t){e._x_ids||(e._x_ids={}),e._x_ids[t]||(e._x_ids[t]=zt(t))}y("id",(e,{cleanup:t})=>(r,n=null)=>{let i=`${r}${n?`-${n}`:""}`;return Vi(e,i,t,()=>{let o=hn(e,r),s=o?o._x_ids[r]:zt(r);return n?`${r}-${s}-${n}`:`${r}-${s}`})});H((e,t)=>{e._x_id&&(t._x_id=e._x_id)});function Vi(e,t,r,n){if(e._x_id||(e._x_id={}),e._x_id[t])return e._x_id[t];let i=n();return e._x_id[t]=i,r(()=>{delete e._x_id[t]}),i}y("el",e=>e);gn("Focus","focus","focus");gn("Persist","persist","persist");function gn(e,t,r){y(t,n=>E(`You can't use [$${t}] without first installing the "${e}" plugin here: https://alpinejs.dev/plugins/${r}`,n))}d("modelable",(e,{expression:t},{effect:r,evaluateLater:n,cleanup:i})=>{let o=n(t),s=()=>{let u;return o(p=>u=p),u},a=n(`${t} = __placeholder`),c=u=>a(()=>{},{scope:{__placeholder:u}}),l=s();c(l),queueMicrotask(()=>{if(!e._x_model)return;e._x_removeModelListeners.default();let u=e._x_model.get,p=e._x_model.set,h=Ve({get(){return u()},set(w){p(w)}},{get(){return s()},set(w){c(w)}});i(h)})});d("teleport",(e,{modifiers:t,expression:r},{cleanup:n})=>{e.tagName.toLowerCase()!=="template"&&E("x-teleport can only be used on a <template> tag",e);let i=xn(r),o=e.content.cloneNode(!0).firstElementChild;e._x_teleport=o,o._x_teleportBack=e,e.setAttribute("data-teleport-template",!0),o.setAttribute("data-teleport-target",!0),e._x_forwardEvents&&e._x_forwardEvents.forEach(a=>{o.addEventListener(a,c=>{c.stopPropagation(),e.dispatchEvent(new c.constructor(c.type,c))})}),k(o,{},e);let s=(a,c,l)=>{l.includes("prepend")?c.parentNode.insertBefore(a,c):l.includes("append")?c.parentNode.insertBefore(a,c.nextSibling):c.appendChild(a)};m(()=>{s(o,i,t),A(()=>{S(o)})()}),e._x_teleportPutBack=()=>{let a=xn(r);m(()=>{s(e._x_teleport,a,t)})},n(()=>m(()=>{o.remove(),P(o)}))});var qi=document.createElement("div");function xn(e){let t=A(()=>document.querySelector(e),()=>qi)();return t||E(`Cannot find x-teleport element for selector: "${e}"`),t}var yn=()=>{};yn.inline=(e,{modifiers:t},{cleanup:r})=>{t.includes("self")?e._x_ignoreSelf=!0:e._x_ignore=!0,r(()=>{t.includes("self")?delete e._x_ignoreSelf:delete e._x_ignore})};d("ignore",yn);d("effect",A((e,{expression:t},{effect:r})=>{r(x(e,t))}));function ae(e,t,r,n){let i=e,o=c=>n(c),s={},a=(c,l)=>u=>l(c,u);if(r.includes("dot")&&(t=Ui(t)),r.includes("camel")&&(t=Wi(t)),r.includes("passive")&&(s.passive=!0),r.includes("capture")&&(s.capture=!0),r.includes("window")&&(i=window),r.includes("document")&&(i=document),r.includes("debounce")){let c=r[r.indexOf("debounce")+1]||"invalid-wait",l=tt(c.split("ms")[0])?Number(c.split("ms")[0]):250;o=Ke(o,l)}if(r.includes("throttle")){let c=r[r.indexOf("throttle")+1]||"invalid-wait",l=tt(c.split("ms")[0])?Number(c.split("ms")[0]):250;o=He(o,l)}return r.includes("prevent")&&(o=a(o,(c,l)=>{l.preventDefault(),c(l)})),r.includes("stop")&&(o=a(o,(c,l)=>{l.stopPropagation(),c(l)})),r.includes("once")&&(o=a(o,(c,l)=>{c(l),i.removeEventListener(t,o,s)})),(r.includes("away")||r.includes("outside"))&&(i=document,o=a(o,(c,l)=>{e.contains(l.target)||l.target.isConnected!==!1&&(e.offsetWidth<1&&e.offsetHeight<1||e._x_isShown!==!1&&c(l))})),r.includes("self")&&(o=a(o,(c,l)=>{l.target===e&&c(l)})),(Ji(t)||wn(t))&&(o=a(o,(c,l)=>{Yi(l,r)||c(l)})),i.addEventListener(t,o,s),()=>{i.removeEventListener(t,o,s)}}function Ui(e){return e.replace(/-/g,".")}function Wi(e){return e.toLowerCase().replace(/-(\w)/g,(t,r)=>r.toUpperCase())}function tt(e){return!Array.isArray(e)&&!isNaN(e)}function Gi(e){return[" ","_"].includes(e)?e:e.replace(/([a-z])([A-Z])/g,"$1-$2").replace(/[_\s]/,"-").toLowerCase()}function Ji(e){return["keydown","keyup"].includes(e)}function wn(e){return["contextmenu","click","mouse"].some(t=>e.includes(t))}function Yi(e,t){let r=t.filter(o=>!["window","document","prevent","stop","once","capture","self","away","outside","passive"].includes(o));if(r.includes("debounce")){let o=r.indexOf("debounce");r.splice(o,tt((r[o+1]||"invalid-wait").split("ms")[0])?2:1)}if(r.includes("throttle")){let o=r.indexOf("throttle");r.splice(o,tt((r[o+1]||"invalid-wait").split("ms")[0])?2:1)}if(r.length===0||r.length===1&&bn(e.key).includes(r[0]))return!1;let i=["ctrl","shift","alt","meta","cmd","super"].filter(o=>r.includes(o));return r=r.filter(o=>!i.includes(o)),!(i.length>0&&i.filter(s=>((s==="cmd"||s==="super")&&(s="meta"),e[`${s}Key`])).length===i.length&&(wn(e.type)||bn(e.key).includes(r[0])))}function bn(e){if(!e)return[];e=Gi(e);let t={ctrl:"control",slash:"/",space:" ",spacebar:" ",cmd:"meta",esc:"escape",up:"arrow-up",down:"arrow-down",left:"arrow-left",right:"arrow-right",period:".",comma:",",equal:"=",minus:"-",underscore:"_"};return t[e]=e,Object.keys(t).map(r=>{if(t[r]===e)return r}).filter(r=>r)}d("model",(e,{modifiers:t,expression:r},{effect:n,cleanup:i})=>{let o=e;t.includes("parent")&&(o=e.parentNode);let s=x(o,r),a;typeof r=="string"?a=x(o,`${r} = __placeholder`):typeof r=="function"&&typeof r()=="string"?a=x(o,`${r()} = __placeholder`):a=()=>{};let c=()=>{let h;return s(w=>h=w),En(h)?h.get():h},l=h=>{let w;s(F=>w=F),En(w)?w.set(h):a(()=>{},{scope:{__placeholder:h}})};typeof r=="string"&&e.type==="radio"&&m(()=>{e.hasAttribute("name")||e.setAttribute("name",r)});var u=e.tagName.toLowerCase()==="select"||["checkbox","radio"].includes(e.type)||t.includes("lazy")?"change":"input";let p=I?()=>{}:ae(e,u,t,h=>{l(Kt(e,t,h,c()))});if(t.includes("fill")&&([void 0,null,""].includes(c())||ze(e)&&Array.isArray(c())||e.tagName.toLowerCase()==="select"&&e.multiple)&&l(Kt(e,t,{target:e},c())),e._x_removeModelListeners||(e._x_removeModelListeners={}),e._x_removeModelListeners.default=p,i(()=>e._x_removeModelListeners.default()),e.form){let h=ae(e.form,"reset",[],w=>{ie(()=>e._x_model&&e._x_model.set(Kt(e,t,{target:e},c())))});i(()=>h())}e._x_model={get(){return c()},set(h){l(h)}},e._x_forceModelUpdate=h=>{h===void 0&&typeof r=="string"&&r.match(/\./)&&(h=""),window.fromModel=!0,m(()=>ge(e,"value",h)),delete window.fromModel},n(()=>{let h=c();t.includes("unintrusive")&&document.activeElement.isSameNode(e)||e._x_forceModelUpdate(h)})});function Kt(e,t,r,n){return m(()=>{if(r instanceof CustomEvent&&r.detail!==void 0)return r.detail!==null&&r.detail!==void 0?r.detail:r.target.value;if(ze(e))if(Array.isArray(n)){let i=null;return t.includes("number")?i=Ht(r.target.value):t.includes("boolean")?i=xe(r.target.value):i=r.target.value,r.target.checked?n.includes(i)?n:n.concat([i]):n.filter(o=>!Xi(o,i))}else return r.target.checked;else{if(e.tagName.toLowerCase()==="select"&&e.multiple)return t.includes("number")?Array.from(r.target.selectedOptions).map(i=>{let o=i.value||i.text;return Ht(o)}):t.includes("boolean")?Array.from(r.target.selectedOptions).map(i=>{let o=i.value||i.text;return xe(o)}):Array.from(r.target.selectedOptions).map(i=>i.value||i.text);{let i;return Ot(e)?r.target.checked?i=r.target.value:i=n:i=r.target.value,t.includes("number")?Ht(i):t.includes("boolean")?xe(i):t.includes("trim")?i.trim():i}}})}function Ht(e){let t=e?parseFloat(e):null;return Zi(t)?t:e}function Xi(e,t){return e==t}function Zi(e){return!Array.isArray(e)&&!isNaN(e)}function En(e){return e!==null&&typeof e=="object"&&typeof e.get=="function"&&typeof e.set=="function"}d("cloak",e=>queueMicrotask(()=>m(()=>e.removeAttribute(C("cloak")))));$e(()=>`[${C("init")}]`);d("init",A((e,{expression:t},{evaluate:r})=>typeof t=="string"?!!t.trim()&&r(t,{},!1):r(t,{},!1)));d("text",(e,{expression:t},{effect:r,evaluateLater:n})=>{let i=n(t);r(()=>{i(o=>{m(()=>{e.textContent=o})})})});d("html",(e,{expression:t},{effect:r,evaluateLater:n})=>{let i=n(t);r(()=>{i(o=>{m(()=>{e.innerHTML=o,e._x_ignoreSelf=!0,S(e),delete e._x_ignoreSelf})})})});ne(Pe(":",Ie(C("bind:"))));var vn=(e,{value:t,modifiers:r,expression:n,original:i},{effect:o,cleanup:s})=>{if(!t){let c={};qr(c),x(e,n)(u=>{Tt(e,u,i)},{scope:c});return}if(t==="key")return Qi(e,n);if(e._x_inlineBindings&&e._x_inlineBindings[t]&&e._x_inlineBindings[t].extract)return;let a=x(e,n);o(()=>a(c=>{c===void 0&&typeof n=="string"&&n.match(/\./)&&(c=""),m(()=>ge(e,t,c,r))})),s(()=>{e._x_undoAddedClasses&&e._x_undoAddedClasses(),e._x_undoAddedStyles&&e._x_undoAddedStyles()})};vn.inline=(e,{value:t,modifiers:r,expression:n})=>{t&&(e._x_inlineBindings||(e._x_inlineBindings={}),e._x_inlineBindings[t]={expression:n,extract:!1})};d("bind",vn);function Qi(e,t){e._x_keyExpression=t}Le(()=>`[${C("data")}]`);d("data",(e,{expression:t},{cleanup:r})=>{if(eo(e))return;t=t===""?"{}":t;let n={};fe(n,e);let i={};Gr(i,n);let o=R(e,t,{scope:i});(o===void 0||o===!0)&&(o={}),fe(o,e);let s=T(o);Te(s);let a=k(e,s);s.init&&R(e,s.init),r(()=>{s.destroy&&R(e,s.destroy),a()})});H((e,t)=>{e._x_dataStack&&(t._x_dataStack=e._x_dataStack,t.setAttribute("data-has-alpine-state",!0))});function eo(e){return I?Be?!0:e.hasAttribute("data-has-alpine-state"):!1}d("show",(e,{modifiers:t,expression:r},{effect:n})=>{let i=x(e,r);e._x_doHide||(e._x_doHide=()=>{m(()=>{e.style.setProperty("display","none",t.includes("important")?"important":void 0)})}),e._x_doShow||(e._x_doShow=()=>{m(()=>{e.style.length===1&&e.style.display==="none"?e.removeAttribute("style"):e.style.removeProperty("display")})});let o=()=>{e._x_doHide(),e._x_isShown=!1},s=()=>{e._x_doShow(),e._x_isShown=!0},a=()=>setTimeout(s),c=he(p=>p?s():o(),p=>{typeof e._x_toggleAndCascadeWithTransitions=="function"?e._x_toggleAndCascadeWithTransitions(e,p,s,o):p?a():o()}),l,u=!0;n(()=>i(p=>{!u&&p===l||(t.includes("immediate")&&(p?a():o()),c(p),l=p,u=!1)}))});d("for",(e,{expression:t},{effect:r,cleanup:n})=>{let i=ro(t),o=x(e,i.items),s=x(e,e._x_keyExpression||"index");e._x_prevKeys=[],e._x_lookup={},r(()=>to(e,i,o,s)),n(()=>{Object.values(e._x_lookup).forEach(a=>m(()=>{P(a),a.remove()})),delete e._x_prevKeys,delete e._x_lookup})});function to(e,t,r,n){let i=s=>typeof s=="object"&&!Array.isArray(s),o=e;r(s=>{no(s)&&s>=0&&(s=Array.from(Array(s).keys(),f=>f+1)),s===void 0&&(s=[]);let a=e._x_lookup,c=e._x_prevKeys,l=[],u=[];if(i(s))s=Object.entries(s).map(([f,g])=>{let b=Sn(t,g,f,s);n(v=>{u.includes(v)&&E("Duplicate key on x-for",e),u.push(v)},{scope:{index:f,...b}}),l.push(b)});else for(let f=0;f<s.length;f++){let g=Sn(t,s[f],f,s);n(b=>{u.includes(b)&&E("Duplicate key on x-for",e),u.push(b)},{scope:{index:f,...g}}),l.push(g)}let p=[],h=[],w=[],F=[];for(let f=0;f<c.length;f++){let g=c[f];u.indexOf(g)===-1&&w.push(g)}c=c.filter(f=>!w.includes(f));let Ee="template";for(let f=0;f<u.length;f++){let g=u[f],b=c.indexOf(g);if(b===-1)c.splice(f,0,g),p.push([Ee,f]);else if(b!==f){let v=c.splice(f,1)[0],O=c.splice(b-1,1)[0];c.splice(f,0,O),c.splice(b,0,v),h.push([v,O])}else F.push(g);Ee=g}for(let f=0;f<w.length;f++){let g=w[f];g in a&&(m(()=>{P(a[g]),a[g].remove()}),delete a[g])}for(let f=0;f<h.length;f++){let[g,b]=h[f],v=a[g],O=a[b],ee=document.createElement("div");m(()=>{O||E('x-for ":key" is undefined or invalid',o,b,a),O.after(ee),v.after(O),O._x_currentIfEl&&O.after(O._x_currentIfEl),ee.before(v),v._x_currentIfEl&&v.after(v._x_currentIfEl),ee.remove()}),O._x_refreshXForScope(l[u.indexOf(b)])}for(let f=0;f<p.length;f++){let[g,b]=p[f],v=g==="template"?o:a[g];v._x_currentIfEl&&(v=v._x_currentIfEl);let O=l[b],ee=u[b],ce=document.importNode(o.content,!0).firstElementChild,qt=T(O);k(ce,qt,o),ce._x_refreshXForScope=On=>{Object.entries(On).forEach(([Cn,Tn])=>{qt[Cn]=Tn})},m(()=>{v.after(ce),A(()=>S(ce))()}),typeof ee=="object"&&E("x-for key cannot be an object, it must be a string or an integer",o),a[ee]=ce}for(let f=0;f<F.length;f++)a[F[f]]._x_refreshXForScope(l[u.indexOf(F[f])]);o._x_prevKeys=u})}function ro(e){let t=/,([^,\}\]]*)(?:,([^,\}\]]*))?$/,r=/^\s*\(|\)\s*$/g,n=/([\s\S]*?)\s+(?:in|of)\s+([\s\S]*)/,i=e.match(n);if(!i)return;let o={};o.items=i[2].trim();let s=i[1].replace(r,"").trim(),a=s.match(t);return a?(o.item=s.replace(t,"").trim(),o.index=a[1].trim(),a[2]&&(o.collection=a[2].trim())):o.item=s,o}function Sn(e,t,r,n){let i={};return/^\[.*\]$/.test(e.item)&&Array.isArray(t)?e.item.replace("[","").replace("]","").split(",").map(s=>s.trim()).forEach((s,a)=>{i[s]=t[a]}):/^\{.*\}$/.test(e.item)&&!Array.isArray(t)&&typeof t=="object"?e.item.replace("{","").replace("}","").split(",").map(s=>s.trim()).forEach(s=>{i[s]=t[s]}):i[e.item]=t,e.index&&(i[e.index]=r),e.collection&&(i[e.collection]=n),i}function no(e){return!Array.isArray(e)&&!isNaN(e)}function An(){}An.inline=(e,{expression:t},{cleanup:r})=>{let n=Y(e);n._x_refs||(n._x_refs={}),n._x_refs[t]=e,r(()=>delete n._x_refs[t])};d("ref",An);d("if",(e,{expression:t},{effect:r,cleanup:n})=>{e.tagName.toLowerCase()!=="template"&&E("x-if can only be used on a <template> tag",e);let i=x(e,t),o=()=>{if(e._x_currentIfEl)return e._x_currentIfEl;let a=e.content.cloneNode(!0).firstElementChild;return k(a,{},e),m(()=>{e.after(a),A(()=>S(a))()}),e._x_currentIfEl=a,e._x_undoIf=()=>{m(()=>{P(a),a.remove()}),delete e._x_currentIfEl},a},s=()=>{e._x_undoIf&&(e._x_undoIf(),delete e._x_undoIf)};r(()=>i(a=>{a?o():s()})),n(()=>e._x_undoIf&&e._x_undoIf())});d("id",(e,{expression:t},{evaluate:r})=>{r(t).forEach(i=>_n(e,i))});H((e,t)=>{e._x_ids&&(t._x_ids=e._x_ids)});ne(Pe("@",Ie(C("on:"))));d("on",A((e,{value:t,modifiers:r,expression:n},{cleanup:i})=>{let o=n?x(e,n):()=>{};e.tagName.toLowerCase()==="template"&&(e._x_forwardEvents||(e._x_forwardEvents=[]),e._x_forwardEvents.includes(t)||e._x_forwardEvents.push(t));let s=ae(e,t,r,a=>{o(()=>{},{scope:{$event:a},params:[a]})});i(()=>s())}));rt("Collapse","collapse","collapse");rt("Intersect","intersect","intersect");rt("Focus","trap","focus");rt("Mask","mask","mask");function rt(e,t,r){d(t,n=>E(`You can't use [x-${t}] without first installing the "${e}" plugin here: https://alpinejs.dev/plugins/${r}`,n))}K.setEvaluator(xt);K.setReactivityEngine({reactive:et,effect:rn,release:nn,raw:_});var Vt=K;window.Alpine=Vt;queueMicrotask(()=>{Vt.start()});})();
+/* ===== 工具 ===== */
+function $(id){return document.getElementById(id)}
+function fmtKB(k){ k=+k||0;
+  if(k>=1048576) return (k/1048576).toFixed(1)+'G';
+  if(k>=1024) return (k/1024).toFixed(1)+'M';
+  return k+'K'; }
+function T(k){ const l=(L&&L[k])||null; return l!==null?l:(I18N.zh[k]||k); }
+let toastTimer=null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2000); }
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+  $(id).classList.add('show');
+}
+function openDrawer(id){ $(id).classList.add('show'); }
+function closeDrawer(id){ $(id).classList.remove('show'); }
+function openSub(id){ document.querySelectorAll('.drawer').forEach(d=>d.classList.remove('show')); openDrawer(id); }
+function setTheme(t){ document.documentElement.dataset.theme=t; localStorage.setItem('jc_theme',t); }
+function setLang(l){ L=I18N[l]; localStorage.setItem('jc_lang',l); }
+function fmtSize(sum){
+  const p=Object.keys(sel);
+  $('sel-count').textContent=p.length;
+  $('sel-size').textContent=fmtKB(sum);
+  $('btn-clean').disabled = p.length===0;
+}
+
+/* ===== 首页 ===== */
+async function loadHome(){
+  const s=await api('/api/status');
+  const daemonEl=$('lastscan');
+  if(s&&s.daemon) {
+    // 加载上次 scan
+    const sc=await api('/api/scan');
+    if(sc&&sc.ts){
+      let tot=0; for(const c of Object.keys(sc.cats||{})) tot+=(+sc.cats[c].kb||0);
+      daemonEl.textContent=T('last')+' '+sc.ts+' · '+fmtKB(tot);
+      $('home-ring').style.setProperty('--pct', Math.min(100, 40+(sc.free_kb/1024/1024)*5));
+      $('home-free').textContent=fmtKB(sc.free_kb*1024);
+    } else { $('home-free').textContent=fmtKB(s.free_kb*1024); }
+    daemonEl.textContent += ' · '+T('running');
+  } else {
+    daemonEl.textContent=T('stopped');
+  }
+}
+
+/* ===== 扫描流程 ===== */
+async function startScan(){
+  showPage('page-scan');
+  $('scan-pct').textContent='0%'; $('scan-arc').style.strokeDashoffset='415';
+  $('scan-cur').textContent='准备中…';
+  await api('/api/scan',{method:'POST',body:'{}'});
+  pollScan();
+}
+let scanTimer=null;
+async function pollScan(){
+  scanTimer=setInterval(async ()=>{
+    const p=await api('/api/progress');
+    if(!p) return;
+    const pct=p.pct||0;
+    $('scan-pct').textContent=pct+'%';
+    $('scan-arc').style.strokeDashoffset=(415*(100-pct)/100);
+    $('scan-cur').textContent=p.msg||'';
+    if(p.running===0 && pct>=100){
+      clearInterval(scanTimer); scanTimer=null;
+      const sc=await api('/api/scan');
+      if(sc&&sc.ts){ scan=sc; renderReview(); showPage('page-review'); }
+      else { toast('扫描无结果'); showPage('page-home'); }
+    }
+  }, 500);
+}
+function cancelScan(){ clearInterval(scanTimer); showPage('page-home'); }
+
+/* ===== 清单 ===== */
+function renderReview(){
+  const cats=scan.cats||{};
+  let total=0; for(const c of CAT_ORDER) total+=(+cats[c]?.kb||0);
+  $('review-sum').textContent=T('release')+' '+fmtKB(total);
+  sel={};
+  const box=$('catlist'); box.innerHTML='';
+  CAT_ORDER.forEach(id=>{
+    const v=cats[id]; if(!v) return;
+    const kb=+v.kb||0; if(!kb) return;
+    const isRed=(id==='social');
+    const el=document.createElement('div');
+    el.className='catcard'+(isRed?' redline':'');
+    el.dataset.cat=id;
+    el.innerHTML=`<div class="chk">✓</div>
+      <div class="nm">${CATS[id][0]}${isRed?'<span class="redbadge">'+T('red')+'</span>':''}
+        <div class="cnt">${v.count||0} ${T('files')}</div></div>
+      <div class="sz">${fmtKB(kb)}</div>`;
+    // 默认勾选安全项（social/大文件/重复不勾）
+    if(!isRed) sel[id]=true;
+    el.onclick=()=>{ sel[id]=!sel[id]; el.classList.toggle('on',!!sel[id]); updateSel(); };
+    if(sel[id]) el.classList.add('on');
+    box.appendChild(el);
+  });
+  updateSel();
+}
+function updateSel(){
+  let sum=0, cnt=0;
+  for(const id of Object.keys(sel)){ if(!sel[id]) continue;
+    const kb=+(scan.cats?.[id]?.kb||0); sum+=kb; cnt++; }
+  fmtSize(sum);
+}
+function openConfirm(){
+  const items=Object.keys(sel).filter(id=>sel[id]);
+  if(!items.length) return;
+  const list=$('confirm-list'); list.innerHTML='';
+  let sum=0, red=false;
+  items.forEach(id=>{
+    const kb=+scan.cats[id].kb||0; sum+=kb;
+    if(id==='social') red=true;
+    const row=document.createElement('div');
+    row.className='row';
+    row.innerHTML=`<span class="grow">${CATS[id][0]}</span><b>${fmtKB(kb)}</b>`;
+    list.appendChild(row);
+  });
+  $('confirm-size').textContent=T('release')+' '+fmtKB(sum);
+  $('confirm-warn').classList.toggle('hidden',!red);
+  $('confirm').classList.add('show');
+}
+function closeConfirm(){ $('confirm').classList.remove('show'); }
+
+/* ===== 清理流程 ===== */
+async function doClean(){
+  closeConfirm();
+  const items=Object.keys(sel).filter(id=>sel[id]).join(',');
+  if(!items) return;
+  showPage('page-cleaning');
+  $('clean-pct').textContent='0%'; $('clean-arc').style.strokeDashoffset='415';
+  $('clean-cur').textContent='开始清理…';
+  await api('/api/clean',{method:'POST',body:JSON.stringify({cats:items})});
+  pollClean();
+}
+let cleanTimer=null;
+async function pollClean(){
+  cleanTimer=setInterval(async ()=>{
+    const p=await api('/api/progress');
+    if(!p) return;
+    const pct=p.pct||0;
+    $('clean-pct').textContent=pct+'%';
+    $('clean-arc').style.strokeDashoffset=(415*(100-pct)/100);
+    $('clean-cur').textContent=p.msg||'';
+    if(p.running===0 && pct>=100){
+      clearInterval(cleanTimer); cleanTimer=null;
+      let freed=0;
+      const sc=await api('/api/scan');
+      if(sc&&sc.ts){ for(const id of Object.keys(sel)){ if(sel[id]) freed+=(+(scan.cats?.[id]?.kb)||0); } }
+      $('done-size').textContent=fmtKB(freed);
+      $('done-msg').textContent=T('freed')+' '+items.split(',').length+' '+T('files');
+      showPage('page-done');
+      sel={};
+    }
+  }, 500);
+}
+function toHome(){ showPage('page-home'); loadHome(); }
+
+/* ===== 整理/维护 ===== */
+async function postRun(ep){
+  toast(T(ep==='classify'?'classify':ep==='duplicate'?'dup':ep==='fstrim'?'fstrim':'rescan')+'…');
+  const r=await api('/api/'+ep,{method:'POST',body:'{}'});
+  toast((r&&r.ok)?'✓':'✗ '+((r&&r.e)||'error'));
+}
+/* ===== 设置：分类开关 ===== */
+async function loadCatSwitches(){
+  const r=await api('/api/config');
+  cfg={}; if(r&&r.cfg){ r.cfg.split('\n').forEach(l=>{const i=l.indexOf('='); if(i>0){cfg[l.slice(0,i)]=l.slice(i+1);}}); }
+  const box=$('cat-switches'); box.innerHTML='';
+  ['cache','junk','apk','empty','social','sqlite'].forEach(id=>{
+    const on=cfg['cat_'+id]!=='0';
+    const row=document.createElement('div');
+    row.className='setrow';
+    row.innerHTML=`<span class="lbl">${CATS[id][0]}</span>
+      <div class="switch ${on?'on':''}" data-cat="${id}"></div>`;
+    row.querySelector('.switch').onclick=async (e)=>{
+      e.stopPropagation();
+      const s=e.target; s.classList.toggle('on');
+      cfg['cat_'+id]=s.classList.contains('on')?'1':'0';
+      await saveConfig();
+    };
+    box.appendChild(row);
+  });
+}
+async function saveConfig(){
+  const lines=Object.keys(cfg).map(k=>k+'='+cfg[k]);
+  const r=await api('/api/config',{method:'POST',body:lines.join('\n')+'\n'});
+  if(r.ok) toast(T('saved'));
+}
+
+/* ===== AI ===== */
+async function loadAI(){
+  const r=await api('/api/config');
+  if(r&&r.cfg){
+    let base='',key='',model='';
+    r.cfg.split('\n').forEach(l=>{
+      if(l.startsWith('ai_base='))base=l.slice(8);
+      else if(l.startsWith('ai_key='))key=l.slice(7);
+      else if(l.startsWith('ai_model='))model=l.slice(9);
+    });
+    $('ai-base').value=base; $('ai-key').value=key; $('ai-model').value=model;
+  }
+}
+async function saveAI(){
+  // 保留现有非 ai 配置（v1.6.2 修复）
+  const r=await api('/api/config');
+  const lines=(r&&r.cfg||'').split('\n').filter(l=>l&&!l.startsWith('ai_'));
+  lines.push('ai_base='+$('ai-base').value,'ai_key='+$('ai-key').value,'ai_model='+$('ai-model').value);
+  const rr=await api('/api/config',{method:'POST',body:lines.join('\n')+'\n'});
+  toast(rr.ok?T('saved'):'✗');
+}
+async function runAI(){
+  const out=$('ai-out'); out.textContent='分析中…';
+  const r=await api('/api/ai',{method:'POST',body:'{}'});
+  out.textContent=r.ai||(r.e||'AI error');
+}
+
+/* ===== 规则/白名单 ===== */
+async function loadRule(tp){
+  const r=await api('/api/rules?type='+tp);
+  $('rule-text').value=(r&&r.content)||'';
+}
+async function saveRule(){
+  const tp=$('sel-rule').value;
+  const r=await api('/api/rules?type='+tp,{method:'POST',body:$('rule-text').value});
+  toast(r.ok?T('saved'):'✗');
+}
+async function loadWhitelist(){
+  const r=await api('/api/rules?type=whitelist');
+  $('wl-text').value=(r&&r.content)||'';
+}
+async function saveWhitelist(){
+  const r=await api('/api/rules?type=whitelist',{method:'POST',body:$('wl-text').value});
+  toast(r.ok?T('saved'):'✗');
+}
+
+/* ===== 日志 ===== */
+async function loadLog(tp){
+  const r=await api('/api/log?type='+tp);
+  $('log-box').textContent=(r&&r.log)||'(空)';
+}
+
+/* ===== 初始化 ===== */
+(function init(){
+  const th=localStorage.getItem('jc_theme'); if(th) setTheme(th);
+  const lg=localStorage.getItem('jc_lang'); if(lg) setLang(lg); else L=I18N.zh;
+  $('sel-theme').value=th||'dark'; $('sel-lang').value=lg||'zh';
+  loadHome();
+  loadCatSwitches();
+})();
 </script>
-</body></html>
+</body>
+</html>
