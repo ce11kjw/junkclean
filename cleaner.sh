@@ -445,28 +445,32 @@ do_duplicate() { # 重复文件（>10M 哈希分组；preview=列出 / delete=�
       echo "$h|$sf" >> "$tmp"
     done
   prog 60 "发现重复项，归档中…"
-  # 保留第一个副本，其余列入移动清单
+  # 原始（第一份）+ 其余副本
   awk -F'|' '!seen[$1]++ {keep[$1]=$2; next} {print $2}' "$tmp" > "$tmp.mv"
+  awk -F'|' '!seen[$1]++ {print $2}' "$tmp" > "$tmp.keep"
   if [ "$preview" = "1" ]; then
-    # 预览：列出重复文件（全部）
+    # 预览：副本(keep:0 将处理) + 原始(keep:1 保留)
     out=''
     while IFS= read -r sf; do
       [ -n "$sf" ] || continue
-      out="$out{\"p\":\"$sf\"},"
+      out="$out{\"p\":\"$sf\",\"keep\":0},"
     done < "$tmp.mv"
+    while IFS= read -r sf; do
+      [ -n "$sf" ] || continue
+      out="$out{\"p\":\"$sf\",\"keep\":1},"
+    done < "$tmp.keep"
     out=${out%,}
-    rm -f "$tmp" "$tmp.dup" "$tmp.mv"
+    rm -f "$tmp" "$tmp.dup" "$tmp.mv" "$tmp.keep"
     echo "{\"files\":[$out]}" > "$ADR/.dup.preview.json"
     echo "{\"ok\":1}"
   elif [ "$delmode" = "1" ]; then
-    # 全部删除：重复组内所有文件（含第一份）都删
-    awk -F'|' '{print $2}' "$tmp" > "$tmp.all"
+    # 删除副本（保留原始第一份）
     del_n=0
     while IFS= read -r sf; do
       [ -n "$sf" ] || continue
       bj "$sf" || continue
       rm -f "$sf" 2>/dev/null && { del_n=$((del_n+1)); log INFO "dup-del $sf"; }
-    done < "$tmp.all"
+    done < "$tmp.mv"
     rm -f "$tmp" "$tmp.dup" "$tmp.mv" "$tmp.all"
     log INFO "duplicate deleted=$del_n"
     echo "{\"deleted\":$del_n}"
