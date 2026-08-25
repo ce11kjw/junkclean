@@ -15,7 +15,7 @@
   <div class="brand">
     <div class="logo">◈</div>
     <div><h1>JUNKCLEAN</h1><div class="sub">NEON HUD v3</div></div>
-    <div class="live"><span class="dot"></span><span id="live-txt">守护中</span></div>
+    <div class="live"><span class="dot"></span><span id="live-txt" data-i18n="guard_on">守护中</span></div>
   </div>
   <div class="card">
     <div class="hologram">
@@ -66,7 +66,7 @@
     <div id="catlist"></div>
     <div style="height:64px"></div>
     <div class="bottombar">
-      <div class="sum grow"><b id="sel-size">0B</b><div style="font-size:10px;color:var(--sub)">已选 <span id="sel-count">0</span> 项</div></div>
+      <div class="sum grow"><b id="sel-size">0B</b><div style="font-size:10px;color:var(--sub)"><span data-i18n="selected">已选</span> <span id="sel-count">0</span> <span data-i18n="items">项</span></div></div>
       <button class="btn primary" id="btn-clean" disabled onclick="doClean()"><span data-i18n="confirm">确认清理</span></button>
     </div>
   </div>

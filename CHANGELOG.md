@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.2.1 (2026-08-25)
+- 🌐 修复中英文乱：CATS 动态重建 + 动态渲染硬编码改 T()
+  - renderReview: 文件/天前 → T()
+  - renderTasks: 每/每日/小时后 → T()
+  - renderBig: 个 → T()
+  - postRun: 分类中…/完成/失败 → T()
+  - loadHome: 上次扫描/暂无扫描 → T()
+- 🔧 修复 426 行 renderTasks 字符串拼接错误（JS 语法）
+- 🔧 修复 322 行 classifyPreview 拼接缺引号
+
 ## v3.2.0 (2026-08-25) — WebUI 三文件拆分
 - 📁 前端拆分：index.html(17KB 骨架) + style.css(17KB 样式) + app.js(30KB 逻辑)
 - ✅ cleand serve_file 原生支持多静态文件（text/css + application/javascript）

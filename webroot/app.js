@@ -10,7 +10,7 @@ const I18N={zh:{nav_home:'首页',nav_clean:'清理',nav_settings:'设置',sub:'
   execute:'执行',refresh:'刷新',
   cat_cache:'应用缓存',cat_junk:'系统垃圾',cat_apk:'安装包',cat_zip:'压缩包',cat_thumb:'缩略图',
   cat_log:'日志',cat_temp:'临时文件',cat_uninst:'卸载残留',cat_zero:'空文件',cat_empty:'空文件夹',
-  cat_social:'社交专项',cat_sqlite:'SQLite',cat_big:'大文件'},
+  cat_social:'社交专项',cat_sqlite:'SQLite',cat_big:'大文件',files:'文件',count:'个',last_scan:'上次扫描',no_scan:'暂无扫描·点击开始体检',days_ago:'天前',next_clean:'下次清理',hours_after:'小时后',every:'每',hours:'小时',daily:'每日',cleaned_done:'清理完成，释放',selected:'已选',items:'项',guard_on:'守护中'},
   en:{nav_home:'Home',nav_clean:'Clean',nav_settings:'Settings',sub:'NEON HUD v3',
   free:'Available',scan_now:'⚡ Start Scan',
   scanning:'Deep Scan',review:'Review',cleaning:'Cleaning…',done:'Done',
@@ -20,7 +20,7 @@ const I18N={zh:{nav_home:'首页',nav_clean:'清理',nav_settings:'设置',sub:'
   execute:'Run',refresh:'Refresh',
   cat_cache:'App Cache',cat_junk:'System Junk',cat_apk:'APK',cat_zip:'Archive',cat_thumb:'Thumbnails',
   cat_log:'Logs',cat_temp:'Temps',cat_uninst:'Uninstall',cat_zero:'Empty Files',cat_empty:'Empty Folders',
-  cat_social:'Social',cat_sqlite:'SQLite',cat_big:'Big Files'}};
+  cat_social:'Social',cat_sqlite:'SQLite',cat_big:'Big Files',files:'files',count:'',last_scan:'Last scan',no_scan:'No scan data·Start now',days_ago:'d ago',next_clean:'Next clean',hours_after:'h later',every:'Every',hours:'h',daily:'Daily',cleaned_done:'Cleaned, freed',selected:'Selected',items:'items',guard_on:'Running'}};
 function T(k){return (I18N[LANG]||I18N.zh)[k]||k;}
 const $=id=>document.getElementById(id);
 const CATS={cache:[T('cat_cache'),'🗄'],junk:[T('cat_junk'),'🧩'],apk:[T('cat_apk'),'📦'],zip:[T('cat_zip'),'🗜'],thumb:[T('cat_thumb'),'🖼'],log:[T('cat_log'),'📋'],temp:[T('cat_temp'),'⏳'],uninst:[T('cat_uninst'),'🗑'],zero:[T('cat_zero'),'📄'],empty:[T('cat_empty'),'📂'],social:[T('cat_social'),'💬'],sqlite:[T('cat_sqlite'),'🗃'],big:[T('cat_big'),'📈']};
@@ -106,7 +106,7 @@ async function loadHome(){
     lastScan=sc;
     if(sc&&sc.ts){
       let tot=0; for(const c of Object.keys(sc.cats||{})) tot+=(+sc.cats[c].kb||0);
-      $('lastscan').textContent='上次扫描 '+sc.ts+' · 可释放 '+fmtKB(tot);
+      $('lastscan').textContent=T('last_scan')+' '+sc.ts+' · '+T('files')+' '+fmtKB(tot);
       const avail=sc.free_kb*1024;
       $('home-bar').style.width=Math.min(100,40+(sc.free_kb/1024/1024)*5)+'%';
       animNum($('home-free'),avail);
@@ -116,7 +116,7 @@ async function loadHome(){
       $('st-big').textContent=(sc.big||[]).length+'个';
       if(s.stats){ $('st-clean').textContent=fmtKB(s.stats.kb*1024); $('st-count').textContent=s.stats.del+'次'; }
       loadHistory(sc);
-    } else { $('lastscan').textContent='暂无扫描 · 点击开始体检'; animNum($('home-free'),(s.free_kb||0)*1024); }
+    } else { $('lastscan').textContent=T('no_scan'); animNum($('home-free'),(s.free_kb||0)*1024); }
   } else { live.textContent='守护离线'; live.classList.remove('on'); $('home-free').textContent='--'; }
 }
 async function loadHistory(sc){
@@ -164,7 +164,7 @@ function renderReview(){
     el.dataset.cat=id;
     const ico=(CATS[id]||[])[1]||'•';
     el.innerHTML='<div class="chk">✓</div><div class="catico">'+ico+'</div>'+
-      '<div class="nm">'+(CATS[id]||[id])[0]+'<div class="cnt">'+v.count+' 文件'+(v.old?' · 7天前 '+fmtKB(v.old*1024):'')+'</div></div>'+
+      '<div class="nm">'+(CATS[id]||[id])[0]+'<div class="cnt">'+v.count+' '+T('files')+(v.old?' · '+T('days_ago')+' '+fmtKB(v.old*1024):'')+'</div></div>'+
       '<div class="sz">'+fmtKB(kb)+'</div>';
     el.onclick=()=>{ sel[id]=!sel[id]; el.classList.toggle('on',!!sel[id]); updateSel(); };
     box.appendChild(el);
@@ -191,7 +191,7 @@ function renderBig(){
   el.className='catcard'+(sel.big?' on':'');
   el.dataset.cat='big';
   el.innerHTML='<div class="chk">✓</div><div class="catico">📈</div>'+
-    '<div class="nm">大文件<div class="cnt">'+big.length+' 个 · ≥'+(window.big_min||100)+'MB</div></div>'+
+    '<div class="nm">大文件<div class="cnt">'+big.length+' '+T('count')+' · ≥'+(window.big_min||100)+'MB</div></div>'+
     '<div class="sz">'+fmtKB(total)+'</div>';
   el.onclick=()=>{ sel.big=!sel.big; el.classList.toggle('on',!!sel.big); updateSel(); };
   $('catlist').appendChild(el);
@@ -266,7 +266,7 @@ async function finishClean(){
   const sc=await api('/api/scan');
   let freed=0; for(const c of Object.keys(sel)){ if(sc.cats&&sc.cats[c]) freed+=(+sc.cats[c].kb||0); }
   $('done-size').textContent=fmtKB(freed);
-  $('done-msg').textContent='清理完成，释放 '+fmtKB(freed);
+  $('done-msg').textContent=T('cleaned_done')+' '+fmtKB(freed);
   showView('done');
   loadHome(); loadCatSwitches();
 }
@@ -298,13 +298,16 @@ function setTheme(t){ document.documentElement.dataset.theme=t; localStorage.set
 function setLang(l){ LANG=l; localStorage.setItem('jc_lang',l);
   document.querySelectorAll('[data-i18n]').forEach(el=>{ const k=el.dataset.i18n; if(k) el.textContent=T(k); });
   document.querySelectorAll('.tab span').forEach((el,i)=>el.textContent=[T('nav_home'),T('nav_clean'),T('nav_settings')][i]);
-  $('sel-lang')&&($('sel-lang').value=LANG); gotoHome(); loadCatSwitches(); }
+  $('sel-lang')&&($('sel-lang').value=LANG);
+  // 重建 CATS 分类名（const 对象不可替换但属性可改）
+  Object.keys(CATS).forEach(k=>{ CATS[k][0]=T('cat_'+k); });
+  gotoHome(); loadCatSwitches(); }
 /* ===== 工具 ===== */
 async function postRun(ep){
-  const msgs={classify:'分类中…',duplicate:'去重中…',fstrim:'维护中…',rescan:'刷新中…'};
+  const msgs={classify:T('classifying'),duplicate:T('deduping'),fstrim:T('maintaining'),rescan:T('refreshing')};
   toast(msgs[ep]||'执行中…');
   const r=await api('/api/'+ep,{method:'POST',body:'{}'});
-  toast(r&&r.ok?'✓ 完成':'✗ '+(r&&r.e||'失败'));
+  toast(r&&r.ok?'✓ '+T('done'):'✗ '+(r&&r.e||T('failed')));
   if(ep==='classify'||ep==='duplicate') loadHome();
 }
 async function classifyPreview(){
@@ -316,7 +319,7 @@ async function classifyPreview(){
   if(!files.length){ toast('预览为空'); return; }
   let html='<div style="max-height:50vh;overflow-y:auto;font-size:12px">';
   files.forEach(f=>{ html+='<div style="padding:4px 0;border-bottom:1px solid var(--line);word-break:break-all">'+escapeHtml(f.s)+' → '+escapeHtml(f.d)+'</div>'; });
-  html+='</div>'+'<div style="margin-top:10px;font-size:12px;color:var(--sub)">共 '+files.length+' 个文件</div>';
+  html+='</div>'+'<div style="margin-top:10px;font-size:12px;color:var(--sub)">共 '+files.length+' '+T('files')+'</div>';
   showDialog('📂 分类预览',html);
 }
 let dupKeep=null;
@@ -412,7 +415,7 @@ function renderTasks(){
     const hmi=m[1].split(':').map(Number); const n=new Date(now); n.setHours(hmi[0],hmi[1],0,0); if(n<=now) n.setDate(n.getDate()+1); return n; }).filter(Boolean);
   if(nextTimes.length){ const nt=nextTimes.reduce((a,b)=>a<b?a:b);
     const diff=Math.round((nt-now)/3600000*10)/10;
-    box.innerHTML+='<div style="padding:8px;font-size:12px;color:var(--acc)">⏱ 下次清理：'+nt.toLocaleString()+'（'+diff+'小时后）</div>';
+    box.innerHTML+='<div style="padding:8px;font-size:12px;color:var(--acc)">⏱ '+T('next_clean')+'：'+nt.toLocaleString()+'（'+diff+''+T('hours_after')+'）</div>';
   }
   tasks.forEach((l,i)=>{
     const enable=l.includes('enable=1');
@@ -420,7 +423,7 @@ function renderTasks(){
     const cond=[l.includes('charge=1')?'充电':'',l.includes('wifi=1')?'WiFi':'',l.includes('idle=1')?'空闲':''].filter(Boolean).join('/');
     const row=document.createElement('div'); row.className='setrow';
     row.innerHTML='<div class="switch '+(enable?'on':'')+'" data-i="'+i+'"></div>'+
-      '<span class="lbl" style="font-size:12px">'+(every?'每 '+every[1]+' 小时':(daily?'每日 '+daily[1]:''))+' · '+(cats?cats[1].replace(/,/g,'/'):'')+(cond?' <span style="color:var(--acc)">['+cond+']</span>':'')+'</span>'+
+      '<span class="lbl" style="font-size:12px">'+(every?T('every')+' '+every[1]+' '+T('hours'):(daily?T('daily')+' '+daily[1]:''))+' · '+(cats?cats[1].replace(/,/g,'/'):'')+(cond?' <span style="color:var(--acc)">['+cond+']</span>':'')+'</span>'
       '<button class="sw" onclick="delTask('+i+')">🗑</button>';
     row.querySelector('.switch').onclick=()=>toggleTask(i);
     box.appendChild(row);
