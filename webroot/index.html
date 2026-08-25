@@ -121,13 +121,17 @@ body{
 .confirm{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.65);
   display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
 .confirm.show{opacity:1;pointer-events:auto}
-.confirm .sheet{width:100%;background:var(--card);border-radius:22px 22px 0 0;
+.confirm .sheet{width:100%;
+  background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+  border-top:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 -10px 40px rgba(0,0,0,.4);
+  border-radius:22px 22px 0 0;
   padding:22px 18px calc(var(--window-inset-bottom,0px) + 18px);
   transform:translateY(100%);transition:transform .3s var(--spring)}
 .confirm.show .sheet{transform:none}
 .confirm h3{margin:0 0 4px;font-size:19px}
 .confirm .big{font-size:34px;font-weight:800;margin:10px 0 2px}
-.confirm .clist{margin:14px 0;background:var(--card2);border-radius:12px;padding:6px 14px}
+.confirm .clist{margin:14px 0;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:12px;padding:6px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .confirm .clist .row{padding:10px 0;border-bottom:1px solid var(--line)}
 .confirm .clist .row:last-child{border-bottom:none}
 .confirm .warn{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);
@@ -139,7 +143,10 @@ body{
 .done{display:flex;flex-direction:column;align-items:center;padding-top:70px;text-align:center}
 .done .emo{font-size:64px;animation:bounce .6s var(--spring) .2s}
 @keyframes bounce{from{transform:scale(0)}to{transform:scale(1)}}
-.done .released{font-size:44px;font-weight:800;margin:18px 0 4px;color:var(--acc)}
+.done .released{font-size:44px;font-weight:800;margin:18px 0 4px;
+  background:linear-gradient(135deg,#2dd4bf,#34d399);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  filter:drop-shadow(0 0 18px rgba(45,212,191,.35));font-variant-numeric:tabular-nums}
 .done .btns{display:flex;gap:10px;margin-top:36px}
 
 /* ===== 设置 ===== */
@@ -163,8 +170,11 @@ body{
 .switch.on{background:linear-gradient(135deg,#2dd4bf,#34d399);box-shadow:0 0 14px rgba(45,212,191,.35)}
 .switch.on::after{left:23px}
 select,input[type=text],textarea{width:100%;background:var(--card2);color:var(--txt);
-  border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;
-  font-family:inherit;margin:6px 0}
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.2);
+  transition:border-color .2s, box-shadow .2s;user-select:text}
+select:focus,input[type=text]:focus,textarea:focus{border-color:rgba(45,212,191,.5);
+  box-shadow:0 0 0 3px rgba(45,212,191,.12), inset 0 1px 3px rgba(0,0,0,.2)}
 textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;font-size:13px}
 
 /* ===== 规则路径行（卡片下） ===== */
@@ -185,7 +195,11 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
 .toast.show{transform:translate(-50%,0)}
 
 /* ===== 子页面抽屉 ===== */
-.drawer{position:fixed;inset:0;z-index:40;background:var(--bg);
+.drawer{position:fixed;inset:0;z-index:40;
+  background:
+    radial-gradient(520px 340px at 50% -6%, rgba(45,212,191,.09), transparent 62%),
+    radial-gradient(360px 240px at 90% 10%, rgba(52,211,153,.05), transparent 60%),
+    var(--bg);
   transform:translateX(100%);transition:transform .3s var(--spring);
   padding:calc(var(--window-inset-top,16px) + 8px) 14px calc(var(--window-inset-bottom,0px) + 20px);
   overflow-y:auto}
