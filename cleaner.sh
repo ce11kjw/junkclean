@@ -46,7 +46,7 @@ bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏
 # 升级路径：load_rules 改换行分隔 + 所有 for p in $RUL 调用点改 while read（改动大，内置规则无空格暂缓）。
 load_rules() { # load_rules <file> -> RUL(路径) + RFLAGS(|分隔标志)
   # 每路径两开关: recurse 子目录(默认关) / no-integrity 完整性(默认开)
-  RUL='' REDR='' RFLAGS=''
+  RUL='' REDR='' RFLAGS='' RHIGH=''
   [ -f "$1" ] || return 0
   while IFS= read -r l; do
     case "$l" in '#RED '*) REDR="$REDR ${l#\#RED }";; \#*|"") continue;; esac
@@ -57,6 +57,7 @@ load_rules() { # load_rules <file> -> RUL(路径) + RFLAGS(|分隔标志)
     flags=''
     case "$rest" in *recurse*) flags="$flags recurse";; esac
     case "$rest" in *no-integrity*) flags="$flags no-integrity";; esac
+    case "$rest" in *high*) RHIGH="$RHIGH $path";; esac
     RFLAGS="${RFLAGS:+$RFLAGS|}$flags"
   done < "$1"
 }
@@ -66,6 +67,7 @@ do_clean() { # do_clean <cats_csv> [force]
   FORCE=0; [ "$2" = "force" ] && FORCE=1
   [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats=$(echo "$1" | tr ',' ' ')
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
+  free_before=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_before" ] && free_before=0
   for c in $cats; do total_jobs=$((total_jobs+1)); done
   for c in $cats; do
     job=$((job+1))
@@ -178,6 +180,9 @@ do_clean() { # do_clean <cats_csv> [force]
           if [ "$FORCE" != "1" ]; then
             bj "$rp" || { n_skip=$((n_skip+1)); continue; }
           fi
+          if [ "$FORCE" != "1" ]; then
+            case " $RHIGH " in *" $dirpat "*) n_skip=$((n_skip+1)); continue;; esac
+          fi
           sz=$(du -sk "$rp" 2>/dev/null | awk '{print $1}')
           if [ "$mode" = "move" ]; then
             # 安装包/压缩包：只转移归档到 下载/对应目录（不删除，可反悔）
@@ -186,7 +191,15 @@ do_clean() { # do_clean <cats_csv> [force]
               n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "move $rp → 下载/$nm"
             fi
           else
-            rm -rf "$rp" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del $rp"; }
+            if [ "$(get_cfg trash 1)" = "1" ]; then
+              mkdir -p /sdcard/.junkclean_trash 2>/dev/null
+              if mv -f "$rp" "/sdcard/.junkclean_trash/$(basename "$rp")_$(date +%s)" 2>/dev/null; then
+                n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "trash $rp"
+              fi
+            else
+              echo "$rp" >> "$ADR/.clean.list"
+              n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del $rp"
+            fi
           fi
         done < "$ADR/.clean.tmp"
       fi
@@ -195,6 +208,11 @@ do_clean() { # do_clean <cats_csv> [force]
     done
     set +f
   done
+  # 批量删除（xargs 分批，避免 ARG_MAX）
+  if [ -f "$ADR/.clean.list" ]; then
+    xargs -r -n 200 rm -rf < "$ADR/.clean.list" 2>/dev/null
+    rm -f "$ADR/.clean.list"
+  fi
   prog 100 "完成: 删除$n_del项 释放$(human $freed)"
   # 累计统计（SmartClear/SweepX 模式：管理器 description 可见）
   if [ -f "$ADR/stats.total" ]; then
@@ -208,7 +226,8 @@ do_clean() { # do_clean <cats_csv> [force]
     desc=$(sed -n 's/^description=//p' "$MP" 2>/dev/null | sed 's/ · 累计.*//')
     sed -i "s|^description=.*|description=${desc} · 累计清理 ${tdel} 项/释放 $(human $tfreed)|" "$MP" 2>/dev/null
   fi
-  echo "{\"deleted\":$n_del,\"skipped\":$n_skip,\"freed_kb\":$freed}"
+  free_after=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_after" ] && free_after=0
+  echo "{\"deleted\":$n_del,\"skipped\":$n_skip,\"freed_kb\":$freed,\"before\":$free_before,\"after\":$free_after}"
 }
 # ponytail: shell 引擎的天花板是高频操作性能（每次操作 fork 子进程）。
 # 升级路径：核心引擎 C 化（目录遍历/统计/删除/md5），shell 保留 fstrim/sqlite 编排。
@@ -242,6 +261,9 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
       cat "$SCAN"; return
     fi
   fi
+  roots=$(get_cfg scan_roots /sdcard)
+  depth=$(get_cfg scan_depth 4)
+  big_min=$(get_cfg big_min 102400)
   prog 5 "开始体检…"
   free_kb=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_kb" ] && free_kb=0
   total_kb=0; sc=''
@@ -249,20 +271,21 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   for c in $cats; do
     i=$((i+1))
     f=$RULES/$c.list; [ -f "$f" ] || f=""; load_rules "$f"
-    n=0; sz=0
-    # 性能+正确性：规则转目录级（去尾部 /*），find/du 对目录内部遍历
-    # 避免 glob 展开数万路径超 ARG_MAX（此前大目录 count=0）
+    n=0; sz=0; old_kb=0; new_kb=0
     dirs=$(echo "$RUL" | tr ' ' '\n' | sed 's|/\*$||' | grep '^/')
     sz=$(du -sk $dirs 2>/dev/null | awk 'END{print $1}'); [ -z "$sz" ] && sz=0
     n=$(find $dirs -type f 2>/dev/null | wc -l)
+    old_kb=$(find $dirs -type f -mtime +7 2>/dev/null | xargs -r du -sk 2>/dev/null | awk 'END{print $1}')
+    [ -z "$old_kb" ] && old_kb=0
+    new_kb=$(( sz - old_kb )); [ "$new_kb" -lt 0 ] && new_kb=0
     total_kb=$((total_kb+sz))
-    sc="$sc\"$c\":{\"count\":$n,\"kb\":\"$sz\"},"
+    sc="$sc\"$c\":{\"count\":$n,\"kb\":\"$sz\",\"old\":\"$old_kb\",\"new\":\"$new_kb\"},"
     prog $((5+i*15)) "统计中 $c ($(human $sz))"
   done
   # 大文件 Top20
   big=''
   # busybox find +du 排序（避免进程替换）
-  find /sdcard -type f -size +100M 2>/dev/null | while IFS= read -r pf; do
+  find "$roots" -type f -size +"$big_min"k 2>/dev/null | while IFS= read -r pf; do
     bs=$(du -sk "$pf" 2>/dev/null | awk '{print $1}')
     echo "$bs|$pf"
   done | sort -rn | head -20 > "$SCAN.tmp"
@@ -280,10 +303,29 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   [ "$free_kb" -lt 3145728 ] && health=yellow   # <3GB
   [ "$free_kb" -lt 1048576 ] && health=red      # <1GB
   sc=${sc%,}
-  printf '{"ts":"%s","free_kb":"%s","health":"%s","cats":{%s},"big":[%s],"redlines":[%s]}\n' \
-    "$(date '+%F %T')" "$free_kb" "$health" "$sc" "$big" "$red" > "$SCAN"
+  # 应用级缓存统计（/sdcard/Android/data/<pkg>/cache）
+  apps=''
+  for d in /sdcard/Android/data/*/cache; do
+    [ -d "$d" ] || continue
+    pkg=$(basename "$(dirname "$d")")
+    [ "$pkg" = "Android" ] || [ "$pkg" = "cache" ] && continue
+    asz=$(du -sk "$d" 2>/dev/null | awk '{print $1}')
+    [ -n "$asz" ] && [ "$asz" -gt 0 ] 2>/dev/null && apps="$apps{\"p\":\"$pkg\",\"kb\":\"$asz\"},"
+  done
+  apps=${apps%,}
+  printf '{"ts":"%s","free_kb":"%s","health":"%s","cats":{%s},"big":[%s],"redlines":[%s],"apps":[%s]}\n' \
+    "$(date '+%F %T')" "$free_kb" "$health" "$sc" "$big" "$red" "$apps" > "$SCAN"
   prog 100 "体检完成，可释放约 $(human $total_kb)"
   cat "$SCAN"
+}
+do_cleanapp() { # 清单个应用缓存（/sdcard/Android/data/<pkg>/cache）
+  pkg="$1"; [ -n "$pkg" ] || { echo '{"ok":0,"e":"nopkg"}'; exit 0; }
+  case "$pkg" in */*|*..*) echo '{"ok":0,"e":"bad"}'; exit 0;; esac
+  d="/sdcard/Android/data/$pkg/cache"
+  [ -d "$d" ] || { echo '{"ok":0,"e":"noapp"}'; exit 0; }
+  sz=$(du -sk "$d" 2>/dev/null | awk '{print $1}'); [ -z "$sz" ] && sz=0
+  rm -rf "$d"/* 2>/dev/null
+  echo "{\"ok\":1,\"freed\":$sz}"
 }
 do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出将移动文件）
   f="$RULES/classify.list"; [ -f "$f" ] || { log WARN "无 classify.list"; exit 0; }
@@ -439,11 +481,12 @@ do_status() { # cleand/WebUI 状态
 }
 [ "${JC_LIB:-0}" = "1" ] && return 0
 # 入口参数拆分：cleand 传整个命令行串（"clean cache,apk force" → $1=clean $2=cache,apk $3=force）
-set -- $1
+if [ $# -le 1 ]; then set -- $1; fi
 case "$1" in
   clean)     do_clean "${2:-all}" "$3" ;;
   scan)      do_scan ;;
   classify)  do_classify "$2" ;;
+  cleanapp)  do_cleanapp "$2" ;;
   duplicate) do_duplicate ;;
   fstrim)    do_fstrim ;;
   rescan)    do_rescan ;;

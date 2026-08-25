@@ -568,7 +568,7 @@ function renderReview(){
     el.dataset.cat=id;
     el.innerHTML=`<div class="chk">✓</div>
       <div class="nm">${CATS[id][0]}${isRed?'<span class="redbadge">'+T('red')+'</span>':''}
-        <div class="cnt">${v.count||0} ${T('files')}</div></div>
+        <div class="cnt">${v.count||0} ${T('files')}${v.old?\` · <span style="font-size:10px;color:var(--sub)">7天前 ${fmtKB(v.old*1024)}</span>\`:''}</div></div>
       <div class="sz">${fmtKB(kb)}</div>`;
     // 默认勾选安全项（social/大文件/重复不勾）
     if(!isRed) sel[id]=true;
@@ -576,7 +576,24 @@ function renderReview(){
     if(sel[id]) el.classList.add('on');
     box.appendChild(el);
   });
+  if(!window.big_min){ try{ const cfg=await api('/api/config'); const m=(cfg&&cfg.cfg||'').match(/big_min=(\d+)/); window.big_min=m?parseInt(m[1]/1024):100; }catch(e){ window.big_min=100; } }
   renderBig();
+  // 按应用清理区块
+  if(scan.apps&&scan.apps.length){
+    const ab=document.createElement('div');
+    ab.className='setgroup';
+    const items=scan.apps.filter(a=>(+a.kb||0)>0).sort((a,b)=>+b.kb-+a.kb);
+    ab.innerHTML='<div class="sg-title">📱 按应用清理（'+items.length+' 个应用）</div>'+
+      items.slice(0,20).map(a=>'<div class="setrow"><span class="lbl" style="font-size:12px">'+escapeHtml(a.p)+'</span><span class="val" style="font-size:11px;gap:6px;display:flex;align-items:center">'+fmtKB((+a.kb)*1024)+' <button class="sw on" style="padding:2px 8px" data-pkg="'+escapeHtml(a.p)+'">清理</button></span></div>').join('');
+    ab.querySelectorAll('button[data-pkg]').forEach(b=>b.onclick=async()=>{
+      b.textContent='…'; b.disabled=1;
+      const r=await api('/api/cleanapp',{method:'POST',body:b.dataset.pkg});
+      toast(r.ok?('✓ '+fmtKB((r.freed||0)*1024)):('✗ '+(r.e||'err')));
+      b.textContent='清理'; b.disabled=0;
+      if(r.ok&&r.freed){ b.closest('.setrow').remove(); }
+    });
+    document.querySelector('#page-review .content').appendChild(ab);
+  }
   updateSel();
   // 异步加载每分类规则路径行
   CAT_ORDER.forEach(id=>renderRules(id));
@@ -649,6 +666,7 @@ async function pollClean(){
         detailHtml+=`<div class="muted" style="font-size:13px;margin-top:4px">${CATS[id]?.[0]||'大文件'}: ${fmtKB(kb)}</div>`;
       } }
       $('done-size').textContent=fmtKB(freed);
+      if(r.before&&r.after){ const rec=(+r.before-+r.after)*1024; if(rec>0) $('done-msg').innerHTML+='<br><span style="font-size:11px;color:var(--sub)">对比: 清理前 '+fmtKB(r.before*1024)+' → 清理后 '+fmtKB(r.after*1024)+'（+'+fmtKB(rec)+'）</span>'; }
       $('done-msg').innerHTML=T('freed')+' '+items.split(',').length+' '+T('files')+detailHtml;
       showPage('page-done');
       sel={};
@@ -708,6 +726,18 @@ async function loadCatSwitches(){
     };
     box.appendChild(row);
   });
+  // 回收站开关
+  const tr=document.createElement('div');
+  tr.className='setrow';
+  const trashOn=cfg.trash!=='0';
+  tr.innerHTML='<span class="lbl">🗑 回收站</span><span class="val" style="font-size:11px;color:var(--sub)">删除先进回收站</span><div class="switch '+(trashOn?'on':'')+'" id="sw-trash"></div>';
+  tr.querySelector('.switch').onclick=async (e)=>{
+    e.stopPropagation();
+    const s=e.target; s.classList.toggle('on');
+    cfg.trash=s.classList.contains('on')?'1':'0';
+    await saveConfig();
+  };
+  box.appendChild(tr);
 }
 async function saveConfig(){
   const lines=Object.keys(cfg).map(k=>k+'='+cfg[k]);
@@ -843,7 +873,7 @@ function renderBig(){
   el.dataset.cat='big';
   el.innerHTML=`<div class="chk">✓</div>
     <div class="nm">大文件 ${sel.big?'<span class="redbadge">'+T('red')+'</span>':''}
-      <div class="cnt">${big.length} ${T('files')} · ≥100MB</div></div>
+      <div class="cnt">${big.length} ${T('files')} · ≥${window.big_min||100}MB</div></div>
     <div class="sz">${fmtKB(total)}</div>`;
   el.onclick=()=>{ sel.big=!sel.big; el.classList.toggle('on',!!sel.big); updateSel(); };
   $('catlist').appendChild(el);
@@ -851,7 +881,20 @@ function renderBig(){
   const detail=document.createElement('div');
   detail.className='hidden';
   detail.style.cssText='padding:10px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)';
-  detail.innerHTML=big.slice(0,10).map(b=>`<div style="padding:3px 0;word-break:break-all">${fmtKB(b.kb)} · ${b.p}</div>`).join('')+(big.length>10?`<div style="padding:3px 0;color:var(--sub)">…还有 ${big.length-10} 个</div>`:'');
+  const extSet=[...new Set(big.map(b=>(b.p.match(/\.(\w+)$/)||['',''])[1]).filter(Boolean))];
+  detail.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'+
+    '<span class="sw on" style="padding:2px 8px;font-size:11px" data-ext="">所有</span>'+
+    extSet.map(e=>'<span class="sw" style="padding:2px 8px;font-size:11px" data-ext="'+e+'">.'+e+'</span>').join('')+
+    '</div>'+
+    big.slice(0,20).map(b=>`<div class="bigitem" data-ext="${(b.p.match(/\.(\w+)$/)||['',''])[1]}">${fmtKB(b.kb)} · ${b.p}</div>`).join('')+
+    (big.length>20?`<div style="padding:3px 0;color:var(--sub)">…还有 ${big.length-20} 个</div>`:'');
+  detail.querySelectorAll('.sw[data-ext]').forEach(el=>el.onclick=()=>{
+    detail.querySelectorAll('.sw[data-ext]').forEach(e=>e.classList.remove('on'));
+    el.classList.add('on');
+    detail.querySelectorAll('.bigitem').forEach(item=>{
+      item.style.display=!el.dataset.ext||item.dataset.ext===el.dataset.ext?'':'none';
+    });
+  });
   el.appendChild(detail);
   el.querySelector('.nm').style.cursor='pointer';
   el.querySelector('.nm').onclick=(e)=>{ e.stopPropagation(); detail.classList.toggle('hidden'); };
@@ -903,9 +946,10 @@ async function renderRules(catId){
     const flags=parts.slice(1);
     const recurse=flags.includes('recurse');
     const noInt=flags.includes('no-integrity');
+    const isHigh=flags.includes('high');
     const row=document.createElement('div');
     row.className='ruleline';
-    row.innerHTML=`<div class="rulepath">${path}${exists[path]?'':'<span class="rulemiss">⚠️ 不存在</span>'}</div>
+    row.innerHTML=`<div class="rulepath">${path}${exists[path]?'':'<span class="rulemiss">⚠️ 不存在</span>'}${isHigh?'<span class="rulemiss">⚠️ 高风险</span>':''}</div>
       <div class="rulesw">
         <button class="sw ${recurse?'on':''}" data-k="recurse" data-i="${idx}">子目录</button>
         <button class="sw ${noInt?'':'on'}" data-k="integrity" data-i="${idx}">完整性</button>

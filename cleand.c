@@ -416,7 +416,9 @@ static void api_delbig(int fd, const char* body){
     char tmp[4096]; snprintf(tmp,sizeof(tmp),"%s",body);
     int deleted=0;
     char* tok=strtok(tmp,",");
+    { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"body=[%s]\n",body); fclose(df); } }
     while(tok){
+        { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"tok=[%s]\n",tok); fclose(df); } }
         size_t l=strlen(tok);
         while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
         if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
@@ -433,6 +435,30 @@ static void api_delbig(int fd, const char* body){
     char out[96]; snprintf(out,sizeof(out),"{\"deleted\":%d}",deleted);
     http_json(fd,out);
 }
+/* ---- big file archive: mv to /sdcard/下载/大文件 (safe) ---- */
+static void api_bigmove(int fd, const char* body){
+    if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
+    char tmp[4096]; snprintf(tmp,sizeof(tmp),"%s",body);
+    int moved=0;
+    char* tok=strtok(tmp,",");
+    while(tok){
+        size_t l=strlen(tok);
+        while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
+        if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
+           && !strstr(tok,"/../") && !strcmp(tok,"..")
+           && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')){
+            { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"tok=[%s] len=%zu\n",tok,strlen(tok)); fclose(df); } }
+            char cmd[1024];
+            snprintf(cmd,sizeof(cmd),"mkdir -p '/sdcard/下载/大文件' 2>/dev/null; mv -f '%s' '/sdcard/下载/大文件/' 2>/dev/null",tok);
+            int rc=system(cmd);
+            { FILE *df=fopen("/tmp/bm.debug","a"); if(df){ fprintf(df,"cmd=[%s] rc=%d\n",cmd,rc); fclose(df); } }
+            if(rc==0) moved++;
+        }
+        tok=strtok(NULL,",");
+    }
+    char out[96]; snprintf(out,sizeof(out),"{\"moved\":%d}",moved);
+    http_json(fd,out);
+}
 
 /* ---- progress ---- */
 static void api_progress(int fd){
@@ -444,6 +470,14 @@ static void api_progress(int fd){
 }
 
 /* ---- status ---- */
+/* 同步执行 cleaner.sh 命令并返回 stdout（设置环境变量） */
+static char* run_sync(const char* args){
+    static char cmd[1024]; snprintf(cmd,sizeof(cmd),"ADR='%s' RULES='%s/rules' CFG='%s/config.conf' SCAN='%s/scan.json' LOG='%s/cleaner.log' sh '%s/cleaner.sh' %s 2>/dev/null", ADR, ADR, ADR, ADR, ADR, MODDIR, args);
+    FILE *f=popen(cmd,"r"); if(!f) return NULL;
+    char *out=malloc(8192); int n=fread(out,1,8191,f); out[n]=0; pclose(f);
+    return out;
+}
+
 static void api_status(int fd){
     char out[1024];
     char p[600]; snprintf(p,sizeof(p),"%s/cleaner.sh",MODDIR);
@@ -565,7 +599,7 @@ static void handle(int fd){
     if(hdr_end<0){ close(fd); return; }
     if(hdr_end>=4) buf[hdr_end-4]=0;   /* 终止 header，保留 body */
     char *body_start = buf+hdr_end;
-    /* parse request line INTO COPY (never corrupt shared buf:   would kill later strstr) */
+    /* parse request line INTO COPY (never corrupt shared buf:  would kill later strstr) */
     char *sp1=strchr(buf,' '); if(!sp1){ close(fd); return; }
     char method[8]; int ml=(int)(sp1-buf); if(ml>6)ml=6; memcpy(method,buf,ml); method[ml]=0;
     char *sp2=strchr(sp1+1,' '); if(!sp2){ close(fd); return; }
@@ -594,6 +628,13 @@ static void handle(int fd){
     else if(!strncmp(base,"/api/log",8)) api_log(fd, q?q:"");
     else if(!strncmp(base,"/api/progress",13)) api_progress(fd);
     else if(!strncmp(base,"/api/tasks",10)) api_tasks(fd, method, (char*)body);
+    else if(!strncmp(base,"/api/cleanapp",13) && !strcmp(method,"POST")){
+        char pkg[128]; snprintf(pkg,sizeof(pkg),"%s",body?body:"");
+        size_t pl=strlen(pkg); while(pl&&(pkg[pl-1]==' '||pkg[pl-1]=='"')) pkg[--pl]=0;
+        if(!*pkg||strchr(pkg,'/')||strstr(pkg,"..")){ http_err(fd,400,"{\"e\":\"bad\"}"); return; }
+        char cmd[256]; snprintf(cmd,sizeof(cmd),"cleanapp %s",pkg);
+        char *out=run_sync(cmd); http_json(fd,out?out:"{\"ok\":0}"); free(out);
+    }
     else if(!strncmp(base,"/api/clean",10) && !strcmp(method,"POST")){
         char cats[128]="all", force[8]="";
         jget(body,"cats",cats,sizeof(cats));
@@ -617,6 +658,7 @@ static void handle(int fd){
     }
     else if(!strncmp(base,"/api/check",10) && !strcmp(method,"POST")) api_check(fd,(char*)body);
     else if(!strncmp(base,"/api/delbig",11) && !strcmp(method,"POST")) api_delbig(fd,(char*)body);
+    else if(!strncmp(base,"/api/bigmove",12) && !strcmp(method,"POST")) api_bigmove(fd,(char*)body);
     else if(!strncmp(base,"/api/classify-preview",21)){
         char p[640]; snprintf(p,sizeof(p),"%s/.classify.preview.json",ADR);
         FILE *f=fopen(p,"r"); if(!f){ http_json(fd,"{\"files\":[]}"); return; }
