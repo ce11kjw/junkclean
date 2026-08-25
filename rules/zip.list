@@ -1,0 +1,8 @@
+# 压缩包残留（独立分类，勾选后删除）
+/sdcard/Download/*.zip
+/sdcard/Download/*.7z
+/sdcard/Download/*.rar
+/sdcard/Download/*.tar
+/sdcard/Download/*.gz
+/sdcard/Download/*.xz
+/sdcard/Download/*.bz2

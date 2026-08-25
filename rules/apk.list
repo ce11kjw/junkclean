@@ -1,7 +1,4 @@
-# 安装包/压缩包残留（用户勾选后删除）
+# 安装包残留（勾选后删除）
 /sdcard/Download/*.apk
 /sdcard/Download/*.apex
-/sdcard/Download/*.zip
-/sdcard/Download/*.7z
-/sdcard/Download/*.rar
 /sdcard/tmp/*.apk

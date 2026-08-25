@@ -41,6 +41,7 @@ mkdir -p "$ADR/rules"
 cat_cache=1
 cat_junk=1
 cat_apk=1
+cat_zip=1
 cat_empty=1
 cat_social=1
 cat_sqlite=1

@@ -1,7 +1,12 @@
-# 文件分类：扩展名列表 目标目录（相对 /sdcard 自动前缀）
-jpg jpeg png gif webp heic /sdcard/Pictures
-mp4 mkv mov avi webm 3gp /sdcard/Movies
-mp3 wav flac m4a ogg aac /sdcard/Music
-pdf doc docx xls xlsx ppt pptx txt md epub /sdcard/Documents
-apk xapk apks /sdcard/AppInstall
-zip 7z rar tar gz xz iso /sdcard/Archives
+# 文件分类整理配置
+# @src=路径      指定从哪个目录找文件（默认 /sdcard，可改成 /sdcard/Download 等）
+# @dest=路径     指定分类目标根目录（默认 /sdcard/下载，即 /sdcard/Download）
+# 每行: 扩展名列表 目标子目录（相对 @dest；写 /绝对路径 则用绝对路径）
+@src=/sdcard
+@dest=/sdcard/下载
+jpg jpeg png gif webp heic /图片
+mp4 mkv mov avi webm 3gp /视频
+mp3 wav flac m4a ogg aac /音乐
+pdf doc docx xls xlsx ppt pptx txt md epub /文档
+apk xapk apks /安装包
+zip 7z rar tar gz xz iso /压缩包

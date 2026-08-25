@@ -408,9 +408,9 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
 'use strict';
 /* ===== 常量/状态 ===== */
 const API='http://127.0.0.1:46780';
-const CATS={cache:['应用缓存','缓存'],junk:['系统垃圾','垃圾'],apk:['安装包','安装包'],
+const CATS={cache:['应用缓存','缓存'],junk:['系统垃圾','垃圾'],apk:['安装包','安装包'],zip:['压缩包','压缩包'],
   empty:['空文件夹','空夹'],social:['社交专项','社交'],sqlite:['SQLite 优化','SQLite']};
-const CAT_ORDER=['cache','junk','apk','empty','social','sqlite'];
+const CAT_ORDER=['cache','junk','apk','zip','empty','social','sqlite'];
 let scan=null, sel={}, cleaning=false, cfg={}, L=null;
 const I18N={zh:{free:'可用空间',scan:'扫描垃圾',scanning:'扫描中…',done:'扫描完成',
   start:'开始扫描垃圾',last:'上次扫描',clean:'一键清理',confirm:'确认清理',cancel:'取消',
@@ -631,7 +631,7 @@ async function loadCatSwitches(){
   const r=await api('/api/config');
   cfg={}; if(r&&r.cfg){ r.cfg.split('\n').forEach(l=>{const i=l.indexOf('='); if(i>0){cfg[l.slice(0,i)]=l.slice(i+1);}}); }
   const box=$('cat-switches'); box.innerHTML='';
-  ['cache','junk','apk','empty','social','sqlite'].forEach(id=>{
+  ['cache','junk','apk','zip','empty','social','sqlite'].forEach(id=>{
     const on=cfg['cat_'+id]!=='0';
     const row=document.createElement('div');
     row.className='setrow';

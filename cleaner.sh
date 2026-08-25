@@ -53,7 +53,7 @@ load_rules() { # load_rules <file> -> RULES_LINES (norm+red separated)
 }
 do_clean() { # do_clean <cats_csv> [force]
   FORCE=0; [ "$2" = "force" ] && FORCE=1
-  [ "$1" = "all" ] && cats="cache junk apk empty social sqlite" || cats="$1"
+  [ "$1" = "all" ] && cats="cache junk apk zip empty social sqlite" || cats="$1"
   n_del=0; n_skip=0; freed=0; total_jobs=0; job=0
   for c in $cats; do total_jobs=$((total_jobs+1)); done
   for c in $cats; do
@@ -62,6 +62,7 @@ do_clean() { # do_clean <cats_csv> [force]
       cache)   [ "$(get_cfg cat_cache 1)" = "1" ] || { prog $((job*100/total_jobs)) "跳过 缓存(已关)"; continue; }; f="$RULES/cache.list"; nm="应用缓存";;
       junk)    [ "$(get_cfg cat_junk 1)" = "1" ] || continue; f="$RULES/junk.list"; nm="系统垃圾";;
       apk)     [ "$(get_cfg cat_apk 1)" = "1" ] || continue; f="$RULES/apk.list"; nm="安装包";;
+      zip)     [ "$(get_cfg cat_zip 1)" = "1" ] || continue; f="$RULES/zip.list"; nm="压缩包";;
       social)  [ "$(get_cfg cat_social 1)" = "1" ] || continue; f="$RULES/social.list"; nm="社交专项";;
       empty)   [ "$(get_cfg cat_empty 1)" = "1" ] || continue; f=""; nm="空文件夹";;
       sqlite)  [ "$(get_cfg cat_sqlite 1)" = "1" ] || continue; f=""; nm="SQLite优化";;
@@ -228,18 +229,26 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   prog 100 "体检完成，可释放约 $(human $total_kb)"
   cat "$SCAN"
 }
-do_classify() { # 文件分类（跳过下载中文件，重名加序号）
+do_classify() { # 文件分类（@src 源目录 / @dest 目标根，跳过下载中文件，重名加序号）
   f="$RULES/classify.list"; [ -f "$f" ] || { log WARN "无 classify.list"; exit 0; }
+  src=/sdcard; destbase=/sdcard/下载
   moved=0
   while IFS= read -r l; do
     case "$l" in \#*|"") continue;; esac
+    case "$l" in
+      @src=*)  src="${l#@src=}";  continue;;
+      @dest=*) destbase="${l#@dest=}"; continue;;
+    esac
     dest=$(echo "$l" | awk '{print $NF}')
     exts=$(echo "$l" | sed 's/ *[^ ]*$//')
-    case "$dest" in /*) ;; *) dest="/sdcard/$dest";; esac
+    case "$dest" in
+      /sdcard/*|/data/*|/storage/*|/mnt/*) ;;          # 绝对路径保留
+      /*) dest="$destbase$dest";;                       # /子目录 → 目标根下
+      *)  dest="$destbase/$dest";; esac                  # 相对路径 → 目标根下
     [ -d "$dest" ] || mkdir -p "$dest" 2>/dev/null || continue
     for ext in $exts; do
       # 用临时文件计数（避免管道子 shell 变量丢失）
-      find /sdcard -maxdepth 4 -type f -name "*.$ext" ! -path "/sdcard/$dest/*" 2>/dev/null | while IFS= read -r sf; do
+      find "$src" -maxdepth 4 -type f -name "*.$ext" ! -path "$dest/*" 2>/dev/null | while IFS= read -r sf; do
         base=$(basename "$sf")
         case "$base" in
           *.part|*.crdownload|*.partial|*.tmp|*.downloading|*.!q|*.aria2) continue;;
