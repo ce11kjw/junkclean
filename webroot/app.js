@@ -152,24 +152,26 @@ async function pollScan(){
 }
 /* ===== 清单 ===== */
 let scan=null,lastScan=null,sel={},rulesStore={};
-function renderReview(){
+async function renderReview(){
   scan=lastScan; sel={};
   if(!window.big_min){ api('/api/config').then(cfg=>{ const m=(cfg&&cfg.cfg||'').match(/big_min=(\d+)/); window.big_min=m?Math.round(parseInt(m[1])/1024):100; }); }
   const box=$('catlist'); box.innerHTML='';
-  CAT_ORDER.forEach(id=>{
-    const v=scan.cats&&scan.cats[id]; if(!v||!(+v.kb||+v.count)) return;
-    const kb=+v.kb||0;
+  for(const id of CAT_ORDER){
+    const v=scan.cats&&scan.cats[id];
+    const kb=+((v&&v.kb)||0);
     const el=document.createElement('div');
-    el.className='catcard'+(id==='social'?' redline':'');
+    el.className='catcard'+(id==='social'?' redline':'')+(kb||(v&&v.count)?'':' dim');
     el.dataset.cat=id;
     const ico=(CATS[id]||[])[1]||'•';
     el.innerHTML='<div class="chk">✓</div><div class="catico">'+ico+'</div>'+
-      '<div class="nm">'+(CATS[id]||[id])[0]+'<div class="cnt">'+v.count+' '+T('files')+(v.old?' · '+T('days_ago')+' '+fmtKB(v.old*1024):'')+'</div></div>'+
-      '<div class="sz">'+fmtKB(kb)+'</div>';
+      '<div class="nm">'+(CATS[id]||[id])[0]+'<div class="cnt">'+((v&&v.count)||0)+' '+T('files')+((v&&v.old)?' · '+T('days_ago')+' '+fmtKB(v.old*1024):'')+'</div></div>'+
+      '<div class="sz">'+fmtKB(kb)+'</div>'+
+      '<span class="rules-arrow" onclick="event.stopPropagation();toggleRules(this)">▾</span>'+
+      '<div class="rules-open"></div>';
     el.onclick=()=>{ sel[id]=!sel[id]; el.classList.toggle('on',!!sel[id]); updateSel(); };
     box.appendChild(el);
-    renderRules(id,el);
-  });
+    try{ await renderRules(id,el); }catch(e){}
+  }
   renderBig();
   renderApps();
   showTab('clean'); showView('review');
@@ -215,35 +217,52 @@ function renderBig(){
 /* ===== 规则路径行 ===== */
 async function renderRules(catId,card){
   if(['big','empty','zero','temp','uninst','sqlite'].includes(catId)) return;
-  const r=await api('/api/rules?type='+catId); if(!r||!r.content) return;
+  let r;
+  try{ r=await api('/api/rules?type='+catId); }catch(e){ return; }
+  if(!r||!r.content) return;
   const lines=r.content.split('\n').map(l=>l.trimEnd());
   const paths=lines.map(l=>{ const t=l.trim(); if(!t||t.startsWith('#')||t.startsWith('@')) return null; const p=t.split(/\s+/)[0]; return p.startsWith('/')?p:null; }).filter(Boolean);
   let exists={};
   if(paths.length){ const chk=await api('/api/check',{method:'POST',body:JSON.stringify({paths})}); exists=(chk&&chk.exists)||{}; }
   const box=document.createElement('div'); box.className='rulelist';
+  let shown=0;
   lines.forEach((l,idx)=>{
     const t=l.trim(); if(!t||t.startsWith('#')||t.startsWith('@')) return;
     const parts=t.split(/\s+/); const path=parts[0]; if(!path.startsWith('/')) return;
     const flags=parts.slice(1);
     const row=document.createElement('div'); row.className='ruleline';
-    row.innerHTML='<div class="rulepath">'+escapeHtml(path)+(exists[path]?'':'<span class="rulemiss">⚠️ 不存在</span>')+
-      (flags.includes('high')?'<span class="rulemiss">⚠️ 高风险</span>':'')+'</div>'+
-      '<div class="rulesw"><button class="sw '+(flags.includes('recurse')?'on':'')+'" data-k="recurse" data-i="'+idx+'">子目录</button>'+
-      '<button class="sw '+(flags.includes('no-integrity')?'':'on')+'" data-k="integrity" data-i="'+idx+'">完整性</button></div>';
-    box.appendChild(row);
-    row.querySelector('[data-k=recurse]').onclick=()=>toggleRuleFlag(catId,idx,'recurse',flags,r.content,row);
-    row.querySelector('[data-k=integrity]').onclick=()=>toggleRuleFlag(catId,idx,'no-integrity',flags,r.content,row);
+    const hasRecurse=flags.includes('recurse');
+    const hasNoIntegrity=flags.includes('no-integrity');
+    let badge='<span class="rbadge ok">✅</span>';
+    if(!exists[path]) badge='<span class="rbadge warn">⚠️</span>';
+    if(flags.includes('high')) badge='<span class="rbadge danger">🔴</span>';
+    row.innerHTML='<div class="rulepath">'+badge+escapeHtml(path)+'</div>'+
+      '<div class="rulesw"><span class="swlbl">子目录 <span class="rswitch '+(hasRecurse?'on':'')+'" data-k="recurse" data-i="'+idx+'"></span></span>'+
+      '<span class="swlbl">完整性 <span class="rswitch '+(hasNoIntegrity?'':'on')+'" data-k="integrity" data-i="'+idx+'"></span></span></div>';
+    box.appendChild(row); shown++;
+    row.querySelector('[data-k=recurse]').onclick=function(e){ e.stopPropagation(); toggleRuleFlag(catId,idx,'recurse',flags,r.content,this); };
+    row.querySelector('[data-k=integrity]').onclick=function(e){ e.stopPropagation(); toggleRuleFlag(catId,idx,'no-integrity',flags,r.content,this); };
   });
-  card.appendChild(box);
+  if(shown){ const slot=card.querySelector('.rules-open'); if(slot) slot.appendChild(box); }
 }
-async function toggleRuleFlag(cat,idx,flag,cur,content,row){
+function toggleRules(arrow){
+  const card=arrow.closest('.catcard');
+  card.classList.toggle('rules-expanded');
+  localStorage.setItem('jc_rules_'+card.dataset.cat,card.classList.contains('rules-expanded')?'1':'0');
+}
+const _rd={};
+async function toggleRuleFlag(cat,idx,flag,cur,content,el){
+  const k=cat+'_'+idx+'_'+flag;
+  if(_rd[k]) return; _rd[k]=1; setTimeout(()=>delete _rd[k],300);
+  el.classList.toggle('on');
   const parts=content.split('\n'); let line=parts[idx]||'';
   if(flag==='recurse'){ if(cur.includes('recurse')) line=line.replace(/\s*recurse/,''); else line+=' recurse'; }
   else { if(cur.includes('no-integrity')) line=line.replace(/\s*no-integrity/,''); else line+=' no-integrity'; }
   parts[idx]=line;
   const rr=await api('/api/rules?type='+cat,{method:'POST',body:parts.join('\n')});
-  if(rr.ok){ toast('已保存'); row.querySelector('[data-k="'+flag+'"]').classList.toggle('on'); }
+  if(!rr.ok) el.classList.toggle('on');
 }
+
 /* ===== 清理 ===== */
 async function doClean(){
   const items=Object.keys(sel).filter(c=>sel[c]).join(',');
