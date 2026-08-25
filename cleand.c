@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
@@ -377,6 +378,19 @@ static void api_ai(int fd){
 }
 
 
+/* whitelist check: return 1 if path is protected (prefix + path-boundary) */
+static int wl_block(const char *path){
+    char p[600]; snprintf(p,sizeof(p),"%s/rules/whitelist.list",ADR);
+    FILE *f=fopen(p,"r"); if(!f) return 0;
+    char line[700]; int block=0;
+    while(fgets(line,sizeof(line),f)){
+        line[strcspn(line,"\r\n")]=0;
+        if(!*line||line[0]=='#') continue;
+        size_t wl=strlen(line);
+        if(!strncasecmp(path,line,wl)&&(path[wl]==0||path[wl]=='/')){ block=1; break; }
+    }
+    fclose(f); return block;
+}
 /* ---- delete user-confirmed big files (argv-safe rm, prefix guard) ---- */
 static void api_delbig(int fd, const char* body){
     if(!body||!*body){ http_err(fd,400,"{\"e\":\"empty\"}"); return; }
@@ -388,7 +402,8 @@ static void api_delbig(int fd, const char* body){
         while(l&&(tok[l-1]==' '||tok[l-1]=='"')) tok[--l]=0;
         if((!strncmp(tok,"/sdcard/",8)||!strncmp(tok,"/storage/emulated/",18))
            && !strstr(tok,"/../") && !strstr(tok,"/..") && !strcmp(tok,"..")
-           && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')){
+           && !strchr(tok,';')&&!strchr(tok,'&')&&!strchr(tok,'|')&&!strchr(tok,'$')&&!strchr(tok,'`')&&!strchr(tok,'*')&&!strchr(tok,'?')
+           && !wl_block(tok)){
             pid_t c=fork();
             if(c==0){ execl("/bin/rm","rm","-rf",tok,(char*)NULL); execl("/system/bin/rm","rm","-rf",tok,(char*)NULL); _exit(127); }
             int st=0; waitpid(c,&st,0);

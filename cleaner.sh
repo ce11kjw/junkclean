@@ -31,10 +31,12 @@ get_cfg() { # get_cfg <key> <default>
   v=$(sed -n "s/^$1=//p" "$CFG" 2>/dev/null | tail -1)
   [ -n "$v" ] && echo "$v" || echo "$2"
 }
-bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截
+bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏感，统一转小写比较）
   p=$1; [ -n "$p" ] || return 1
+  p=$(printf '%s' "$p" | tr 'A-Z' 'a-z')
   while IFS= read -r w; do
     case "$w" in \#*|"") continue;; esac
+    w=$(printf '%s' "$w" | tr 'A-Z' 'a-z')
     case "$p" in "$w"|"$w"/*) return 1;; esac
   done < "$RULES/whitelist.list"
   return 0
@@ -240,6 +242,7 @@ do_classify() { # 文件分类（跳过下载中文件，重名加序号）
         esac
         tgt="$dest/$base"
         [ -e "$tgt" ] && tgt="$dest/${base%.*}_$(date +%s).${ext}"
+        bj "$sf" || continue
         mv -f "$sf" "$tgt" 2>/dev/null && echo x >> "$ADR/.classify.cnt"
       done
     done
@@ -267,6 +270,7 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   mv_n=0
   while IFS= read -r sf; do
     [ -n "$sf" ] || continue
+    bj "$sf" || continue
     mv -f "$sf" "$dest/" 2>/dev/null && { mv_n=$((mv_n+1)); log INFO "dup->  $sf"; }
   done < "$tmp.mv"
   rm -f "$tmp" "$tmp.dup" "$tmp.mv"
