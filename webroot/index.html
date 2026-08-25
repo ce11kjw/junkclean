@@ -200,8 +200,12 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
 
 /* ===== Toast ===== */
 .toast{position:fixed;top:calc(var(--window-inset-top,16px) + 8px);left:50%;transform:translate(-50%,-150%);
-  background:var(--card2);color:var(--txt);padding:11px 20px;border-radius:999px;font-size:14px;
-  border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:99;transition:transform .3s var(--spring)}
+  background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05));
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  color:var(--txt);padding:11px 20px;border-radius:999px;font-size:14px;font-weight:500;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 10px 30px rgba(0,0,0,.4);
+  z-index:99;transition:transform .3s var(--spring)}
 .toast.show{transform:translate(-50%,0)}
 
 /* ===== 子页面抽屉 ===== */
@@ -247,8 +251,11 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
   </div>
   <div class="scanring">
     <svg width="150" height="150">
-      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.07)" stroke-width="9" fill="none"/>
-      <circle id="scan-arc" cx="75" cy="75" r="66" stroke="var(--acc)" stroke-width="9" fill="none"
+      <defs><linearGradient id="scanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#2dd4bf"/><stop offset="100%" stop-color="#34d399"/>
+      </linearGradient></defs>
+      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.06)" stroke-width="9" fill="none"/>
+      <circle id="scan-arc" cx="75" cy="75" r="66" stroke="url(#scanGrad)" stroke-width="9" fill="none"
         stroke-linecap="round" stroke-dasharray="415" stroke-dashoffset="415" style="transition:stroke-dashoffset .3s"/>
     </svg>
     <div class="pct" id="scan-pct">0%</div>
@@ -291,8 +298,11 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
   <div class="topbar"><h1>正在清理…</h1></div>
   <div class="scanring">
     <svg width="150" height="150">
-      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.07)" stroke-width="9" fill="none"/>
-      <circle id="clean-arc" cx="75" cy="75" r="66" stroke="var(--acc)" stroke-width="9" fill="none"
+      <defs><linearGradient id="cleanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#2dd4bf"/><stop offset="100%" stop-color="#34d399"/>
+      </linearGradient></defs>
+      <circle cx="75" cy="75" r="66" stroke="rgba(255,255,255,.06)" stroke-width="9" fill="none"/>
+      <circle id="clean-arc" cx="75" cy="75" r="66" stroke="url(#cleanGrad)" stroke-width="9" fill="none"
         stroke-linecap="round" stroke-dasharray="415" stroke-dashoffset="415" style="transition:stroke-dashoffset .3s"/>
     </svg>
     <div class="pct" id="clean-pct">0%</div>
@@ -475,7 +485,7 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
     <button class="btn ghost" style="flex:1" onclick="loadLog('cleaner')">🧹 清理</button>
     <button class="btn ghost" style="flex:1" onclick="loadLog('daemon')">🛡️ 守护</button>
   </div>
-  <pre id="log-box" style="font-size:11px;color:var(--sub);white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:70vh;overflow-y:auto"></pre>
+  <pre id="log-box" style="font-size:11px;color:var(--sub);white-space:pre-wrap;word-break:break-all;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:14px;padding:14px;max-height:70vh;overflow-y:auto;box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 6px 22px rgba(0,0,0,.18)"></pre>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -951,8 +961,12 @@ let aiHist=[]; let aiLoading=false;
 function addAIMsg(role,text){
   const chat=$('ai-chat');
   const div=document.createElement('div');
-  div.style.cssText='padding:6px 8px;margin:4px 0;border-radius:8px;'+(role==='user'?'background:var(--card2);text-align:right':'background:var(--card)');
-  div.textContent=text; chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  div.style.cssText='padding:8px 11px;margin:5px 0;border-radius:14px;max-width:88%;font-size:13px;line-height:1.5;word-break:break-all;'+
+    (role==='user'?'align-self:flex-end;margin-left:auto;background:linear-gradient(135deg,#2dd4bf,#34d399);color:#04211d;border-bottom-right-radius:4px;box-shadow:0 3px 12px rgba(45,212,191,.25)':
+    'align-self:flex-start;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid var(--line);border-bottom-left-radius:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)');
+  div.textContent=text;
+  chat.style.display='flex';chat.style.flexDirection='column';
+  chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
 }
 async function doAI(){
   if(aiLoading) return;
