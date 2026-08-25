@@ -8,9 +8,9 @@
 <style>
 /* ===== 主题 ===== */
 :root{
-  --bg:#07090f; --card:rgba(255,255,255,.045); --card2:rgba(255,255,255,.07);
-  --line:rgba(255,255,255,.08); --txt:#eef0f6; --sub:#8b93a7;
-  --acc:#2dd4bf; --acc2:#34d399; --acc-dim:rgba(45,212,191,.12);
+  --bg:#030509; --card:rgba(10,16,24,.55); --card2:rgba(16,24,36,.6);
+  --line:rgba(0,229,200,.16); --txt:#e8f6f3; --sub:#7d9b97;
+  --acc:#00e5c8; --acc2:#7c5cff; --acc-dim:rgba(0,229,200,.12);
   --warn:#f59e0b; --danger:#f87171; --ok:#34d399;
   --r:16px; --spring:cubic-bezier(.32,.72,0,1);
 }
@@ -23,16 +23,44 @@ html,body{margin:0;padding:0}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   background:
-    radial-gradient(620px 420px at 50% -10%, rgba(45,212,191,.10), transparent 62%),
-    radial-gradient(460px 300px at 88% 12%, rgba(52,211,153,.05), transparent 60%),
-    radial-gradient(380px 260px at 8% 82%, rgba(45,212,191,.04), transparent 60%),
+    radial-gradient(700px 480px at 50% -12%, rgba(0,229,200,.13), transparent 60%),
+    radial-gradient(500px 320px at 90% 8%, rgba(124,92,255,.08), transparent 58%),
+    radial-gradient(420px 300px at 6% 85%, rgba(0,229,200,.05), transparent 60%),
     var(--bg);
   color:var(--txt);min-height:100vh;
-  padding:calc(var(--window-inset-top,16px) + 8px) 14px calc(var(--window-inset-bottom,0px) + 20px);
+  padding:calc(var(--window-inset-top,16px) + 8px) 14px calc(var(--window-inset-bottom,0px) + 96px);
   user-select:none;overflow-x:hidden;
   transition:background .3s;
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ===== 底部导航（霓虹全息胶囊） ===== */
+.bottomnav{position:fixed;left:50%;transform:translateX(-50%);z-index:35;
+  bottom:calc(var(--window-inset-bottom,0px) + 12px);
+  display:flex;gap:4px;padding:5px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(16,24,36,.78),rgba(8,14,22,.72));
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(0,229,200,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 12px 44px rgba(0,0,0,.55), 0 0 30px rgba(0,229,200,.07)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 20px;border-radius:999px;border:none;background:none;
+  color:var(--sub);cursor:pointer;font-size:10px;min-width:66px;
+  transition:all .25s var(--spring)}
+.tab svg{width:22px;height:22px;transition:transform .25s var(--spring), filter .25s}
+.tab span{font-weight:600;letter-spacing:.4px}
+.tab:active{transform:scale(.92)}
+.tab.on{background:linear-gradient(135deg,#00e5c8,#7c5cff);
+  color:#02100e;
+  box-shadow:0 4px 22px rgba(0,229,200,.4), inset 0 1px 0 rgba(255,255,255,.35)}
+.tab.on span{color:#02100e}
+.tab.on svg{filter:drop-shadow(0 0 9px rgba(0,229,200,.9))}
+.tab:not(.on) svg{opacity:.75}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    linear-gradient(rgba(0,229,200,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,200,.04) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 90% 70% at 50% 30%, #000 30%, transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 30%, #000 30%, transparent 75%)}
 
 /* ===== 通用 ===== */
 .hidden{display:none!important}
@@ -46,7 +74,7 @@ body{
   font-size:16px;font-weight:600;color:var(--txt);cursor:pointer;
   padding:15px 24px;background:var(--card2);transition:transform .15s var(--spring);}
 .btn:active{transform:scale(.97)}
-.btn.primary{background:var(--acc);color:#062e27}
+.btn.primary{background:linear-gradient(135deg,#00e5c8,#7c5cff);color:#02100e;box-shadow:0 0 24px rgba(0,229,200,.3)}
 .btn.danger{background:var(--danger);color:#fff}
 .btn.ghost{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:1px solid var(--line);color:var(--sub);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .btn:disabled{opacity:.4;pointer-events:none}
@@ -65,14 +93,19 @@ body{
 .ringwrap{display:flex;flex-direction:column;align-items:center;padding:26px 0 8px}
 /* 条形进度条 */
 .barwrap{width:86%;max-width:340px;text-align:center}
-.bar{width:100%;height:14px;border-radius:999px;background:rgba(255,255,255,.05);
-  border:1px solid var(--line);overflow:hidden;
-  box-shadow:inset 0 2px 8px rgba(0,0,0,.35), 0 0 30px rgba(45,212,191,.06);
+.bar{width:100%;height:16px;border-radius:999px;background:rgba(0,10,14,.6);
+  border:1px solid rgba(0,229,200,.35);overflow:hidden;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 0 30px rgba(0,229,200,.15);
   position:relative}
 .bar-fill{height:100%;width:0%;border-radius:999px;
-  background:linear-gradient(90deg,#2dd4bf,#34d399);
-  box-shadow:0 0 18px rgba(45,212,191,.45), inset 0 1px 0 rgba(255,255,255,.3);
-  transition:width .6s cubic-bezier(.32,.72,0,1)}
+  background:linear-gradient(90deg,#00e5c8,#7c5cff);
+  box-shadow:0 0 24px rgba(0,229,200,.6), inset 0 1px 0 rgba(255,255,255,.4);
+  transition:width .6s cubic-bezier(.32,.72,0,1);
+  position:relative;overflow:hidden}
+.bar-fill::after{content:'';position:absolute;top:0;bottom:0;width:40px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+  animation:barscan 2.2s linear infinite}
+@keyframes barscan{from{left:-40px}to{left:100%}}
 .barinfo{margin-top:14px}
 .barinfo .num{font-size:36px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-1px}
 .barinfo .lbl{font-size:12px;color:var(--sub);margin-top:2px}
@@ -89,8 +122,9 @@ body{
 .ring .lbl{font-size:12px;color:var(--sub)}
 .herobtn{display:flex;flex-direction:column;align-items:center;margin:26px 0 8px}
 .herobtn .btn{width:82%;max-width:340px;padding:19px;font-size:18px;border-radius:18px;
-  background:linear-gradient(135deg,#2dd4bf,#22c55e);
-  color:#04211d;box-shadow:0 10px 34px rgba(45,212,191,.30), inset 0 1px 0 rgba(255,255,255,.25);
+  background:linear-gradient(135deg,#00e5c8,#7c5cff);
+  color:#02100e;box-shadow:0 0 40px rgba(0,229,200,.35), inset 0 1px 0 rgba(255,255,255,.35);
+  border:1px solid rgba(0,229,200,.4);
   transition:transform .15s var(--spring), box-shadow .3s}
 .herobtn .btn:active{transform:scale(.97)}
 .lastscan{text-align:center;color:var(--sub);font-size:13px;margin-top:10px}
@@ -240,7 +274,6 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
     <h1>JunkClean</h1>
     <div class="grow"></div>
     <button class="iconbtn" onclick="openDrawer('drawer-organize')" title="整理">🗂</button>
-    <button class="iconbtn" onclick="openDrawer('drawer-settings')" title="设置">⚙️</button>
   </div>
   <div class="ringwrap">
     <div class="barwrap">
@@ -560,9 +593,17 @@ function T(k){ const l=(L&&L[k])||null; return l!==null?l:(I18N.zh[k]||k); }
 let toastTimer=null;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2000); }
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+}
+function gotoHome(){ showTab('home'); showPage('page-home'); loadHome(); }
+function gotoClean(){ showTab('clean'); showPage('page-scan'); }
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
   $(id).classList.add('show');
+  // 底部导航联动
+  if(id==='page-home') showTab('home');
+  else if(id==='page-scan'||id==='page-review'||id==='page-cleaning'||id==='page-done') showTab('clean');
 }
 function openDrawer(id){ $(id).classList.add('show'); }
 function closeDrawer(id){ $(id).classList.remove('show'); }
@@ -1217,5 +1258,20 @@ async function toggleRuleFlag(cat,idx,flag,cur,content,row){
   loadTasks();
 })();
 </script>
+<!-- ============ 底部导航 ============ -->
+<nav class="bottomnav">
+  <button class="tab on" data-tab="home" onclick="gotoHome()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+    <span>首页</span>
+  </button>
+  <button class="tab" data-tab="clean" onclick="gotoClean()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2z"/></svg>
+    <span>清理</span>
+  </button>
+  <button class="tab" data-tab="settings" onclick="openDrawer('drawer-settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>设置</span>
+  </button>
+</nav>
 </body>
 </html>
