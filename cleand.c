@@ -450,8 +450,13 @@ static void api_status(int fd){
     pthread_mutex_lock(&task_mu);
     int busy = task.running;
     pthread_mutex_unlock(&task_mu);
+    /* 累计统计: stats.total 存 "del_count freed_kb" */
+    long sdel=0, skb=0;
+    { char sp[512]; snprintf(sp,sizeof(sp),"%s/stats.total",ADR);
+      FILE *sf=fopen(sp,"r");
+      if(sf){ char b[128]; if(fgets(b,sizeof(b),sf)) sscanf(b,"%ld %ld",&sdel,&skb); fclose(sf); } }
     snprintf(out,sizeof(out),
-        "{\"daemon\":1,\"busy\":%d,\"port\":%d,\"start\":\"%d\"}", busy, PORT, (int)time(NULL));
+        "{\"daemon\":1,\"busy\":%d,\"port\":%d,\"start\":\"%d\",\"stats\":{\"del\":%ld,\"kb\":%ld}}", busy, PORT, (int)time(NULL), sdel, skb);
     http_json(fd,out);
 }
 
@@ -599,7 +604,7 @@ static void handle(int fd){
         http_json(fd,"{\"ok\":1,\"started\":1}");
     }
     else if(!strncmp(base,"/api/scan",9)){
-        if(!strcmp(method,"POST")){ char *cmd=strdup("scan"); bg(cmd); http_json(fd,"{\"ok\":1,\"scanning\":1}"); }
+        if(!strcmp(method,"POST")){ char *cmd=strdup(body&&strstr(body,"force")?"scan force":"scan"); bg(cmd); http_json(fd,"{\"ok\":1,\"scanning\":1}"); }
         else { /* serve cached scan.json */ char p[600]; snprintf(p,sizeof(p),"%s/scan.json",ADR); FILE*f=fopen(p,"r");
             if(f){ char *t=malloc(MAXRES); int sz=fread(t,1,MAXRES-1,f); fclose(f); t[sz]=0; http_json(fd,t); free(t); }
             else http_err(fd,404,"{\"e\":\"no scan yet\"}");
@@ -612,7 +617,13 @@ static void handle(int fd){
     }
     else if(!strncmp(base,"/api/check",10) && !strcmp(method,"POST")) api_check(fd,(char*)body);
     else if(!strncmp(base,"/api/delbig",11) && !strcmp(method,"POST")) api_delbig(fd,(char*)body);
-    else if(!strncmp(base,"/api/classify",13)){ char *c=strdup("classify"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/classify-preview",21)){
+        char p[640]; snprintf(p,sizeof(p),"%s/.classify.preview.json",ADR);
+        FILE *f=fopen(p,"r"); if(!f){ http_json(fd,"{\"files\":[]}"); return; }
+        char *txt=malloc(32768); int n=fread(txt,1,32767,f); fclose(f); txt[n]=0;
+        http_json(fd,txt); free(txt);
+    }
+    else if(!strncmp(base,"/api/classify",13)){ char *c=strdup(body&&strstr(body,"preview")?"classify preview":"classify"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/duplicate",14)){ char *c=strdup("duplicate"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/fstrim",11)){ char *c=strdup("fstrim"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/rescan",11)){ char *c=strdup("rescan"); bg(c); http_json(fd,"{\"ok\":1}"); }

@@ -236,6 +236,12 @@ sqlite_opt() {
 }
 
 do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
+  # 增量缓存：60 秒内不重扫（force 参数强制重扫）
+  if [ "$1" != "force" ] && [ -f "$SCAN" ]; then
+    if [ $(( $(date +%s) - $(stat -c %Y "$SCAN") )) -lt 60 ] 2>/dev/null; then
+      cat "$SCAN"; return
+    fi
+  fi
   prog 5 "开始体检…"
   free_kb=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_kb" ] && free_kb=0
   total_kb=0; sc=''
@@ -279,8 +285,9 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   prog 100 "体检完成，可释放约 $(human $total_kb)"
   cat "$SCAN"
 }
-do_classify() { # 文件分类（@src 源目录 / @dest 目标根，跳过下载中文件，重名加序号）
+do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出将移动文件）
   f="$RULES/classify.list"; [ -f "$f" ] || { log WARN "无 classify.list"; exit 0; }
+  preview=0; [ "$1" = "preview" ] && preview=1
   src=/sdcard; destbase=/sdcard/下载
   moved=0
   while IFS= read -r l; do
@@ -306,14 +313,34 @@ do_classify() { # 文件分类（@src 源目录 / @dest 目标根，跳过下载
         tgt="$dest/$base"
         [ -e "$tgt" ] && tgt="$dest/${base%.*}_$(date +%s).${ext}"
         bj "$sf" || continue
-        mv -f "$sf" "$tgt" 2>/dev/null && echo x >> "$ADR/.classify.cnt"
+        if [ "$preview" = "1" ]; then
+          # 预览：只记录不移
+          echo "$sf|$dest" >> "$ADR/.classify.pv"
+        else
+          mv -f "$sf" "$tgt" 2>/dev/null && echo x >> "$ADR/.classify.cnt"
+        fi
       done
     done
     prog 50 "分类完成 $dest"
   done < "$f"
-  [ -f "$ADR/.classify.cnt" ] && { moved=$(wc -l < "$ADR/.classify.cnt"); rm -f "$ADR/.classify.cnt"; }
-  log INFO "classify moved=$moved"
-  echo "{\"moved\":$moved}"
+  if [ "$preview" = "1" ]; then
+    # 输出预览清单 {"files":[{"s":src,"d":dest}]}
+    out=''
+    if [ -f "$ADR/.classify.pv" ]; then
+      while IFS='|' read -r sfile ddir; do
+        [ -n "$sfile" ] || continue
+        out="$out{\"s\":\"$sfile\",\"d\":\"$ddir\"},"
+      done < "$ADR/.classify.pv"
+      rm -f "$ADR/.classify.pv"
+    fi
+    out=${out%,}
+    echo "{\"files\":[$out]}" > "$ADR/.classify.preview.json"
+    echo "{\"ok\":1,\"preview\":$out}"
+  else
+    [ -f "$ADR/.classify.cnt" ] && { moved=$(wc -l < "$ADR/.classify.cnt"); rm -f "$ADR/.classify.cnt"; }
+    log INFO "classify moved=$moved"
+    echo "{\"moved\":$moved}"
+  fi
 }
 do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只移不删）
   dest=/sdcard/Duplicates; mkdir -p "$dest" 2>/dev/null
@@ -416,7 +443,7 @@ set -- $1
 case "$1" in
   clean)     do_clean "${2:-all}" "$3" ;;
   scan)      do_scan ;;
-  classify)  do_classify ;;
+  classify)  do_classify "$2" ;;
   duplicate) do_duplicate ;;
   fstrim)    do_fstrim ;;
   rescan)    do_rescan ;;

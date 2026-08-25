@@ -318,7 +318,10 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
     <h1>整理</h1>
   </div>
   <div class="setgroup">
-    <div class="setrow" onclick="postRun('classify')"><span class="lbl">🗂 文件分类</span><span class="val">按类型归档</span></div>
+    <div class="setrow"><span class="lbl">🗂 文件分类</span><span class="val" style="display:flex;gap:6px;align-items:center">
+      <button class="sw" onclick="event.stopPropagation();classifyPreview()">预览</button>
+      <button class="sw on" onclick="postRun('classify')">归档</button>
+    </span></div>
     <div class="setrow" onclick="postRun('duplicate')"><span class="lbl">📑 重复归档</span><span class="val">移到 Duplicates</span></div>
   </div>
   <div class="setgroup">
@@ -493,18 +496,27 @@ async function loadHome(){
   const s=await api('/api/status');
   const daemonEl=$('lastscan');
   if(s&&s.daemon) {
-    // 加载上次 scan
     const sc=await api('/api/scan');
     lastScan=sc;
     if(sc&&sc.ts){
       let tot=0; for(const c of Object.keys(sc.cats||{})) tot+=(+sc.cats[c].kb||0);
       daemonEl.textContent=T('last')+' '+sc.ts+' · '+fmtKB(tot);
+      const avail=sc.free_kb*1024;
       $('home-ring').style.setProperty('--pct', Math.min(100, 40+(sc.free_kb/1024/1024)*5));
-      $('home-free').textContent=fmtKB(sc.free_kb*1024);
-    } else { $('home-free').textContent=fmtKB(s.free_kb*1024); }
-    daemonEl.textContent += ' · '+T('running');
+      animNum($('home-free'), avail);
+      if(s.stats&&s.stats.del>0){
+        $('home-free-lbl').innerHTML='可用空间<br><span style="font-size:11px;color:var(--sub)">累计清理 '+s.stats.del+' 项 · '+fmtKB(s.stats.kb*1024)+'</span>';
+      }
+    } else {
+      daemonEl.innerHTML='暂无扫描记录 · <b style="color:var(--acc)">点击上方开始体检</b>';
+      animNum($('home-free'), (s.free_kb||0)*1024);
+      $('home-free-lbl').textContent='可用空间';
+    }
+    daemonEl.innerHTML += ' · <span style="color:var(--green)">● 运行中</span>';
   } else {
-    daemonEl.textContent=T('stopped');
+    daemonEl.innerHTML='<span style="color:var(--danger)">● 守护进程未运行</span>';
+    $('home-free').textContent='--';
+    $('home-free-lbl').textContent='可用空间';
   }
 }
 
@@ -643,6 +655,32 @@ async function pollClean(){
     }
   }, 500);
 }
+function showDialog(title,html){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px';
+  d.onclick=function(e){ if(e.target===d) d.remove(); };
+  d.innerHTML='<div style="background:var(--card);border-radius:16px;padding:16px;max-width:92vw;width:380px;max-height:75vh;overflow:auto">'+
+    '<div style="font-weight:700;margin-bottom:10px">'+title+'</div>'+html+
+    '<div style="margin-top:12px;text-align:center"><button class="sw on" style="width:100%;padding:8px">关闭</button></div></div>';
+  d.querySelector('button').onclick=function(){ d.remove(); };
+  document.body.appendChild(d);
+}
+function escapeHtml(t){return String(t).replace(/[&<>"]/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]||m})}
+
+/* ===== 分类预览 ===== */
+async function classifyPreview(){
+  toast('生成预览…');
+  await api('/api/classify',{method:'POST',body:'{"preview":1}'});
+  await new Promise(r=>setTimeout(r,900)); // 等异步完成
+  const r=await api('/api/classify-preview');
+  const files=r&&r.files||[];
+  if(!files.length){ toast('预览为空'); return; }
+  let html='<div style="max-height:55vh;overflow-y:auto;font-size:12px">';
+  files.forEach(f=>{ html+='<div style="padding:4px 0;border-bottom:1px solid var(--line);word-break:break-all">'+
+    escapeHtml(f.s)+' → '+escapeHtml(f.d)+'</div>'; });
+  html+='</div><div style="margin-top:10px;font-size:12px;color:var(--sub)">共 '+files.length+' 个文件</div>';
+  showDialog('📂 分类预览', html);
+}
 function toHome(){ showPage('page-home'); loadHome(); }
 
 /* ===== 整理/维护 ===== */
@@ -701,7 +739,23 @@ async function saveAI(){
 async function runAI(){
   const out=$('ai-out'); out.textContent='分析中…';
   const r=await api('/api/ai',{method:'POST',body:'{}'});
-  out.textContent=r.ai||(r.e||'AI error');
+  const txt=r.ai||(r.e||'AI error');
+  out.textContent=txt;
+  // 一键采纳：解析分类关键词 → 勾选
+  const names=[['cache','缓存'],['junk','系统垃圾'],['apk','安装包'],['zip','压缩包'],['empty','空文件夹'],['social','社交'],['sqlite','SQLite'],['temp','临时']];
+  const matched=names.filter(n=>txt.match(new RegExp(n[1],'i'))).map(n=>n[0]);
+  if(matched.length){
+    const wrap=document.createElement('div');
+    wrap.style.marginTop='8px';
+    wrap.innerHTML='<button class="sw on" style="padding:6px 14px">✅ 采纳：'+matched.map(c=>T(c)).join('、')+'</button>';
+    out.parentNode.appendChild(wrap);
+    wrap.querySelector('button').onclick=()=>{
+      matched.forEach(c=>{ sel[c]=1; });
+      showPage('page-review'); renderReview();
+      toast('已采纳建议');
+      wrap.remove();
+    };
+  }
 }
 
 /* ===== 规则/白名单 ===== */
@@ -803,6 +857,17 @@ function renderBig(){
   el.querySelector('.nm').onclick=(e)=>{ e.stopPropagation(); detail.classList.toggle('hidden'); };
 }
 
+/* ===== 数字滚动动画 ===== */
+function animNum(el, to, fmt){
+  if(!el) return;
+  const D=600, t0=performance.now();
+  const step=(t)=>{
+    const p=Math.min(1,(t-t0)/D), e=1-Math.pow(1-p,3);
+    el.textContent=(fmt||fmtKB)(Math.round(to*e));
+    if(p<1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 /* ===== 清理清单：每条规则路径 + 双开关 + 不存在标注 ===== */
 const rulesStore={}; // cat → {content, lines:[{path,flags}]}
 async function renderRules(catId){
