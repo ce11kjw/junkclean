@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.3 (2026-08-25)
+- 🛡️ timer daily 定时任务防抖（同一 HH:MM 不重复触发）
+- ponytail: 规则文件空格分隔限制标注（含空格自定义规则不精确，内置规则无空格不受影响）
+
 ## v1.6.2 (2026-08-25)
 - 🔴 前端严审修复：saveTasks 裸 $() ReferenceError（无 jQuery）→ 定时任务保存/开关失效 → 删死代码
 - 🔴 saveAISettings 整文件覆盖 config.conf → 用户 cat_* 配置丢失 → 改为读现有+替换ai_行+回写

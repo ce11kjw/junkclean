@@ -41,6 +41,9 @@ bj() { # 白名单拦截: bj <path>; 0=放行 1=拦截（/sdcard 大小写不敏
   done < "$RULES/whitelist.list"
   return 0
 }
+# ponytail: 规则文件用空格分隔路径，含空格路径（如 "我的 目录"）会被拆错。
+# 天花板：用户自定义含空格规则时统计/删除不精确。
+# 升级路径：load_rules 改换行分隔 + 所有 for p in $RUL 调用点改 while read（改动大，内置规则无空格暂缓）。
 load_rules() { # load_rules <file> -> RULES_LINES (norm+red separated)
   RUL='' REDR=''
   [ -f "$1" ] || return 0
