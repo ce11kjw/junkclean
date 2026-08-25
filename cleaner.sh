@@ -61,6 +61,8 @@ do_clean() { # do_clean <cats_csv> [force]
       social)  [ "$(get_cfg cat_social 1)" = "1" ] || continue; f="$RULES/social.list"; nm="社交专项";;
       empty)   [ "$(get_cfg cat_empty 1)" = "1" ] || continue; f=""; nm="空文件夹";;
       sqlite)  [ "$(get_cfg cat_sqlite 1)" = "1" ] || continue; f=""; nm="SQLite优化";;
+      temp)    [ "$(get_cfg cat_temp 1)" = "1" ] || continue; f=""; nm="临时文件";;
+      uninst)  [ "$(get_cfg cat_uninst 0)" = "1" ] || continue; f=""; nm="卸载残留";;
       *) continue;;
     esac
     prog $((job*100/total_jobs)) "$nm 清理中…"
@@ -79,7 +81,48 @@ do_clean() { # do_clean <cats_csv> [force]
     if [ "$c" = "sqlite" ]; then
       sqlite_opt; continue
     fi
+    if [ "$c" = "temp" ]; then
+      # 递归临时文件（白名单保护；日志类保守处理）
+      find /sdcard -type f \( -name "*.tmp" -o -name "*.bak" -o -name "*.old" -o -name "*.temp" -o -name "*.log" \) ! -path "/sdcard/Android/obb/*" 2>/dev/null | while IFS= read -r tf; do
+        [ -e "$tf" ] || continue
+        if [ "$FORCE" != "1" ]; then
+          bj "$tf" || { echo x >> "$ADR/.temp.skip"; continue; }
+        fi
+        sz=$(du -sk "$tf" 2>/dev/null | awk '{print $1}')
+        rm -f "$tf" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del-temp $tf"; }
+      done
+      rm -f "$ADR/.temp.skip"
+      prog $((job*100/total_jobs)) "临时文件清理完成"
+      continue
+    fi
+    if [ "$c" = "uninst" ]; then
+      # 卸载应用残留：/data/data 下已卸载包目录（与 pm list 对比）
+      pm list packages 2>/dev/null | sed 's/^package://' > "$ADR/.pkgs"
+      for dd in /data/data/*/; do
+        [ -d "$dd" ] || continue
+        pkg=$(basename "$dd")
+        grep -qx "$pkg" "$ADR/.pkgs" 2>/dev/null && continue
+        # 确认不是系统关键目录
+        case "$pkg" in com.android.*|com.google.android.*) continue;; esac
+        sz=$(du -sk "$dd" 2>/dev/null | awk '{print $1}')
+        rm -rf "$dd" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del-uninst $dd"; }
+      done
+      rm -f "$ADR/.pkgs"
+      prog $((job*100/total_jobs)) "卸载残留清理完成"
+      continue
+    fi
     load_rules "$f"
+    # APK 保留期：仅删 N 天前的安装包（防误删刚下载）
+    if [ "$c" = "apk" ]; then
+      keep=$(get_cfg apk_keep_days 7)
+      [ "$keep" -gt 0 ] 2>/dev/null || keep=7
+      find /sdcard/Download /sdcard/tmp -type f \( -name "*.apk" -o -name "*.xapk" \) -mtime +"$keep" 2>/dev/null | while IFS= read -r ap; do
+        [ -e "$ap" ] || continue
+        sz=$(du -sk "$ap" 2>/dev/null | awk '{print $1}')
+        rm -f "$ap" 2>/dev/null && { n_del=$((n_del+1)); freed=$((freed+sz)); log INFO "del-old-apk $ap"; }
+      done
+      # 非 apk 的压缩包仍走规则（不过期）
+    fi
     # 红线项默认不删（social 的聊天媒体）; cat_junk 等开关为1时普通规则全清
     for p in $RUL; do
       case "$p" in /*);; *) continue;; esac
@@ -98,6 +141,18 @@ do_clean() { # do_clean <cats_csv> [force]
     done
   done
   prog 100 "完成: 删除$n_del项 释放$(human $freed)"
+  # 累计统计（SmartClear/SweepX 模式：管理器 description 可见）
+  if [ -f "$ADR/stats.total" ]; then
+    read -r tdel tfreed < "$ADR/stats.total" 2>/dev/null
+  fi
+  tdel=$((tdel + n_del)); tfreed=$((tfreed + freed))
+  echo "$tdel $tfreed" > "$ADR/stats.total"
+  # 更新 module.prop description（动态展示累计清理）
+  MP="$JC_MOD/module.prop"
+  if [ -f "$MP" ] && [ -n "$JC_MOD" ]; then
+    desc=$(sed -n 's/^description=//p' "$MP" 2>/dev/null | sed 's/ · 累计.*//')
+    sed -i "s|^description=.*|description=${desc} · 累计清理 ${tdel} 项/释放 $(human $tfreed)|" "$MP" 2>/dev/null
+  fi
   echo "{\"deleted\":$n_del,\"skipped\":$n_skip,\"freed_kb\":$freed}"
 }
 # ponytail: shell 引擎的天花板是高频操作性能（每次操作 fork 子进程）。
@@ -129,10 +184,10 @@ do_scan() { # 体检：规则分类统计 + 大文件 Top20（只统计不删）
   prog 5 "开始体检…"
   free_kb=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$free_kb" ] && free_kb=0
   total_kb=0; sc=''
-  i=0; cats="cache junk apk social"
+  i=0; cats="cache junk apk social temp"
   for c in $cats; do
     i=$((i+1))
-    f=$RULES/$c.list; load_rules "$f"
+    f=$RULES/$c.list; [ -f "$f" ] || f=""; load_rules "$f"
     n=0; sz=0
     sz=$(du -sk $RUL 2>/dev/null | awk 'END{print $1}')
     [ -z "$sz" ] && sz=0
@@ -218,8 +273,11 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   log INFO "duplicate moved=$mv_n"
   echo "{\"moved\":$mv_n}"
 }
-do_fstrim() { # 磁盘维护：EXT4 fstrim / F2FS 智能 GC（灭屏/充电检测）
+do_fstrim() { # 磁盘维护：drop_caches 清 RAM + EXT4 fstrim / F2FS 智能 GC
   sync
+  # 释放页缓存/dentry/inode（drop_caches=3），写入不落盘不丢失数据
+  echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+  log INFO "drop_caches done"
   scr=0
   # 亮屏检测（无 backlight 节点视为亮屏可执行）
   if ls /sys/class/backlight/*/brightness >/dev/null 2>&1; then
@@ -269,6 +327,15 @@ do_ai() { # AI 分析：拼聚合数据 → 自填端点（cleaner 只输出，c
   [ -f "$SCAN" ] || do_scan > /dev/null
   cat "$SCAN"
 }
+do_verify() { # 规则完整性：输出每条规则文件的条数+SHA256
+  [ -d "$RULES" ] || RULES="$(dirname "$_self")/rules"
+  for f in "$RULES"/*.list; do
+    [ -f "$f" ] || continue
+    n=$(grep -c '^[^#]' "$f" 2>/dev/null)
+    h=$(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)
+    echo "$(basename "$f") | 条数=$n | sha256=$h"
+  done
+}
 do_status() { # cleand/WebUI 状态
   fk=$(df -k /sdcard 2>/dev/null | awk 'NR==2{print $4}'); [ -z "$fk" ] && fk=0
   h=green; [ "$fk" -lt 3145728 ] && h=yellow; [ "$fk" -lt 1048576 ] && h=red
@@ -288,5 +355,6 @@ case "$1" in
   rescan)    do_rescan ;;
   ai)        do_ai ;;
   status)    do_status ;;
+  verify)    do_verify ;;
   *) echo "usage: $0 {clean|scan|classify|duplicate|fstrim|rescan|ai|status}"; exit 1;;
 esac
