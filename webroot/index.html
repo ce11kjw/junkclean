@@ -328,9 +328,10 @@ textarea{min-height:140px;resize:vertical;font-family:ui-monospace,monospace;fon
       <button class="sw" onclick="event.stopPropagation();classifyPreview()">预览</button>
       <button class="sw on" onclick="postRun('classify')">归档</button>
     </span></div>
-    <div class="setrow"><span class="lbl">📑 重复归档</span><span class="val" style="display:flex;gap:6px;align-items:center">
+    <div class="setrow"><span class="lbl">📑 重复文件</span><span class="val" style="display:flex;gap:6px;align-items:center">
       <button class="sw" onclick="event.stopPropagation();dupPreview()">预览</button>
       <button class="sw on" onclick="postRun('duplicate')">归档</button>
+      <button class="sw" style="color:var(--danger);border-color:var(--danger)" onclick="event.stopPropagation();dupDelete()">删除</button>
     </span></div>
   </div>
   <div class="setgroup">
@@ -700,6 +701,25 @@ function showDialog(title,html){
 }
 function escapeHtml(t){return String(t).replace(/[&<>"]/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]||m})}
 
+/* ===== 删除重复文件（全部删除，不保留） ===== */
+async function dupDelete(){
+  // 先预览数量
+  toast('扫描重复文件中…');
+  await api('/api/duplicate',{method:'POST',body:'{"preview":1}'});
+  await new Promise(r=>setTimeout(r,1000));
+  const r=await api('/api/duplicate-preview');
+  const n=(r&&r.files||[]).length;
+  if(!n){ toast('未发现重复文件'); return; }
+  showDialog('⚠️ 删除重复文件', '<div style="font-size:13px;color:var(--danger);font-weight:700;margin-bottom:8px">将永久删除 '+n+' 个重复文件（一份不留，不可恢复！）</div>'+
+    '<div style="font-size:12px;color:var(--sub)">检测到 '+n+' 个重复文件，确认后全部删除。<br>建议先点"预览"确认。</div>'+
+    '<div style="margin-top:10px;text-align:center"><button class="sw on" style="width:100%;padding:8px;background:var(--danger);border-color:var(--danger);color:#fff" onclick="dupDeleteConfirm(this)">确认全部删除</button></div>');
+}
+async function dupDeleteConfirm(btn){
+  btn.textContent='删除中…'; btn.disabled=1;
+  const r=await api('/api/duplicate',{method:'POST',body:'{"delete":1}'});
+  btn.closest('div[style]').remove();
+  toast(r.ok?('✓ 已删除 '+n+' 个重复文件'):'✗ '+(r.e||'err'));
+}
 /* ===== 重复预览 ===== */
 async function dupPreview(){
   toast('扫描重复文件中…');

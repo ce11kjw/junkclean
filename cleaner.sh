@@ -431,8 +431,10 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
     echo "{\"moved\":$moved}"
   fi
 }
-do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只移不删；preview 参数=只列出）
-  preview=0; [ "$1" = "preview" ] && preview=1
+do_duplicate() { # 重复文件（>10M 哈希分组；preview=列出 / delete=全部删除 / 默认归档到 Duplicates）
+  preview=0; delmode=0
+  [ "$1" = "preview" ] && preview=1
+  [ "$1" = "delete" ] && delmode=1
   dest=/sdcard/Duplicates; mkdir -p "$dest" 2>/dev/null
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
@@ -446,7 +448,7 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
   # 保留第一个副本，其余列入移动清单
   awk -F'|' '!seen[$1]++ {keep[$1]=$2; next} {print $2}' "$tmp" > "$tmp.mv"
   if [ "$preview" = "1" ]; then
-    # 预览：列出将移动的重复文件
+    # 预览：列出重复文件（全部）
     out=''
     while IFS= read -r sf; do
       [ -n "$sf" ] || continue
@@ -456,6 +458,18 @@ do_duplicate() { # 重复文件归档（>10M 哈希分组 → Duplicates，只�
     rm -f "$tmp" "$tmp.dup" "$tmp.mv"
     echo "{\"files\":[$out]}" > "$ADR/.dup.preview.json"
     echo "{\"ok\":1}"
+  elif [ "$delmode" = "1" ]; then
+    # 全部删除：重复组内所有文件（含第一份）都删
+    awk -F'|' '{print $2}' "$tmp" > "$tmp.all"
+    del_n=0
+    while IFS= read -r sf; do
+      [ -n "$sf" ] || continue
+      bj "$sf" || continue
+      rm -f "$sf" 2>/dev/null && { del_n=$((del_n+1)); log INFO "dup-del $sf"; }
+    done < "$tmp.all"
+    rm -f "$tmp" "$tmp.dup" "$tmp.mv" "$tmp.all"
+    log INFO "duplicate deleted=$del_n"
+    echo "{\"deleted\":$del_n}"
   else
     mv_n=0
     while IFS= read -r sf; do
