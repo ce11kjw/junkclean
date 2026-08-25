@@ -153,7 +153,8 @@ do_clean() { # do_clean <cats_csv> [force]
         root=$(echo "$dirpat" | sed 's|/[^/]*\*[^/]*$||'); [ -n "$root" ] || root=/
         pat=$(echo "$dirpat" | sed 's|.*/||')
         [ -d "$root" ] || continue
-        find "$root" $md -type f -name "$pat" > "$ADR/.clean.tmp" 2>/dev/null
+        # 兼容数字后缀分卷: *.zip 也匹配 *.zip.1 / *.zip.12（下载工具重名残留）
+        find "$root" $md -type f \( -name "$pat" -o -name "$pat.[0-9]*" \) > "$ADR/.clean.tmp" 2>/dev/null
       else
         : > "$ADR/.clean.tmp"
         set +f; for d in $dirpat; do set -f
@@ -297,7 +298,7 @@ do_classify() { # 文件分类（@src 源目录 / @dest 目标根，跳过下载
     [ -d "$dest" ] || mkdir -p "$dest" 2>/dev/null || continue
     for ext in $exts; do
       # 用临时文件计数（避免管道子 shell 变量丢失）
-      find "$src" -maxdepth 4 -type f -name "*.$ext" ! -path "$dest/*" 2>/dev/null | while IFS= read -r sf; do
+      find "$src" -maxdepth 4 -type f \( -name "*.$ext" -o -name "*.$ext.[0-9]*" \) ! -path "$dest/*" 2>/dev/null | while IFS= read -r sf; do
         base=$(basename "$sf")
         case "$base" in
           *.part|*.crdownload|*.partial|*.tmp|*.downloading|*.!q|*.aria2) continue;;

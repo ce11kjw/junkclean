@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.7 (2026-08-25)
+- 🔢 下载序号后缀适配：file.zip.1 / photo.jpg.2 等（浏览器同名下载重命名）——清理 + 分类整理都匹配
+- do_clean 已覆盖（.zip.[0-9]*），classify 补上
+
 ## v2.0.6 (2026-08-25)
 - 🗜 压缩包后缀全量覆盖（24种：zip/7z/rar/tar/gz/xz/bz2/tgz/tbz2/zst/lz4/cab/arj/iso/img 等）+ 安装包补全(xapk/apks/apex)
 - 📁 classify 分类后缀全量补全（图片18/视频14/音乐13/文档16/压缩包29）
