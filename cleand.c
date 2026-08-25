@@ -708,7 +708,11 @@ static void handle(int fd){
                 char tmp[700]; snprintf(tmp,sizeof(tmp),"duplicate keep %s",kpath); cmd=strdup(tmp); }
             else cmd=strdup("duplicate delete");
         }
-        else if(body&&strstr(body,"delete")) cmd=strdup("duplicate delete");
+        else if(body&&strstr(body,"delete")){
+            const char *kp=strstr(body,"\"keep\":\"");
+            if(kp){ kp+=8; const char *ke=strchr(kp,'"'); char kpath[600]=""; if(ke){ int kl=(int)(ke-kp); if(kl>590)kl=590; snprintf(kpath,sizeof(kpath),"%.*s",kl,kp); } char tmp[700]; snprintf(tmp,sizeof(tmp),"duplicate delete %s",kpath); cmd=strdup(tmp); }
+            else cmd=strdup("duplicate delete");
+        }
         else cmd=strdup("duplicate");
         bg(cmd); http_json(fd,"{\"ok\":1}");
     }

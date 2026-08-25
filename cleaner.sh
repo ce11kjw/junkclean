@@ -435,7 +435,8 @@ do_duplicate() { # 重复文件（>10M 哈希分组；preview=列出 / delete=�
   preview=0; delmode=0; keepspec=''
   [ "$1" = "preview" ] && preview=1
   [ "$1" = "delete" ] && delmode=1
-  [ "$1" = "keep" ] && [ -n "$2" ] && { keepspec="$2"; delmode=1; }
+  [ "$1" = "keep" ] && [ -n "$2" ] && { keepspec="$2"; }
+  [ "$1" = "delete" ] && [ -n "$2" ] && keepspec="$2"
   dest=/sdcard/Duplicates; mkdir -p "$dest" 2>/dev/null
   [ -d "$dest" ] || { log WARN "无法创建 Duplicates"; exit 1; }
   tmp="$ADR/.dup.tmp"; : > "$tmp"
