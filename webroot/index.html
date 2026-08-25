@@ -596,7 +596,11 @@ async $f(p,o){
      用注入的 ksu.exec() JS 桥执行 curl 绕过。浏览器场景走 fetch。 */
   if(window.ksu&&typeof window.ksu.exec==='function'){
     try{
-      let cmd='curl -s -m 8 '+JSON.stringify(p)+(o&&o.method==='POST'?" -X POST -d '{}'":'');
+      /* Android 系统无 curl，用模块自带的静态 curl */
+      let CURL='/data/adb/modules/junkclean/bin/curl';
+      let body=(o&&o.body)?o.body:'';
+      let cmd=CURL+' -s -m 8 '+JSON.stringify(p)
+        +(o&&o.method==='POST'?' -X POST -H "Content-Type: application/json" --data '+JSON.stringify(body):'');
       let r=await window.ksu.exec(cmd);
       let txt=typeof r==='string'?r:(r&&(r.stdout||r.result)||'');
       let j=JSON.parse(txt);return j;

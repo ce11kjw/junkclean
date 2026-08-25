@@ -1,4 +1,4 @@
-# JunkClean 🧹 v1.5.8
+# JunkClean 🧹 v1.5.9
 
 智能垃圾清理 + 存储维护模块（KernelSU / APatch / Magisk 通用）
 本地优先 · 零数据采集 · 删除全程人工确认 · 开源致谢

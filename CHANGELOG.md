@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.9 (2026-08-25)
+- 🔴 修复管理器 WebUI 适配层 2 坑：裸 curl 命令不存在（改模块完整路径）+ POST body 丢失（透传）
+- 其他确认无坑项：单文件无外部资源/无混合内容/cleand 绑 127.0.0.1 root 可访问/日志轮转正常
+
 ## v1.5.8 (2026-08-25)
 - 🔴 修复管理器 WebUI 按钮失效：APatch/KSU WebView 页面为 https://mui.kernelsu.org，fetch http://127.0.0.1 被混合内容拦截
 - ✅ $f 加 JS 桥适配：window.ksu.exec() 执行 curl 绕过（浏览器场景仍走 fetch）
