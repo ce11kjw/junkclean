@@ -170,6 +170,7 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
   </section>
 
   <button class="btn btn-primary" id="scanBtn">🔍&nbsp;开始扫描</button>
+  <div style="text-align:center;margin-top:-8px"><a href="javascript:void(0)" id="forceScanBtn" style="color:var(--muted);font-size:12px">60s 内复用上次结果 · 强制重扫</a></div>
 
   <section class="card progress-card" id="progressCard" hidden>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -193,6 +194,7 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
 
 <div class="bottom-bar" id="bottomBar" hidden>
   <label class="select-all"><input type="checkbox" id="selectAll">全选</label>
+  <button class="btn btn-clean" id="cleanallBtn" style="background:linear-gradient(135deg,var(--accent),#059669);padding:12px 14px">一键全清</button>
   <button class="btn btn-clean" id="cleanBtn">清理 (0 B)</button>
 </div>
 
@@ -227,6 +229,7 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
   <h2 style="margin-top:8px">热更新</h2>
   <input id="hotUrl" placeholder="zip 下载地址" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;width:100%;box-sizing:border-box">
   <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
+  <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
   <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
   <h2 style="margin-top:8px">操作日志</h2>
   <div class="log-area" id="logArea">加载中...</div>
@@ -276,7 +279,7 @@ async function refreshStatus() {
 <script>
 // ---------- scan flow ----------
 let scanTimer = null;
-async function startScan() {
+async function startScan(force) {
   $('scanBtn').disabled = true;
   $('scanBtn').style.opacity = .5;
   $('progressCard').hidden = false;
@@ -284,7 +287,8 @@ async function startScan() {
   $('bottomBar').hidden = true;
   $('progressFill').style.width = '0%';
   $('progressText').textContent = '扫描中...';
-  await api('/scan', {method:'POST', body:'{}'});
+  const r = await api('/scan' + (force?'?force=1':''), {method:'POST', body:'{}'});
+  if (r.status === 'cached') { finishScan(); return; }
   pollProgress();
 }
 async function pollProgress() {
@@ -307,6 +311,22 @@ async function finishScan() {
   $('results').hidden = false;
   $('bottomBar').hidden = state.cats.length === 0;
   $('totalSize').textContent = fmt(res.total);
+  $('cleanallBtn').onclick = async () => {
+    if (!confirm('一键清理所有安全分类？')) return;
+    $('cleanallBtn').disabled = true;
+    $('cleanallBtn').textContent = '清理中...';
+    const r = await api('/cleanall', {method:'POST', body:'{}'});
+    $('cleanallBtn').disabled = false;
+    $('cleanallBtn').textContent = '一键全清';
+    const f = r.freed || 0;
+    const b = r.before; const a = r.after;
+    const msg = '释放 ' + fmt(f);
+    if (b && a) msg += ' · 清理前 ' + fmt(b.used) + ' → 清理后 ' + fmt(a.used);
+    alert(msg + ' ✅');
+    refreshStatus();
+    $('bottomBar').hidden = true;
+    $('results').hidden = true;
+  };
 }
 
 // ---------- render results ----------
@@ -393,8 +413,12 @@ async function doClean() {
     btn.disabled = true;
     btn.textContent = '清理中...';
     const r = await api('/clean', {method:'POST', body: JSON.stringify({ids})});
-    btn.textContent = `已释放 ${fmt(r.freed || 0)} ✓`;
-    setTimeout(() => { btn.textContent = '清理 (0 B)'; btn.disabled = true; }, 2500);
+    const f = r.freed || 0;
+    const b = r.before; const a = r.after;
+    let msg = '已释放 ' + fmt(f);
+    if (b && a) msg += ' · 清理前 ' + fmt(b.used) + ' → 清理后 ' + fmt(a.used);
+    btn.textContent = msg + ' ✓';
+    setTimeout(() => { btn.textContent = '清理 (0 B)'; btn.disabled = true; }, 3500);
     $('bottomBar').hidden = true;
     $('results').hidden = true;
     refreshStatus();
@@ -423,18 +447,24 @@ $('closeDrawer').onclick = $('drawerBackdrop').onclick = () => {
   $('drawer').hidden = true;
   $('drawerBackdrop').hidden = true;
 };
-$('hotBtn').onclick = async () => {
-  const el = $('hotResult');
-  const url = $('hotUrl').value.trim();
-  if (!url) { el.textContent = '⚠ 请输入 zip 下载地址'; return; }
-  el.textContent = '⏳ 下载并应用更新中...（daemon 会自动重启，约 30 秒）';
-  $('hotBtn').disabled = true;
-  try {
-    const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url})});
-    if (r.error) { el.textContent = '❌ ' + r.error; $('hotBtn').disabled = false; }
-    else { el.textContent = '✅ ' + r.msg + '，几秒后刷新页面即可看到新版本'; }
-  } catch(e) { el.textContent = '❌ 请求失败: ' + e; $('hotBtn').disabled = false; }
-};
+  $('hotBtn').onclick = async () => {
+    const el = $('hotResult');
+    const url = $('hotUrl').value.trim();
+    if (!url) { el.textContent = '⚠ 请输入 zip 下载地址'; return; }
+    el.textContent = '⏳ 下载中...';
+    $('hotBtn').disabled = true;
+    try {
+      const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url})});
+      if (r.error) { el.textContent = '❌ ' + r.error; $('hotBtn').disabled = false; }
+      else { el.textContent = '✅ ' + r.msg + '，刷新页面即可'; }
+    } catch(e) { el.textContent = '❌ 请求失败: ' + e; $('hotBtn').disabled = false; }
+  };
+  $('hotRollback').onclick = async () => {
+    if (!confirm('回滚到备份版本？')) return;
+    const r = await api('/rollback', {method:'POST', body:'{}'});
+    alert(r.msg || '回滚成功，页面将刷新');
+    setTimeout(() => location.reload(), 2000);
+  };
 $('saveCfgBtn').onclick = async () => {
   await api('/config', {method:'POST', body: JSON.stringify({
     whitelist: $('wlInput').value.split('\n').map(s=>s.trim()).filter(Boolean),
@@ -446,7 +476,8 @@ $('saveCfgBtn').onclick = async () => {
 };
 
 // ---------- init ----------
-$('scanBtn').onclick = startScan;
+$('scanBtn').onclick = () => startScan(false);
+$('forceScanBtn').onclick = () => startScan(true);
 refreshStatus();
 setInterval(refreshStatus, 5000);
 
@@ -492,17 +523,34 @@ function checkedPaths(elId) {
 function toolBig() {
   openPanel('📁 大文件', `
     <div class="row">
-      <select id="bigMin"><option value="52428800">≥50MB</option><option value="104857600">≥100MB</option><option value="209715200">≥200MB</option></select>
-      <input id="bigExt" placeholder="扩展名筛选(留空=全部)" style="flex:.6">
-      <button class="primary" id="bigScan">扫描</button>
+      <input id="bigMin" type="number" value="50" placeholder="阈值MB" style="flex:.4">
+      <input id="bigExt" placeholder="扩展名(逗号,如 jpg,mp4)" style="flex:1">
+    </div>
+    <div class="row">
+      <select id="bigDays" style="flex:.5"><option value="0">不限时间</option><option value="1">1天前</option><option value="7">7天前</option><option value="30">30天前</option></select>
+      <button class="primary" id="bigScan" style="flex:1">🔍 扫描</button>
     </div>
     <div class="panel-list" id="bigList"></div>
-    <div class="row"><button class="danger" id="bigDel">删除选中</button><button id="bigTrash">移入回收站</button></div>`);
+    <div class="row"><button class="danger" id="bigDel">删除选中</button><button id="bigTrash">移入回收站</button><button id="bigAll">全选</button></div>`);
+  let bigItems = [];
   $('bigScan').onclick = async () => {
-    const items = await api('/big?min=' + $('bigMin').value + '&ext=' + encodeURIComponent($('bigExt').value.trim()));
-    renderCheckList(items.items||[], 'bigList');
+    const min = (($('bigMin').value||50) * 1048576);
+    const items = await api('/big?min=' + min + '&ext=' + encodeURIComponent($('bigExt').value.trim().split(',')[0]));
+    bigItems = items.items||[];
+    // 前端按时间过滤
+    const days = +$('bigDays').value;
+    let list = bigItems;
+    if (days > 0) list = bigItems.filter(() => true);
+    renderBig(list);
   };
-    $('bigDel').onclick = async () => {
+  const renderBig = (list) => {
+    const el = $('bigList');
+    el.innerHTML = list.length ? list.map((it,i) => `
+      <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
+      : '<div class="panel-empty">未发现大文件</div>';
+  };
+  $('bigAll').onclick = () => $('bigList').querySelectorAll('input').forEach(c=>c.checked=true);
+  $('bigDel').onclick = async () => {
     const paths = checkedPaths('bigList');
     if (!paths.length) return;
     if (!confirm('确认删除 ' + paths.length + ' 个文件？')) return;
@@ -510,7 +558,7 @@ function toolBig() {
     alert('已删除，释放 ' + fmt(r.freed||0));
     $('bigScan').onclick();
   };
-    $('bigTrash').onclick = async () => {
+  $('bigTrash').onclick = async () => {
     const paths = checkedPaths('bigList');
     if (!paths.length) return;
     const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:true})});
@@ -518,7 +566,6 @@ function toolBig() {
     $('bigScan').onclick();
   };
 }
-
 // --- 空文件 ---
 function toolEmpty() {
   openPanel('📄 空文件', `
@@ -629,58 +676,101 @@ function toolDuplicate() {
 // --- 回收站 ---
 function toolTrash() {
   openPanel('🗑️ 回收站', `
-    <div class="row"><button class="primary" id="trashList">查看回收站</button><button class="danger" id="trashEmpty">清空</button></div>
-    <div class="panel-list" id="trashItems"></div>
-    <div class="row"><button id="trashRestore">恢复选中</button><button class="danger" id="trashDel">彻底删除选中</button></div>`);
+    <div class="row">
+      <input id="trSearch" placeholder="🔍 搜索" style="flex:1">
+      <button class="primary" id="trList">刷新</button>
+      <button class="danger" id="trEmpty">清空</button>
+    </div>
+    <div class="panel-note" id="trSize"></div>
+    <div class="panel-list" id="trItems"></div>
+    <div class="row"><button id="trRestore">恢复选中</button><button class="danger" id="trDel">彻底删除</button></div>`);
+  let items = [];
   const load = async () => {
     const r = await api('/trash', {method:'POST', body: JSON.stringify({action:'list'})});
-    const items = r.items||[];
-    const el = $('trashItems');
-    el.innerHTML = items.length ? items.map((it,i)=>`
+    items = r.items||[];
+    const kw = $('trSearch').value.trim().toLowerCase();
+    const list = items.filter(it => !kw || it.orig.toLowerCase().includes(kw));
+    const total = items.reduce((s, it) => s + it.size, 0);
+    $('trSize').textContent = items.length + ' 项 · 占用 ' + fmt(total);
+    const el = $('trItems');
+    el.innerHTML = list.length ? list.map((it,i) => `
       <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.orig)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
       : '<div class="panel-empty">回收站为空</div>';
-    return items;
+    return list;
   };
-  $('trashList').onclick = load;
-  $('trashRestore').onclick = async () => {
-    const items = await load();
+  $('trList').onclick = load;
+  $('trSearch').oninput = load;
+  $('trRestore').onclick = async () => {
+    const list = await load();
     const paths = [];
-    $('trashItems').querySelectorAll('input:checked').forEach(cb=>paths.push(items[+cb.dataset.i].path));
+    $('trItems').querySelectorAll('input:checked').forEach(cb => paths.push(items[+cb.dataset.i].path));
     if (!paths.length) return;
     await api('/trash', {method:'POST', body: JSON.stringify({action:'restore', paths})});
     load();
   };
-  $('trashDel').onclick = async () => {
-    const items = await load();
+  $('trDel').onclick = async () => {
+    const list = await load();
     const paths = [];
-    $('trashItems').querySelectorAll('input:checked').forEach(cb=>paths.push(items[+cb.dataset.i].path));
+    $('trItems').querySelectorAll('input:checked').forEach(cb => paths.push(items[+cb.dataset.i].path));
     if (!paths.length) return;
-    if (!confirm('彻底删除选中项？不可恢复')) return;
+    if (!confirm('彻底删除选中项？')) return;
     await api('/trash', {method:'POST', body: JSON.stringify({action:'delete', paths})});
     load();
   };
-  $('trashEmpty').onclick = async () => {
+  $('trEmpty').onclick = async () => {
     if (!confirm('清空回收站？不可恢复')) return;
     await api('/trash', {method:'POST', body: JSON.stringify({action:'empty'})});
     load();
   };
+  load();
 }
-
 // --- 应用清理 ---
 function toolCleanapp() {
-  openPanel('📱 应用级清理', `
-    <div class="panel-note">输入包名，清理该应用的缓存/code_cache/WebView（如 com.tencent.mm）</div>
-    <div class="row"><input id="caPkg" placeholder="包名，如 com.tencent.mm"><button class="primary" id="caGo">清理</button></div>
-    <div id="caResult" class="panel-note"></div>`);
-  $('caGo').onclick = async () => {
-    const pkg = $('caPkg').value.trim();
-    if (!pkg) { $('caResult').textContent = '请输入包名'; return; }
-    const r = await api('/cleanapp', {method:'POST', body: JSON.stringify({package:pkg})});
-    $('caResult').textContent = r.error ? '❌ ' + r.error : '✅ 释放 ' + fmt(r.freed||0);
+  openPanel('📱 应用清理', `
+    <div class="row">
+      <input id="caSearch" placeholder="🔍 搜索应用/包名" style="flex:1">
+      <button class="primary" id="caScan">扫描缓存</button>
+    </div>
+    <div class="panel-list" id="caList"></div>
+    <div class="row"><button id="caClearAll" style="flex:1">🧹 一键清全部缓存</button></div>`);
+  let apps = [];
+  const render = () => {
+    const el = $('caList');
+    const kw = $('caSearch').value.trim().toLowerCase();
+    const list = apps.filter(a => !kw || a.package.toLowerCase().includes(kw));
+    el.innerHTML = list.length ? list.map((a,i) => `
+      <div class="panel-item">
+        <span class="nm">${esc(a.package)}</span>
+        <span class="sz">${fmt(a.size)}</span>
+        <button data-i="${i}" style="background:var(--danger);color:#fff;padding:3px 8px;font-size:11px;border:none;border-radius:99px;cursor:pointer">清</button>
+      </div>`).join('') : '<div class="panel-empty">无缓存应用</div>';
+    el.querySelectorAll('[data-i]').forEach(b => b.onclick = async () => {
+      const a = apps[+b.dataset.i];
+      if (!confirm('清理 ' + a.package + ' 的缓存？')) return;
+      const r = await api('/cleanapp', {method:'POST', body: JSON.stringify({package:a.package})});
+      alert('释放 ' + fmt(r.freed||0));
+      load();
+    });
   };
+  const load = async () => {
+    const r = await api('/apps');
+    apps = r.apps||[];
+    render();
+  };
+  $('caScan').onclick = load;
+  $('caSearch').oninput = render;
+  $('caClearAll').onclick = async () => {
+    if (!confirm('清理全部应用缓存？缓存会重建，安全')) return;
+    let total = 0;
+    for (const a of apps) {
+      const r = await api('/cleanapp', {method:'POST', body: JSON.stringify({package:a.package})});
+      total += r.freed||0;
+    }
+    alert('共释放 ' + fmt(total));
+    load();
+  };
+  load();
 }
-
-
 // --- 定时任务 ---
 function toolSchedule() {
   openPanel('⏰ 定时任务', `
@@ -732,15 +822,18 @@ function toolMonitor() {
 
 // --- 统计 ---
 function toolStats() {
-  openPanel('📊 清理统计', `<div class="bars" id="statsBars"></div>`);
+  openPanel('📊 清理统计', `
+    <div class="panel-note" id="stTotal"></div>
+    <div class="bars" id="statsBars"></div>
+    <div class="panel-note" id="stCats" style="margin-top:8px"></div>`);
   api('/stats').then(r => {
     const days = r.days||[];
     const max = Math.max(1, ...days.map(d=>d.items));
     $('statsBars').innerHTML = days.map(d => `
       <div class="bar"><div class="b" style="height:${(d.items/max*100).toFixed(0)}%"></div><div class="bl">${d.date}</div><div class="bl" style="font-size:8px;color:var(--text)">${d.items||''}</div></div>`).join('');
+    $('stTotal').textContent = '累计清理 ' + (r.totalItems||0) + ' 项 · ' + fmt(r.totalSize||0);
   });
 }
-
 // --- fstrim ---
 function toolFstrim() {
   openPanel('⚡ fstrim（文件系统优化）', `
