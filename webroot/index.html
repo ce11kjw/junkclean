@@ -180,6 +180,10 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
     <input id="aiModel" placeholder="gpt-4o-mini">
   </label>
   <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
+  <h2 style="margin-top:8px">热更新</h2>
+  <input id="hotUrl" placeholder="zip 下载地址" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;width:100%;box-sizing:border-box">
+  <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
+  <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
   <h2 style="margin-top:8px">操作日志</h2>
   <div class="log-area" id="logArea">加载中...</div>
 </div>
@@ -374,6 +378,18 @@ $('settingsBtn').onclick = async () => {
 $('closeDrawer').onclick = $('drawerBackdrop').onclick = () => {
   $('drawer').hidden = true;
   $('drawerBackdrop').hidden = true;
+};
+$('hotBtn').onclick = async () => {
+  const el = $('hotResult');
+  const url = $('hotUrl').value.trim();
+  if (!url) { el.textContent = '⚠ 请输入 zip 下载地址'; return; }
+  el.textContent = '⏳ 下载并应用更新中...（daemon 会自动重启，约 30 秒）';
+  $('hotBtn').disabled = true;
+  try {
+    const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url})});
+    if (r.error) { el.textContent = '❌ ' + r.error; $('hotBtn').disabled = false; }
+    else { el.textContent = '✅ ' + r.msg + '，几秒后刷新页面即可看到新版本'; }
+  } catch(e) { el.textContent = '❌ 请求失败: ' + e; $('hotBtn').disabled = false; }
 };
 $('saveCfgBtn').onclick = async () => {
   await api('/config', {method:'POST', body: JSON.stringify({

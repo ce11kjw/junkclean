@@ -2,14 +2,18 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -543,6 +547,154 @@ func apiLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"logs": tailLog(300)})
 }
 
+// ----- 热更新：下载 zip → 覆盖模块文件 → 重启 daemon（不重启手机） -----
+
+func unzipTo(zipPath, dest string) error {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		p := filepath.Join(dest, f.Name)
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(p, 0755)
+			continue
+		}
+		os.MkdirAll(filepath.Dir(p), 0755)
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.Create(p)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		io.Copy(out, rc)
+		out.Close()
+		rc.Close()
+		if f.Mode()&0111 != 0 {
+			os.Chmod(p, 0755)
+		}
+	}
+	return nil
+}
+
+func copyTree(src, dst string) {
+	filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(src, p)
+		if rel == "." {
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		os.WriteFile(target, data, 0755)
+		return nil
+	})
+}
+
+func apiHotupdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	var req struct {
+		URL  string `json:"url"`
+		Path string `json:"path"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	modDir := "/data/adb/modules/junkclean"
+	tmpZip := "/data/local/tmp/jc-hot.zip"
+	tmpDir := "/data/local/tmp/jc-hot"
+
+	if req.URL != "" {
+		client := &http.Client{Timeout: 120 * time.Second}
+		resp, err := client.Get(req.URL)
+		if err != nil {
+			writeJSON(w, 502, map[string]string{"error": "下载失败: " + err.Error()})
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("下载失败: HTTP %d", resp.StatusCode)})
+			return
+		}
+		f, err := os.Create(tmpZip)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			return
+		}
+		io.Copy(f, resp.Body)
+		f.Close()
+	} else if req.Path != "" {
+		tmpZip = req.Path
+	} else {
+		writeJSON(w, 400, map[string]string{"error": "需要 url 或 path"})
+		return
+	}
+
+	// 解压
+	os.RemoveAll(tmpDir)
+	os.MkdirAll(tmpDir, 0755)
+	if err := unzipTo(tmpZip, tmpDir); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "解压失败: " + err.Error()})
+		return
+	}
+
+	// 校验
+	if _, err := os.Stat(tmpDir + "/module.prop"); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "不是有效模块（缺 module.prop）"})
+		return
+	}
+	newBin := tmpDir + "/system/bin/junkclean"
+	if _, err := os.Stat(newBin); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "zip 缺少二进制 system/bin/junkclean"})
+		return
+	}
+
+	// 备份旧二进制
+	if data, err := os.ReadFile(modDir + "/system/bin/junkclean"); err == nil {
+		os.WriteFile("/data/adb/junkclean/junkclean.bak", data, 0755)
+	}
+
+	// 覆盖模块目录（运行时数据 /data/adb/junkclean 不受影响）
+	copyTree(tmpDir, modDir)
+
+	// 启动新 daemon（setsid 独立，等待旧进程释放端口）
+	os.MkdirAll("/data/adb/junkclean", 0700)
+	shPath := "/system/bin/sh"
+	if _, err := os.Stat(shPath); err != nil {
+		shPath = "/bin/sh"
+	}
+	cmd := exec.Command(shPath, "-c",
+		"setsid "+modDir+"/system/bin/junkclean daemon >> /data/adb/junkclean/daemon.log 2>&1 &")
+	if err := cmd.Start(); err != nil {
+		logLine("hotupdate: 启动新 daemon 失败: " + err.Error())
+		writeJSON(w, 500, map[string]string{"error": "启动失败: " + err.Error()})
+		return
+	}
+
+	logLine("hotupdate: 新版本已应用，重启 daemon")
+	writeJSON(w, 200, map[string]string{"status": "ok", "msg": "热更新完成，daemon 重启中"})
+
+	// 响应发送后退出旧进程（释放端口）
+	go func() {
+		time.Sleep(600 * time.Millisecond)
+		os.Exit(0)
+	}()
+}
+
 // ----- AI analysis (optional) -----
 
 func apiAI(w http.ResponseWriter, r *http.Request) {
@@ -665,6 +817,18 @@ func main() {
 	http.HandleFunc("/api/config", corsMiddleware(apiConfig))
 	http.HandleFunc("/api/logs", corsMiddleware(apiLogs))
 	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
+	http.HandleFunc("/api/hotupdate", corsMiddleware(apiHotupdate))
 	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
-	log.Fatal(http.ListenAndServe("127.0.0.1:"+port, nil))
+	// 端口被占时等待旧进程退出（热更新重启场景），最多 5s
+	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+	if err != nil {
+		for i := 0; i < 50 && err != nil; i++ {
+			time.Sleep(100 * time.Millisecond)
+			ln, err = net.Listen("tcp", "127.0.0.1:"+port)
+		}
+		if err != nil {
+			log.Fatal("端口 " + port + " 被占用: " + err.Error())
+		}
+	}
+	log.Fatal(http.Serve(ln, nil))
 }
