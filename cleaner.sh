@@ -389,12 +389,17 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
   f="$RULES/classify.list"; [ -f "$f" ] || { log WARN "无 classify.list"; exit 0; }
   preview=0; [ "$1" = "preview" ] && preview=1
   src=/sdcard; destbase=/sdcard/下载
+  exclude=""
+  while IFS= read -r l; do case "$l" in @exclude=*) exclude="$exclude ${l#@exclude=}";; esac; done < "$f"
+  xargs=""
+  for x in $exclude; do xargs="$xargs ! -name \"$x\""; done
   moved=0
   while IFS= read -r l; do
     case "$l" in \#*|"") continue;; esac
     case "$l" in
       @src=*)  src="${l#@src=}";  continue;;
       @dest=*) destbase="${l#@dest=}"; continue;;
+      @exclude=*) continue;;
       @map=*)  # 自定义模式规则：@map=文件名模式 目标子目录（如 IMG_2024* /照片）
         mp="${l#@map=}"; mdest=$(echo "$mp" | awk '{print $NF}')
         mg=$(echo "$mp" | sed 's/ *[^ ]*$//')
@@ -403,7 +408,7 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
           /*) mdest="$destbase$mdest";;
           *)  mdest="$destbase/$mdest";; esac
         [ -d "$mdest" ] || mkdir -p "$mdest" 2>/dev/null
-        for sf in $(find "$src" -maxdepth 4 -type f -name "$mg" ! -path "$mdest/*" 2>/dev/null); do
+        for sf in $(find "$src" -maxdepth 4 -type f -name "$mg" ! -path "$mdest/*" $xargs 2>/dev/null); do
           bj "$sf" || continue
           if [ "$preview" = "1" ]; then
             echo "$sf|$mdest" >> "$ADR/.classify.pv"
@@ -422,7 +427,7 @@ do_classify() { # 文件分类（@src/@dest 自定义；preview 参数=只列出
     [ -d "$dest" ] || mkdir -p "$dest" 2>/dev/null || continue
     for ext in $exts; do
       # 用临时文件计数（避免管道子 shell 变量丢失）
-      find "$src" -maxdepth 4 -type f \( -name "*.$ext" -o -name "*.$ext.[0-9]*" \) ! -path "$dest/*" 2>/dev/null | while IFS= read -r sf; do
+      find "$src" -maxdepth 4 -type f \( -name "*.$ext" -o -name "*.$ext.[0-9]*" \) ! -path "$dest/*" $xargs 2>/dev/null | while IFS= read -r sf; do
         base=$(basename "$sf")
         case "$base" in
           *.part|*.crdownload|*.partial|*.tmp|*.downloading|*.!q|*.aria2) continue;;

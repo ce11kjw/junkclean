@@ -147,6 +147,8 @@
   <div class="view hidden" id="view-organize">
     <div class="brand"><button class="iconbtn" onclick="goView('settings')">←</button><div><h1>整理</h1></div></div>
     <div class="card"><div class="card-b">
+      <div class="setrow" style="cursor:pointer" onclick="goView('catrules')"><span class="lbl">📂 分类规则</span><span class="arrow">› @map/@exclude 编辑</span></div>
+      <div class="setrow" style="cursor:pointer" onclick="goView('regextest')"><span class="lbl">🧪 正则测试</span><span class="arrow">› 工具</span></div>
       <div class="setrow"><span class="lbl">🗂 文件分类</span><span class="val" style="display:flex;gap:6px">
         <button class="sw" onclick="classifyPreview()">预览</button>
         <button class="sw on" onclick="postRun('classify')">归档</button></span></div>
@@ -156,6 +158,25 @@
         <button class="sw on" onclick="postRun('duplicate')">归档</button></span></div>
       <div class="setrow"><span class="lbl">🛠 磁盘维护</span><button class="sw on" onclick="postRun('fstrim')"><span data-i18n="execute">执行</span></button></div>
       <div class="setrow"><span class="lbl">📶 媒体刷新</span><button class="sw on" onclick="postRun('rescan')">刷新</button></div>
+    </div></div>
+  </div>
+  <div class="view hidden" id="view-catrules">
+    <div class="brand"><button class="iconbtn" onclick="goView('organize')">←</button><div><h1>📂 分类规则</h1></div></div>
+    <div class="card"><div class="card-b">
+      <div style="font-size:11px;color:var(--sub);padding:4px 0 8px">
+        @src=源目录 · @dest=目标根 · @exclude=排除模式(如 *.part *.tmp) · @map=文件名模式 子目录<br>扩展名 子目录（如 jpg png /图片）
+      </div>
+      <textarea id="catrules-text" style="min-height:180px"></textarea>
+      <div style="padding:10px 0"><button class="btn primary" style="width:100%" onclick="saveCatRules()"><span data-i18n="save">保存</span></button></div>
+    </div></div>
+  </div>
+  <div class="view hidden" id="view-regextest">
+    <div class="brand"><button class="iconbtn" onclick="goView('organize')">←</button><div><h1>🧪 正则测试</h1></div></div>
+    <div class="card"><div class="card-b">
+      <div class="setrow"><span class="lbl">正则</span><input id="rt-pattern" placeholder="^IMG_\\d{4}" style="flex:1"></div>
+      <div class="setrow"><span class="lbl">文本</span><input id="rt-input" placeholder="IMG_2024.jpg" style="flex:1"></div>
+      <div style="padding:8px 0"><button class="sw on" onclick="doRegexTest()">测试</button></div>
+      <div id="rt-result" style="font-size:13px;padding:8px;border:1px solid var(--line);border-radius:10px;min-height:40px"></div>
     </div></div>
   </div>
   <!-- 子视图：AI -->

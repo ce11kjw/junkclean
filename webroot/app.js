@@ -107,6 +107,37 @@ async function monAdd(){
   await api('/api/monitor',{method:'POST',body:JSON.stringify({add:v})});
   $('mon-add').value=''; loadMonitor();
 }
+
+
+/* ===== 分类规则 ===== */
+async function loadCatRules(){
+  const r=await api('/api/rules?type=classify');
+  $('catrules-text').value=(r&&r.content)||'';
+}
+async function saveCatRules(){
+  const r=await api('/api/rules?type=classify',{method:'POST',body:$('catrules-text').value});
+  toast(r.ok?'✓ 已保存':'✗ '+(r.e||'err'));
+}
+/* ===== 正则测试 ===== */
+function doRegexTest(){
+  const pat=$('rt-pattern').value, txt=$('rt-input').value;
+  const out=$('rt-result');
+  if(!pat){ out.textContent='请输入正则'; out.style.color='var(--warn)'; return; }
+  try{
+    const re=new RegExp(pat);
+    const m=txt.match(re);
+    if(m){
+      out.innerHTML='<span style="color:var(--ok)">✅ 匹配</span> · '+escapeHtml(pat)+' → '+escapeHtml(m[0])+
+        (m.length>1?'<br>捕获组: '+m.slice(1).map((x,i)=>'['+i+']='+escapeHtml(x)).join(', '):'');
+    } else {
+      out.innerHTML='<span style="color:var(--danger)">✗ 不匹配</span>';
+    }
+    out.style.color='var(--txt)';
+  }catch(e){
+    out.textContent='✗ 正则错误: '+e.message; out.style.color='var(--danger)';
+  }
+}
+
 async function monRemove(path){
   await api('/api/monitor',{method:'POST',body:JSON.stringify({remove:path})});
   loadMonitor();
@@ -116,6 +147,7 @@ function goView(v){
   showTab('settings'); showView(v);
   if(v==='monitor'){ loadMonitor(); clearInterval(monTimer); monTimer=setInterval(loadMonitor,5000); }
   else clearInterval(monTimer);
+  if(v==='catrules') loadCatRules();
   if(v==='organize'){ loadCatSwitches(); }
   else if(v==='ai'){ loadAI(); }
   else if(v==='tasks'){ loadTasks(); }
