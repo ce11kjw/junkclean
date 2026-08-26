@@ -61,7 +61,7 @@ document.addEventListener('pointerdown',function(e){
   b.appendChild(ink); setTimeout(()=>ink.remove(),560);
 });
 /* ===== API（KSU 桥 + fetch 双通道） ===== */
-const API=location.protocol==='http:'?'http://127.0.0.1:46780':'';
+const API='http://127.0.0.1:46780'';
 async function api(p,o){
   const url=p.startsWith('/api')?API+p:p;
   if(window.ksu&&typeof window.ksu.exec==='function'){
