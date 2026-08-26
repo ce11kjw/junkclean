@@ -37,6 +37,22 @@ cat > update.json <<EOF
 }
 EOF
 
+# 追加 CHANGELOG（$1 为可选更新说明）
+DESC="${1:-自动构建更新}"
+cat > /tmp/jc-entry.md <<EOF
+## v$VER ($(date +%Y-%m-%d))
+- $DESC
+
+EOF
+python3 -c "
+c = open('CHANGELOG.md').read()
+entry = open('/tmp/jc-entry.md').read()
+idx = c.find('## v')
+c = c[:idx] + entry + c[idx:] if idx >= 0 else '# Changelog\n\n' + entry + c
+open('CHANGELOG.md','w').write(c)
+"
+rm -f /tmp/jc-entry.md
+
 # 提交推送
 git add -A
 git commit -m "release v$VER (versionCode $VC)" >/dev/null
