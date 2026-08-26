@@ -137,7 +137,7 @@
   <!-- 子视图：整理 -->
   <div class="view hidden" id="view-monitor">
     <div class="brand"><button class="iconbtn" onclick="goView('organize')">←</button><div><h1 data-i18n="monitor">📡 自动监控</h1></div></div>
-    <div class="card"><div class="card-h"><span class="ico">📡</span><span data-i18n="monitor_ttl">总控开关</span> <span class="switch" id="mon-on"></span></div>
+    <div class="card"><div class="card-h"><span class="ico">📡</span><span data-i18n="monitor_ttl">总控开关</span> <span class="switch" id="mon-on" onclick="toggleMon()"></span></div>
       <div class="card-b"><div id="mon-status" class="muted" style="font-size:11px"></div></div></div>
     <div class="card"><div class="card-h"><span class="ico">📁</span><span data-i18n="mon_dirs">监控目录</span></div><div class="card-b" id="mon-dirs"></div>
       <div class="setrow"><input id="mon-add" placeholder="/sdcard/..." style="flex:1"><button class="sw on" onclick="monAdd()">+</button></div></div>

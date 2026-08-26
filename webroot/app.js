@@ -87,28 +87,6 @@ function gotoClean(){ showTab('clean'); showView('scan'); }
 function gotoSettings(){ showTab('settings'); showView('settings'); loadCatSwitches(); loadTasks(); }
 
 
-/* ===== 自动监控 ===== */
-monTimer=null;
-async function loadMonitor(){
-  const r=await api('/api/monitor'); if(!r) return;
-  $('mon-on').classList.toggle('on',!!r.on);
-  $('mon-status').textContent=r.on?(T('on')+' · '+(r.log||'').split('\n').filter(Boolean).length+' '+T('items')):T('off');
-  const dirs=(r.dirs||'').split(',').filter(Boolean);
-  $('mon-dirs').innerHTML=dirs.length?dirs.map(d=>'<div class="setrow"><span class="lbl" style="font-family:ui-monospace;font-size:12px">'+d+'</span><button class="sw" onclick="monRemove(\''+d+'\')">'+T('remove')+'</button></div>').join(''):'<div class="empty">'+T('no_dir')+'</div>';
-  $('mon-log').textContent=r.log||'';
-}
-async function monToggle(){
-  const on=!$('mon-on').classList.contains('on');
-  await api('/api/monitor',{method:'POST',body:JSON.stringify({on:on?1:0})});
-  loadMonitor();
-}
-async function monAdd(){
-  const v=$('mon-add').value.trim(); if(!v) return;
-  await api('/api/monitor',{method:'POST',body:JSON.stringify({add:v})});
-  $('mon-add').value=''; loadMonitor();
-}
-
-
 /* ===== 分类规则 ===== */
 async function loadCatRules(){
   const r=await api('/api/rules?type=classify');
