@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/inotify.h>
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -809,7 +810,7 @@ static void api_monitor(int fd, const char *method, const char *q, const char *b
         int wrote_mon=0, wrote_dirs=0;
         if(rd){ char ln[600]; while(fgets(ln,sizeof(ln),rd)){
             if(!strncmp(ln,"monitor=",8)){ wrote_mon=1; if(set_mon>=0) fprintf(wi,"monitor=%d\n",set_mon); else fputs(ln,wi); }
-            else if(!strncmp(ln,"monitor_dirs=",13)){ wrote_dirs=1; if(dirs[0]) fprintf(wi,"monitor_dirs=%s\n",dirs); else fputs(ln,wi); }
+            else if(!strncmp(ln,"monitor_dirs=",13)){ wrote_dirs=1; fprintf(wi,"monitor_dirs=%s\n",dirs); }
             else fputs(ln,wi);
         } fclose(rd); }
         if(!wrote_mon && set_mon>=0) fprintf(wi,"monitor=%d\n",set_mon);
@@ -822,34 +823,127 @@ static void api_monitor(int fd, const char *method, const char *q, const char *b
     http_err(fd,400,"{\"e\":\"method\"}");
 }
 
-/* monitor 轮询线程（30s 扫新文件→classify） */
+
+/* monitor inotify 线程：监听目录变化 → 去抖稳定检测 → classify */
+#define MON_DIRS_MAX 16
+#define MON_PEND_MAX 64
+typedef struct { int wd; char path[512]; int active; } mon_watch_t;
+typedef struct { char path[768]; time_t t; long sz; int n; } mon_pend_t;
+static mon_watch_t mon_watches[MON_DIRS_MAX];
+static mon_pend_t mon_pends[MON_PEND_MAX];
+static pthread_mutex_t mon_lock=PTHREAD_MUTEX_INITIALIZER;
+static int mon_ifd=-1;
+
+/* 从 config 加载监控目录并重建 watch */
+static void mon_reload_watches(void){
+    char cp[600]; snprintf(cp,sizeof(cp),"%s/config.conf",ADR);
+    FILE *f=fopen(cp,"r"); int on=0; char dirs[MON_DIRS_MAX][512]; int nd=0;
+    if(f){ char line[600]; while(fgets(line,sizeof(line),f)){
+        if(!strncmp(line,"monitor=1",9)) on=1;
+        if(!strncmp(line,"monitor_dirs=",13)){ char *v=line+13; v[strcspn(v,"\r\n")]=0; if(nd<MON_DIRS_MAX) snprintf(dirs[nd++],512,"%s",v); }
+    } fclose(f); }
+    if(!on){ nd=0; }
+    /* 移除旧 watch */
+    pthread_mutex_lock(&mon_lock);
+    for(int i=0;i<MON_DIRS_MAX;i++){
+        if(mon_watches[i].active && mon_ifd>=0){
+            inotify_rm_watch(mon_ifd,mon_watches[i].wd);
+            mon_watches[i].active=0;
+        }
+    }
+    /* 添加新 watch */
+    for(int i=0;i<nd;i++){
+        if(strncmp(dirs[i],"/sdcard/",8)&&strncmp(dirs[i],"/storage/emulated/",18)) continue;
+        int wd=inotify_add_watch(mon_ifd,dirs[i],IN_CREATE|IN_MOVED_TO|IN_CLOSE_WRITE);
+        if(wd>=0){
+            for(int j=0;j<MON_DIRS_MAX;j++) if(!mon_watches[j].active){
+                mon_watches[j].active=1; mon_watches[j].wd=wd; snprintf(mon_watches[j].path,512,"%s",dirs[i]); break;
+            }
+            log_msg("INFO","monitor: inotify watch %s (wd=%d)",dirs[i],wd);
+        } else log_msg("WARN","monitor: watch %s failed: %s",dirs[i],strerror(errno));
+    }
+    pthread_mutex_unlock(&mon_lock);
+}
+
+/* 入队待处理（去抖：同路径重置计时） */
+static void mon_pend_add(const char *path){
+    pthread_mutex_lock(&mon_lock);
+    time_t now=time(NULL);
+    for(int i=0;i<MON_PEND_MAX;i++){
+        if(!mon_pends[i].path[0] || !strcmp(mon_pends[i].path,path)){
+            snprintf(mon_pends[i].path,768,"%s",path);
+            mon_pends[i].t=now; mon_pends[i].n++;
+            struct stat st; if(stat(path,&st)==0) mon_pends[i].sz=st.st_size;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mon_lock);
+}
+
+/* 稳定检测：10s 无变化 → 触发 classify */
+static void mon_check_stable(void){
+    char trig[8][768]; int tn=0;
+    pthread_mutex_lock(&mon_lock);
+    time_t now=time(NULL);
+    for(int i=0;i<MON_PEND_MAX;i++){
+        if(!mon_pends[i].path[0]) continue;
+        if(now-mon_pends[i].t < 10) continue; /* 去抖 10s */
+        struct stat st; if(stat(mon_pends[i].path,&st)==0 && st.st_size==mon_pends[i].sz){
+            if(tn<8) snprintf(trig[tn++],768,"%s",mon_pends[i].path);
+        }
+        mon_pends[i].path[0]=0;
+    }
+    pthread_mutex_unlock(&mon_lock);
+    for(int i=0;i<tn;i++){
+        const char *bn=strrchr(trig[i],'/'); bn=bn?bn+1:trig[i];
+        if(bn[0]=='.'||strstr(bn,".part")||strstr(bn,".tmp")) continue;
+        char cl[1100]; snprintf(cl,sizeof(cl),"JC_ADR='%s' MON_FILE='%s' %s %s/cleaner.sh classify",ADR,trig[i],SH,MODDIR);
+        log_msg("INFO","monitor: classify %s",trig[i]);
+        system(cl);
+        char ml[600]; snprintf(ml,sizeof(ml),"%s/monitor.log",ADR);
+        FILE *lf=fopen(ml,"a");
+        if(lf){ time_t t=time(NULL); struct tm*tm=localtime(&t); fprintf(lf,"[%04d-%02d-%02d %02d:%02d:%02d] %s\n",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec,trig[i]); fclose(lf); }
+        char bm[400]; snprintf(bm,sizeof(bm),"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s >/dev/null 2>&1",trig[i]);
+        system(bm);
+    }
+}
+
 static void *monitor_thread(void *p){
     (void)p;
-    char marker[600]; snprintf(marker,sizeof(marker),"%s/.mon_marker",ADR);
+    mon_ifd=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);
+    if(mon_ifd<0){ log_msg("ERR","monitor: inotify_init1: %s",strerror(errno)); return NULL; }
+    mon_reload_watches();
+    char buf[8192] __attribute__((aligned(8)));
+    time_t last_reload=0;
+    log_msg("INFO","monitor: inotify thread running");
     for(;;){
-        char cp[600]; snprintf(cp,sizeof(cp),"%s/config.conf",ADR);
-        FILE *cf=fopen(cp,"r"); int on=0; char dirs[16][512]; int nd=0;
-        if(cf){ char line[600]; while(fgets(line,sizeof(line),cf)){
-            if(!strncmp(line,"monitor=1",9)) on=1;
-            if(!strncmp(line,"monitor_dirs=",13)){ char *v=line+13; v[strcspn(v,"\r\n")]=0; if(nd<16) snprintf(dirs[nd++],512,"%s",v); }
-        } fclose(cf); }
-        if(!on||nd==0){ sleep(30); continue; }
-        for(int i=0;i<nd;i++){ char cmd[1100]; snprintf(cmd,sizeof(cmd),"find %s -maxdepth 1 -type f -newer %s 2>/dev/null | head -20",dirs[i],marker);
-            char tmp[64]; snprintf(tmp,sizeof(tmp),"/tmp/jcmon%d",getpid()); char full[1100]; snprintf(full,sizeof(full),"%s > %s 2>/dev/null",cmd,tmp);
-            system(full); FILE *rf=fopen(tmp,"r"); if(!rf) continue;
-            char line[1024]; while(fgets(line,sizeof(line),rf)){ line[strcspn(line,"\r\n")]=0; if(!*line) continue;
-                const char *bn=strrchr(line,'/'); bn=bn?bn+1:line; if(bn[0]=='.'||strstr(bn,".part")||strstr(bn,".tmp")) continue;
-                char cl[1100]; snprintf(cl,sizeof(cl),"MON_FILE='%s' %s classify",line,SH);
-                log_msg("INFO","monitor: classify %s",line); system(cl);
-                char ml[600]; snprintf(ml,sizeof(ml),"%s/monitor.log",ADR); FILE *lf=fopen(ml,"a");
-                if(lf){ time_t t=time(NULL); struct tm*tm=localtime(&t); fprintf(lf,"[%04d-%02d-%02d %02d:%02d:%02d] %s\n",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec,line); fclose(lf); }
-                /* 媒体库刷新（清理后通知系统） */
-                { char bm[300]; snprintf(bm,sizeof(bm),"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s >/dev/null 2>&1",line); system(bm); }
-            } fclose(rf); unlink(tmp);
+        fd_set rfds; struct timeval tv={2,0};
+        FD_ZERO(&rfds); FD_SET(mon_ifd,&rfds);
+        int r=select(mon_ifd+1,&rfds,NULL,NULL,&tv);
+        if(r>0 && FD_ISSET(mon_ifd,&rfds)){
+            int len=read(mon_ifd,buf,sizeof(buf));
+            char *bp=buf;
+            while(bp<buf+len){
+                struct inotify_event *ev=(struct inotify_event*)bp;
+                if(ev->len>0 && (ev->mask&(IN_CREATE|IN_MOVED_TO|IN_CLOSE_WRITE))){
+                    if(ev->name[0]=='.') { bp+=sizeof(*ev)+ev->len; continue; }
+                    pthread_mutex_lock(&mon_lock);
+                    for(int i=0;i<MON_DIRS_MAX;i++) if(mon_watches[i].active && mon_watches[i].wd==ev->wd){
+                        char full[768]; snprintf(full,sizeof(full),"%s/%s",mon_watches[i].path,ev->name);
+                        pthread_mutex_unlock(&mon_lock);
+                        mon_pend_add(full);
+                        break;
+                    }
+                    pthread_mutex_unlock(&mon_lock);
+                }
+                bp+=sizeof(struct inotify_event)+ev->len;
+            }
         }
-        char t[700]; snprintf(t,sizeof(t),"touch %s",marker); system(t);
-        sleep(30);
+        mon_check_stable();
+        time_t now=time(NULL);
+        if(now-last_reload>=10){ last_reload=now; mon_reload_watches(); } /* 每 10s 同步 config（add/remove 生效）*/
     }
+    close(mon_ifd);
     return NULL;
 }
 
