@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.3.5 (2026-08-26)
+- 📄 README 全面更新至 v3.3.4（功能总览/架构/API/规则格式/监控配置）
+
 ## v3.3.4 (2026-08-26)
 - 🔴 修复严重遗漏：bin/cleand 交叉编译为 ARM64（含 monitor 线程 + api_monitor + 媒体库刷新）
 - 📡 监控整理后自动 am broadcast MEDIA_SCANNER 刷新媒体库
