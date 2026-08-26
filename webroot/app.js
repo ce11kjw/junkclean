@@ -116,10 +116,6 @@ function doRegexTest(){
   }
 }
 
-async function monRemove(path){
-  await api('/api/monitor',{method:'POST',body:JSON.stringify({remove:path})});
-  loadMonitor();
-}
 
 function goView(v){
   showTab('settings'); showView(v);
