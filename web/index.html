@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JunkClean</title>
+<style>
+:root{--bg:#07070c;--bg2:#0b0b14;--card:rgba(255,255,255,.04);--card2:rgba(255,255,255,.06);--border:rgba(255,255,255,.08);--text:#f2f2f7;--muted:#8e8e9e;--accent:#2dd4a7;--accent2:#7c5cff;--warn:#fbbf24;--danger:#fb7185;--radius:24px;--radius-sm:14px;--pad:20px;font:500 15px/1.5 system-ui,-apple-system,sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 0;display:flex;flex-direction:column}
+#app{max-width:480px;margin:0 auto;width:100%;flex:1;padding-bottom:80px}
+
+/* glass card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.32,.72,0,1)}
+.card:hover{background:var(--card2);border-color:rgba(255,255,255,.15)}
+
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:0 4px}
+.hdr-logo{font-size:18px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.hdr-logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr-btn{background:var(--card);border:1px solid var(--border);border-radius:999px;width:36px;height:36px;font-size:16px;cursor:pointer;color:var(--muted);transition:all .3s}
+.hdr-btn:hover{background:var(--card2);color:var(--text)}
+
+/* storage ring */
+.ring-wrap{position:relative;width:160px;height:160px;margin:0 auto 16px}
+.ring{transform:rotate(-90deg);width:100%;height:100%}
+.ring-bg{fill:none;stroke:var(--card2);stroke-width:8}
+.ring-fg{fill:none;stroke:url(#rg);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1.5s cubic-bezier(.32,.72,0,1)}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-center span:first-child{font-size:32px;font-weight:800;font-variant-numeric:tabular-nums}
+.ring-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+.storage-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center}
+.storage-info .storage-row{display:flex;flex-direction:column;gap:2px}
+.storage-row span:first-child{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.storage-row span:last-child{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* button */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:999px;font-weight:600;font-size:15px;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1);-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.96)}
+.btn-primary{width:100%;padding:16px;background:linear-gradient(135deg,var(--accent),#059669);color:#fff;font-size:17px;margin:16px 0;box-shadow:0 4px 24px rgba(45,212,167,.25)}
+.btn-primary:hover{box-shadow:0 6px 32px rgba(45,212,167,.35);transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.97)}
+.btn-clean{background:linear-gradient(135deg,var(--danger),#e11d48);color:#fff;padding:12px 20px;font-size:14px}
+.btn-danger{background:linear-gradient(135deg,var(--danger),#e11d48);color:#fff;padding:14px 28px;font-size:15px}
+.btn-secondary{background:var(--card);color:var(--muted);padding:14px 28px;font-size:15px;border:1px solid var(--border)}
+.btn-secondary:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+
+/* progress */
+.progress-card{margin:16px 0;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.progress-bar{height:4px;background:var(--card2);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;width:30%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;animation:pulse 1.2s ease-in-out infinite}
+.progress-text{font-size:13px;font-weight:600;color:var(--accent)}
+.progress-path{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* results */
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 12px;display:flex;justify-content:space-between}
+.cat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad);margin-bottom:12px;cursor:pointer;transition:all .3s}
+.cat-card:hover{border-color:rgba(255,255,255,.15)}
+.cat-hdr{display:flex;align-items:center;gap:12px}
+.cat-icon{font-size:24px;width:32px;text-align:center}
+.cat-info{flex:1}
+.cat-name{font-weight:600;font-size:15px}
+.cat-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.cat-size{font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.cat-check{margin-left:8px;width:20px;height:20px;accent-color:var(--accent);cursor:pointer}
+.cat-items{display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;flex-direction:column;gap:6px}
+.cat-items.open{display:flex}
+.item-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;font-size:13px;transition:background .2s}
+.item-row:hover{background:var(--card2)}
+.item-row .item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-row .item-size{color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.item-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+
+/* bottom bar */
+.bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(7,7,12,.85);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:12px}
+.select-all{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.select-all input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+
+/* overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:end;justify-content:center;z-index:200;padding:20px;animation:fadeIn .3s}
+.overlay-sheet{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:440px;animation:slideUp .4s cubic-bezier(.32,.72,0,1)}
+.overlay-sheet h3{font-size:18px;margin-bottom:12px}
+.overlay-sheet p{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6}
+.overlay-actions{display:flex;gap:12px;justify-content:flex-end}
+
+/* drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:360px;background:var(--bg2);border-left:1px solid var(--border);z-index:300;padding:24px;overflow-y:auto;animation:slideRight .3s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;gap:16px}
+.drawer h2{font-size:18px;margin-bottom:8px}
+.drawer label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.drawer textarea,.drawer input{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical}
+.drawer textarea:focus,.drawer input:focus{outline:none;border-color:var(--accent)}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299}
+.drawer .close-btn{position:absolute;top:16px;right:16px;background:var(--card);border:1px solid var(--border);border-radius:999px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:16px}
+.drawer .log-area{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:11px;font-family:monospace;color:var(--muted);max-height:200px;overflow-y:auto;white-space:pre-wrap}
+
+/* utilities */
+.badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:var(--card2);color:var(--muted)}
+.badge-safe{background:rgba(45,212,167,.15);color:var(--accent)}
+.badge-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+.badge-careful{background:rgba(251,113,133,.15);color:var(--danger)}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2dd4a7"/><stop offset="100%" stop-color="#7c5cff"/></linearGradient>
+</defs></svg>
+<div id="app">
+  <header class="hdr">
+    <div class="hdr-logo">🧹<span>JunkClean</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="badge" id="rootBadge">root</span>
+      <button class="hdr-btn" id="settingsBtn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <section class="card" id="storageCard">
+    <div class="ring-wrap">
+      <svg viewBox="0 0 160 160" class="ring">
+        <circle class="ring-bg" cx="80" cy="80" r="68"></circle>
+        <circle class="ring-fg" id="ringFg" cx="80" cy="80" r="68" stroke-dasharray="427" stroke-dashoffset="427"></circle>
+      </svg>
+      <div class="ring-center"><span id="usedPct">--</span><span class="ring-label">已用</span></div>
+    </div>
+    <div class="storage-info">
+      <div class="storage-row"><span>总量</span><span id="totalDisk">--</span></div>
+      <div class="storage-row"><span>已用</span><span id="usedDisk">--</span></div>
+      <div class="storage-row"><span>可用</span><span id="freeDisk">--</span></div>
+    </div>
+  </section>
+
+  <button class="btn btn-primary" id="scanBtn">🔍&nbsp;开始扫描</button>
+
+  <section class="card progress-card" id="progressCard" hidden>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">扫描中...</div>
+    <div class="progress-path" id="progressPath">准备中</div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="section-title"><span>扫描结果</span><span id="totalSize" style="color:var(--accent)"></span></div>
+    <div id="catList"></div>
+  </section>
+</div>
+
+<div class="bottom-bar" id="bottomBar" hidden>
+  <label class="select-all"><input type="checkbox" id="selectAll">全选</label>
+  <button class="btn btn-clean" id="cleanBtn">清理 (0 B)</button>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="overlay-sheet">
+    <h3>确认清理</h3>
+    <p id="confirmSummary"></p>
+    <div class="overlay-actions">
+      <button class="btn btn-secondary" id="cancelBtn">取消</button>
+      <button class="btn btn-danger" id="confirmBtn">💥 确认清理</button>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<div class="drawer" id="drawer" hidden>
+  <button class="close-btn" id="closeDrawer">✕</button>
+  <h2>设置</h2>
+  <label>白名单包名（每行一个，跳过不扫描）
+    <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
+  </label>
+  <label>AI 端点
+    <input id="aiEndpoint" placeholder="https://api.openai.com/v1">
+  </label>
+  <label>AI Key
+    <input id="aiKey" type="password" placeholder="sk-...">
+  </label>
+  <label>AI 模型
+    <input id="aiModel" placeholder="gpt-4o-mini">
+  </label>
+  <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
+  <h2 style="margin-top:8px">更新</h2>
+  <button class="btn btn-secondary" id="checkUpdateBtn" style="width:100%">🔍 检查更新</button>
+  <div id="updateResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
+  <h2 style="margin-top:8px">操作日志</h2>
+  <div class="log-area" id="logArea">加载中...</div>
+</div>
+<script>
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const fmt = b => {
+  if (b >= 1<<30) return (b/(1<<30)).toFixed(1)+' GB';
+  if (b >= 1<<20) return (b/(1<<20)).toFixed(1)+' MB';
+  if (b >= 1<<10) return (b/(1<<10)).toFixed(0)+' KB';
+  return b+' B';
+};
+const api = async (path, opts={}) => {
+  const r = await fetch('/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
+  return r.json();
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---------- state ----------
+let state = { cats: [], selected: new Set() };
+
+// ---------- storage ring ----------
+function renderRing(pct) {
+  const C = 2 * Math.PI * 68; // 427.26
+  $('ringFg').style.strokeDashoffset = C * (1 - Math.min(pct,100)/100);
+  $('usedPct').textContent = Math.round(pct) + '%';
+}
+function renderDisk(d) {
+  if (!d) return;
+  $('totalDisk').textContent = fmt(d.total);
+  $('usedDisk').textContent = fmt(d.used);
+  $('freeDisk').textContent = fmt(d.free);
+  renderRing(d.percent);
+}
+
+// ---------- status ----------
+async function refreshStatus() {
+  const s = await api('/status');
+  if (s.disk) renderDisk(s.disk);
+  $('rootBadge').textContent = s.root ? 'root' : '⚠ 非root';
+  $('rootBadge').className = 'badge ' + (s.root ? 'badge-safe' : 'badge-warn');
+  return s;
+}
+</script>
+<script>
+// ---------- scan flow ----------
+let scanTimer = null;
+async function startScan() {
+  $('scanBtn').disabled = true;
+  $('scanBtn').style.opacity = .5;
+  $('progressCard').hidden = false;
+  $('results').hidden = true;
+  $('bottomBar').hidden = true;
+  $('progressFill').style.width = '0%';
+  $('progressText').textContent = '扫描中...';
+  await api('/scan', {method:'POST', body:'{}'});
+  pollProgress();
+}
+async function pollProgress() {
+  const s = await api('/status');
+  const sc = s.scan;
+  if (sc.done) { finishScan(); return; }
+  $('progressPath').textContent = sc.curPath || '...';
+  $('progressText').textContent = `已发现 ${fmt(sc.bytes)} · 共 ${sc.found} 项`;
+  scanTimer = setTimeout(pollProgress, 700);
+}
+async function finishScan() {
+  clearTimeout(scanTimer);
+  $('scanBtn').disabled = false;
+  $('scanBtn').style.opacity = 1;
+  $('progressCard').hidden = true;
+  const res = await api('/result');
+  state.cats = res.categories || [];
+  state.selected = new Set();
+  renderResults();
+  $('results').hidden = false;
+  $('bottomBar').hidden = state.cats.length === 0;
+  $('totalSize').textContent = fmt(res.total);
+}
+
+// ---------- render results ----------
+function renderResults() {
+  const list = $('catList');
+  list.innerHTML = '';
+  state.cats.forEach((cat, ci) => {
+    const card = document.createElement('div');
+    card.className = 'cat-card';
+    const careful = cat.careful ? '<span class="badge badge-careful">谨慎</span>' : '';
+    card.innerHTML = `
+      <div class="cat-hdr" data-ci="${ci}">
+        <div class="cat-icon">${cat.icon}</div>
+        <div class="cat-info">
+          <div class="cat-name">${esc(cat.name)} ${careful}</div>
+          <div class="cat-desc">${esc(cat.desc)}</div>
+        </div>
+        <div class="cat-size">${fmt(cat.total)}</div>
+        <input type="checkbox" class="cat-check" data-ci="${ci}" ${cat.careful?'':'checked'}>
+      </div>
+      <div class="cat-items" id="items-${ci}"></div>`;
+    const itemsBox = card.querySelector('.cat-items');
+    cat.items.forEach((it, ii) => {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<input type="checkbox" data-key="${ci}:${ii}" ${cat.careful?'':'checked'}><span class="item-name">${esc(it.name)}</span><span class="item-size">${fmt(it.size)}</span>`;
+      itemsBox.appendChild(row);
+    });
+    card.querySelector('.cat-hdr').addEventListener('click', e => {
+      if (e.target.type === 'checkbox') return;
+      itemsBox.classList.toggle('open');
+    });
+    card.querySelector('.cat-check').addEventListener('change', e => {
+      const cc = e.target;
+      itemsBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = cc.checked);
+      syncSelected();
+    });
+    itemsBox.addEventListener('change', e => {
+      if (e.target.type === 'checkbox') {
+        const all = [...itemsBox.querySelectorAll('input[type=checkbox]')];
+        const catCheck = card.querySelector('.cat-check');
+        catCheck.checked = all.every(c => c.checked);
+        catCheck.indeterminate = !catCheck.checked && all.some(c => c.checked);
+        syncSelected();
+      }
+    });
+    list.appendChild(card);
+  });
+  syncSelected();
+}
+
+function syncSelected() {
+  state.selected = new Set();
+  document.querySelectorAll('.item-row input:checked').forEach(cb => {
+    state.selected.add(cb.dataset.key);
+  });
+  const total = [...state.selected].reduce((sum, k) => {
+    const [ci, ii] = k.split(':').map(Number);
+    return sum + state.cats[ci].items[ii].size;
+  }, 0);
+  $('cleanBtn').textContent = `清理 (${fmt(total)})`;
+  $('cleanBtn').disabled = total === 0;
+  const all = document.querySelectorAll('.item-row input').length;
+  const checked = document.querySelectorAll('.item-row input:checked').length;
+  $('selectAll').checked = all > 0 && checked === all;
+  $('selectAll').indeterminate = checked > 0 && checked < all;
+}
+
+// ---------- clean flow ----------
+async function doClean() {
+  const ids = [...state.selected].map(k => {
+    const [ci, ii] = k.split(':').map(Number);
+    return state.cats[ci].items[ii].id;
+  });
+  const total = [...state.selected].reduce((sum, k) => {
+    const [ci, ii] = k.split(':').map(Number);
+    return sum + state.cats[ci].items[ii].size;
+  }, 0);
+  $('confirmSummary').textContent = `将清理 ${ids.length} 个目标，预计释放 ${fmt(total)}。此操作不可恢复！`;
+  $('overlay').hidden = false;
+  $('confirmBtn').onclick = async () => {
+    $('overlay').hidden = true;
+    const btn = $('cleanBtn');
+    btn.disabled = true;
+    btn.textContent = '清理中...';
+    const r = await api('/clean', {method:'POST', body: JSON.stringify({ids})});
+    btn.textContent = `已释放 ${fmt(r.freed || 0)} ✓`;
+    setTimeout(() => { btn.textContent = '清理 (0 B)'; btn.disabled = true; }, 2500);
+    $('bottomBar').hidden = true;
+    $('results').hidden = true;
+    refreshStatus();
+  };
+}
+$('cancelBtn').onclick = () => $('overlay').hidden = true;
+$('cleanBtn').onclick = doClean;
+$('selectAll').onchange = e => {
+  document.querySelectorAll('.item-row input').forEach(cb => cb.checked = e.target.checked);
+  syncSelected();
+};
+
+// ---------- settings drawer ----------
+$('settingsBtn').onclick = async () => {
+  const c = await api('/config');
+  $('wlInput').value = (c.whitelist||[]).join('\n');
+  $('aiEndpoint').value = c.aiEndpoint||'';
+  $('aiKey').value = c.aiKey||'';
+  $('aiModel').value = c.aiModel||'';
+  const lg = await api('/logs');
+  $('logArea').textContent = (lg.logs||[]).join('\n') || '暂无日志';
+  $('drawer').hidden = false;
+  $('drawerBackdrop').hidden = false;
+};
+$('closeDrawer').onclick = $('drawerBackdrop').onclick = () => {
+  $('drawer').hidden = true;
+  $('drawerBackdrop').hidden = true;
+};
+$('checkUpdateBtn').onclick = async () => {
+  const el = $('updateResult');
+  el.textContent = '检查中...';
+  const r = await api('/update');
+  if (r.error) { el.textContent = '❌ ' + r.error; return; }
+  if (r.hasUpdate) {
+    el.innerHTML = `✅ 发现新版本 <b style="color:var(--accent)">v${r.remoteVersion}</b>（当前 v${r.currentVersion}）<br>${esc(r.changelog)}<br><a href="${r.zipUrl}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">⬇ 下载更新</a>`;
+  } else {
+    el.textContent = `✅ 已是最新版本 v${r.currentVersion}（${r.currentCode}）`;
+  }
+};
+$('saveCfgBtn').onclick = async () => {
+  await api('/config', {method:'POST', body: JSON.stringify({
+    whitelist: $('wlInput').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    aiEndpoint: $('aiEndpoint').value.trim(),
+    aiKey: $('aiKey').value.trim(),
+    aiModel: $('aiModel').value.trim()
+  })});
+  alert('已保存 ✓');
+};
+
+// ---------- init ----------
+$('scanBtn').onclick = startScan;
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>

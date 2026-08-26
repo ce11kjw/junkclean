@@ -1,0 +1,685 @@
+// JunkClean v3.0 - Android garbage cleaner (Go single binary, embedded WebUI)
+package main
+
+import (
+	"bufio"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+)
+
+//go:embed web
+var webFS embed.FS
+
+const (
+	ver      = "3.5.1"
+	verCode  = 351
+	port     = "46780"
+	stateDir = "/data/adb/junkclean"
+	logFile  = stateDir + "/junkclean.log"
+	stateF   = stateDir + "/state.json"
+	confF    = stateDir + "/config.json"
+)
+
+// ----- models -----
+
+type JunkFile struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+}
+
+type JunkItem struct {
+	ID    string     `json:"id"`
+	Path  string     `json:"path"`
+	Name  string     `json:"name"`
+	Size  int64      `json:"size"`
+	Count int        `json:"count"`
+	Files []JunkFile `json:"files,omitempty"`
+}
+
+type Category struct {
+	ID      string     `json:"id"`
+	Name    string     `json:"name"`
+	Icon    string     `json:"icon"`
+	Desc    string     `json:"desc"`
+	Careful bool       `json:"careful"`
+	Items   []JunkItem `json:"items"`
+	Total   int64      `json:"total"`
+}
+
+type Config struct {
+	Whitelist  []string `json:"whitelist"`
+	AIEndpoint string   `json:"aiEndpoint"`
+	AIKey      string   `json:"aiKey"`
+	AIModel    string   `json:"aiModel"`
+}
+
+type ScanState struct {
+	mu         sync.Mutex
+	running    bool
+	stage      string
+	curPath    string
+	found      int64
+	bytes      int64
+	categories []Category
+	total      int64
+	done       bool
+}
+
+var (
+	scanSt     = &ScanState{}
+	cfg        = Config{}
+	cfgLock    sync.RWMutex
+	whitelistM = map[string]bool{}
+)
+
+// ----- scan rules -----
+
+type scanRule struct {
+	id      string
+	name    string
+	icon    string
+	desc    string
+	careful bool
+	dirs    []string
+	subDirs []string
+}
+
+var rules = []scanRule{
+	{"cache", "应用缓存", "📦", "各应用 cache / code_cache，清理后自动重建", false, nil,
+		[]string{"cache", "code_cache"}},
+	{"webview", "WebView 缓存", "🌐", "WebView 渲染缓存，可安全清理", false, nil,
+		[]string{"app_webview"}},
+	{"logs", "系统日志", "📋", "崩溃、ANR、dropbox 等诊断日志", false,
+		[]string{"/data/tombstones", "/data/anr", "/data/system/dropbox",
+			"/data/log", "/data/logcat", "/data/system/package_cache"}, nil},
+	{"temp", "临时文件", "🗑️", "系统临时目录", false,
+		[]string{"/data/local/tmp", "/cache", "/data/cache"}, nil},
+	{"remnant", "应用残留", "🧩",
+		"no_backup 与数据库日志文件（谨慎，可能影响部分应用状态）", true, nil,
+		[]string{"no_backup"}},
+}
+
+var pkgRoots = []string{"/data/data", "/data/user_de/0"}
+var forbidden = []string{"/system", "/vendor", "/product", "/apex", "/data/adb", "/data/app"}
+
+func isForbidden(p string) bool {
+	for _, f := range forbidden {
+		if p == f || strings.HasPrefix(p, f+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// ----- helpers -----
+
+func dirSize(root string) (int64, int) {
+	var sz int64
+	var n int
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		sz += info.Size()
+		n++
+		return nil
+	})
+	return sz, n
+}
+
+func diskInfo(p string) map[string]any {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(p, &st); err != nil {
+		return nil
+	}
+	total := st.Blocks * uint64(st.Bsize)
+	free := st.Bavail * uint64(st.Bsize)
+	used := total - free
+	pct := float64(used) / float64(total) * 100
+	return map[string]any{"total": total, "used": used, "free": free, "percent": pct}
+}
+
+func fmtSize(b int64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(b)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
+}
+
+// ----- scan engine -----
+
+func (s *ScanState) setPath(p string) {
+	s.mu.Lock()
+	s.curPath = p
+	s.mu.Unlock()
+}
+
+func (s *ScanState) addFound(n int, b int64) {
+	s.mu.Lock()
+	s.found += int64(n)
+	s.bytes += b
+	s.mu.Unlock()
+}
+
+func forEachPkg(fn func(pkg string)) {
+	for _, root := range pkgRoots {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() || whitelistM[e.Name()] {
+				continue
+			}
+			fn(filepath.Join(root, e.Name()))
+		}
+	}
+}
+
+func (s *ScanState) scanSubDir(cat *Category, ruleID, sub string) {
+	forEachPkg(func(pkg string) {
+		p := filepath.Join(pkg, sub)
+		s.setPath(p)
+		if isForbidden(p) {
+			return
+		}
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			sz, n := dirSize(p)
+			if sz > 0 {
+				cat.Items = append(cat.Items, JunkItem{
+					ID: ruleID + ":" + p, Path: p,
+					Name: filepath.Base(pkg), Size: sz, Count: n,
+				})
+				s.addFound(n, sz)
+			}
+		}
+	})
+}
+
+func (s *ScanState) scanJournals(cat *Category) {
+	forEachPkg(func(pkg string) {
+		dbDir := filepath.Join(pkg, "databases")
+		s.setPath(dbDir)
+		var files []JunkFile
+		var sz int64
+		filepath.WalkDir(dbDir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			name := d.Name()
+			if strings.HasSuffix(name, ".log") || strings.HasSuffix(name, "-journal") ||
+				strings.HasSuffix(name, "-wal") || strings.HasSuffix(name, "-shm") {
+				info, _ := d.Info()
+				if info != nil {
+					sz += info.Size()
+					files = append(files, JunkFile{Path: p, Size: info.Size()})
+				}
+			}
+			return nil
+		})
+		if sz > 0 {
+			cat.Items = append(cat.Items, JunkItem{
+				ID: "remnant:" + dbDir, Path: dbDir,
+				Name: filepath.Base(pkg) + " DB logs", Size: sz,
+				Count: len(files), Files: files,
+			})
+			s.addFound(len(files), sz)
+		}
+	})
+}
+
+
+
+func (s *ScanState) run() {
+	s.mu.Lock()
+	if s.running {
+		s.mu.Unlock()
+		return
+	}
+	s.running, s.stage, s.done = true, "walking", false
+	s.categories, s.total, s.found, s.bytes = nil, 0, 0, 0
+	s.mu.Unlock()
+
+	var cats []Category
+	var total int64
+	for _, r := range rules {
+		cat := Category{ID: r.id, Name: r.name, Icon: r.icon,
+			Desc: r.desc, Careful: r.careful}
+		for _, d := range r.dirs {
+			s.setPath(d)
+			if isForbidden(d) {
+				continue
+			}
+			if st, err := os.Stat(d); err == nil && st.IsDir() {
+				sz, n := dirSize(d)
+				if sz > 0 {
+					cat.Items = append(cat.Items, JunkItem{
+						ID: r.id + ":" + d, Path: d, Name: d,
+						Size: sz, Count: n,
+					})
+					s.addFound(n, sz)
+				}
+			}
+		}
+		for _, sub := range r.subDirs {
+			s.scanSubDir(&cat, r.id, sub)
+		}
+		if r.id == "remnant" {
+			s.scanJournals(&cat)
+		}
+		for i := range cat.Items {
+			cat.Total += cat.Items[i].Size
+		}
+		total += cat.Total
+		if len(cat.Items) > 0 {
+			sort.Slice(cat.Items, func(a, b int) bool {
+				return cat.Items[a].Size > cat.Items[b].Size
+			})
+			cats = append(cats, cat)
+		}
+	}
+
+	s.mu.Lock()
+	s.categories, s.total = cats, total
+	s.stage, s.done, s.running = "done", true, false
+	s.mu.Unlock()
+	saveState()
+	logLine("scan done: "+fmt.Sprintf("%d categories, %s", len(cats), fmtSize(total)))
+}
+
+// ----- clean -----
+
+func (s *ScanState) clean(ids []string) (int64, []string) {
+	var freed int64
+	var errs []string
+	idx := map[string]JunkItem{}
+	for _, c := range s.categories {
+		for _, it := range c.Items {
+			idx[it.ID] = it
+		}
+	}
+	for _, id := range ids {
+		it, ok := idx[id]
+		if !ok {
+			errs = append(errs, "unknown: "+id)
+			continue
+		}
+		if len(it.Files) > 0 {
+			for _, f := range it.Files {
+				if err := os.Remove(f.Path); err == nil {
+					freed += f.Size
+				} else {
+					errs = append(errs, f.Path)
+				}
+			}
+		} else if err := os.RemoveAll(it.Path); err == nil {
+			freed += it.Size
+		} else {
+			errs = append(errs, it.Path+": "+err.Error())
+		}
+		logLine("clean " + it.Path + " (" + fmtSize(it.Size) + ")")
+	}
+	return freed, errs
+}
+
+// ----- state / config / log -----
+
+func saveState() {
+	data, _ := json.Marshal(scanSt.categories)
+	os.WriteFile(stateF, data, 0600)
+}
+
+func loadState() {
+	data, err := os.ReadFile(stateF)
+	if err != nil {
+		return
+	}
+	var cats []Category
+	if json.Unmarshal(data, &cats) != nil {
+		return
+	}
+	scanSt.mu.Lock()
+	scanSt.categories, scanSt.done = cats, true
+	scanSt.total = 0
+	for _, c := range cats {
+		scanSt.total += c.Total
+	}
+	scanSt.mu.Unlock()
+}
+
+func loadConfig() {
+	data, err := os.ReadFile(confF)
+	if err == nil {
+		json.Unmarshal(data, &cfg)
+	}
+	cfgLock.Lock()
+	whitelistM = map[string]bool{}
+	for _, p := range cfg.Whitelist {
+		whitelistM[p] = true
+	}
+	cfgLock.Unlock()
+}
+
+func saveConfig() {
+	os.WriteFile(confF, mustJSON(cfg), 0600)
+}
+
+func mustJSON(v any) []byte {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	return b
+}
+
+func logLine(s string) {
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s %s\n", time.Now().Format("2006-01-02 15:04:05"), s)
+}
+
+func tailLog(n int) []string {
+	f, err := os.Open(logFile)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	var lines []string
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines
+}
+
+// ----- HTTP handlers -----
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(v)
+}
+
+func apiStatus(w http.ResponseWriter, r *http.Request) {
+	scanSt.mu.Lock()
+	resp := map[string]any{
+		"version": ver,
+		"root":    os.Geteuid() == 0,
+		"disk":    diskInfo("/data"),
+		"scan": map[string]any{
+			"running": scanSt.running,
+			"stage":   scanSt.stage,
+			"curPath": scanSt.curPath,
+			"found":   scanSt.found,
+			"bytes":   scanSt.bytes,
+			"done":    scanSt.done,
+			"total":   scanSt.total,
+		},
+	}
+	scanSt.mu.Unlock()
+	writeJSON(w, 200, resp)
+}
+
+func apiScan(w http.ResponseWriter, r *http.Request) {
+	scanSt.mu.Lock()
+	running := scanSt.running
+	scanSt.mu.Unlock()
+	if running {
+		writeJSON(w, 409, map[string]string{"error": "scan already running"})
+		return
+	}
+	go scanSt.run()
+	writeJSON(w, 200, map[string]string{"status": "started"})
+}
+
+func apiResult(w http.ResponseWriter, r *http.Request) {
+	scanSt.mu.Lock()
+	defer scanSt.mu.Unlock()
+	writeJSON(w, 200, map[string]any{
+		"categories": scanSt.categories,
+		"total":      scanSt.total,
+		"done":       scanSt.done,
+	})
+}
+
+func apiClean(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "bad body"})
+		return
+	}
+	scanSt.mu.Lock()
+	if !scanSt.done {
+		scanSt.mu.Unlock()
+		writeJSON(w, 409, map[string]string{"error": "scan not done"})
+		return
+	}
+	freed, errs := scanSt.clean(req.IDs)
+	scanSt.done, scanSt.categories = false, nil
+	scanSt.mu.Unlock()
+	saveState()
+	logLine(fmt.Sprintf("clean done: freed %s", fmtSize(freed)))
+	writeJSON(w, 200, map[string]any{"freed": freed, "errors": errs})
+}
+
+func apiConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		cfgLock.RLock()
+		c := cfg
+		cfgLock.RUnlock()
+		writeJSON(w, 200, c)
+	case http.MethodPost:
+		var nc Config
+		if err := json.NewDecoder(r.Body).Decode(&nc); err != nil {
+			writeJSON(w, 400, map[string]string{"error": "bad body"})
+			return
+		}
+		cfgLock.Lock()
+		cfg = nc
+		whitelistM = map[string]bool{}
+		for _, p := range nc.Whitelist {
+			whitelistM[p] = true
+		}
+		cfgLock.Unlock()
+		saveConfig()
+		writeJSON(w, 200, map[string]string{"status": "ok"})
+	default:
+		writeJSON(w, 405, map[string]string{"error": "GET/POST"})
+	}
+}
+
+func apiLogs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"logs": tailLog(300)})
+}
+
+// ----- OTA update check (APatch/KSU/Magisk 均无按钮，WebUI 自建) -----
+
+func apiUpdate(w http.ResponseWriter, r *http.Request) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json")
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": "网络错误: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	var up struct {
+		Version     string `json:"version"`
+		VersionCode int    `json:"versionCode"`
+		ZipURL      string `json:"zipUrl"`
+		Changelog   string `json:"changelog"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&up); err != nil {
+		writeJSON(w, 502, map[string]string{"error": "update.json 解析失败"})
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"currentVersion": ver,
+		"currentCode":    verCode,
+		"remoteVersion":  up.Version,
+		"remoteCode":     up.VersionCode,
+		"zipUrl":         up.ZipURL,
+		"changelog":      up.Changelog,
+		"hasUpdate":      up.VersionCode > verCode,
+	})
+}
+
+// ----- AI analysis (optional) -----
+
+func apiAI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	cfgLock.RLock()
+	c := cfg
+	cfgLock.RUnlock()
+	if c.AIEndpoint == "" || c.AIKey == "" {
+		writeJSON(w, 400, map[string]string{"error": "AI not configured"})
+		return
+	}
+	var req struct {
+		Summary string `json:"summary"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	prompt := "你是存储清理专家。分析以下垃圾清理扫描结果摘要，给出简短的清理建议（中文，100字内），标注哪些必须清、哪些建议保留：\n" + req.Summary
+	body, _ := json.Marshal(map[string]any{
+		"model": orDefault(c.AIModel, "gpt-4o-mini"),
+		"messages": []map[string]string{
+			{"role": "system", "content": "你是一名专业的 Android 存储清理顾问。"},
+			{"role": "user", "content": prompt},
+		},
+		"max_tokens": 300,
+	})
+	httpReq, err := http.NewRequest("POST", c.AIEndpoint+"/chat/completions", strings.NewReader(string(body)))
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.AIKey)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	json.NewDecoder(resp.Body).Decode(&out)
+	text := ""
+	if len(out.Choices) > 0 {
+		text = out.Choices[0].Message.Content
+	}
+	writeJSON(w, 200, map[string]any{"advice": text})
+}
+
+func orDefault(s, d string) string {
+	if s == "" {
+		return d
+	}
+	return s
+}
+
+// ----- CLI -----
+
+func cliScan() int {
+	scanSt.run()
+	scanSt.mu.Lock()
+	defer scanSt.mu.Unlock()
+	b, _ := json.MarshalIndent(scanSt.categories, "", "  ")
+	fmt.Println(string(b))
+	fmt.Printf("TOTAL: %s\n", fmtSize(scanSt.total))
+	return 0
+}
+
+func cliClean(ids []string) int {
+	if len(ids) == 0 {
+		fmt.Println("usage: junkclean clean <id1,id2,...>")
+		return 1
+	}
+	loadState()
+	scanSt.mu.Lock()
+	freed, errs := scanSt.clean(ids)
+	scanSt.done = false
+	scanSt.mu.Unlock()
+	fmt.Printf("freed %s\n", fmtSize(freed))
+	for _, e := range errs {
+		fmt.Println("ERR", e)
+	}
+	return 0
+}
+
+// ----- main -----
+
+func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "scan":
+			os.Exit(cliScan())
+		case "clean":
+			os.Exit(cliClean(strings.Split(strings.Join(os.Args[2:], ","), ",")))
+		case "daemon", "serve":
+			// fallthrough to daemon
+		default:
+			fmt.Println("usage: junkclean [scan|clean <ids>|daemon]")
+			os.Exit(1)
+		}
+	}
+	os.MkdirAll(stateDir, 0700)
+	loadConfig()
+	webSub, err := fs.Sub(webFS, "web")
+	if err != nil {
+		log.Fatal(err)
+	}
+	http.Handle("/", http.FileServer(http.FS(webSub)))
+	http.HandleFunc("/api/status", apiStatus)
+	http.HandleFunc("/api/scan", apiScan)
+	http.HandleFunc("/api/result", apiResult)
+	http.HandleFunc("/api/clean", apiClean)
+	http.HandleFunc("/api/config", apiConfig)
+	http.HandleFunc("/api/logs", apiLogs)
+	http.HandleFunc("/api/ai", apiAI)
+	http.HandleFunc("/api/update", apiUpdate)
+	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
+	log.Fatal(http.ListenAndServe("127.0.0.1:"+port, nil))
+}

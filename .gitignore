@@ -1,5 +1,1 @@
-*.bak
-*.old
-webroot/_alpine.js
-icon/*.png
-JunkClean-*.zip
+build/

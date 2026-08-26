@@ -1,6 +1,6 @@
 {
-  "version": "v3.3.7",
-  "versionCode": 337,
-  "zipUrl": "https://github.com/ce11kjw/junkclean/releases/download/v3.3.7/JunkClean-v3.3.7.zip",
+  "version": "3.5.1",
+  "versionCode": 351,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v3.5.1.zip",
   "changelog": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/CHANGELOG.md"
 }

@@ -1,4 +1,0 @@
-#!/system/bin/sh
-# JunkClean 手动命令入口: junkclean <clean|scan|classify|duplicate|fstrim|rescan|ai|status> [args]
-DIR=$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")
-exec /system/bin/sh "$DIR/../cleaner.sh" "$@"
