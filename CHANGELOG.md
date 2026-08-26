@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.3.4 (2026-08-26)
+- 🔴 修复严重遗漏：bin/cleand 交叉编译为 ARM64（含 monitor 线程 + api_monitor + 媒体库刷新）
+- 📡 监控整理后自动 am broadcast MEDIA_SCANNER 刷新媒体库
+- 📄 README 更新至 v3.3
+
 ## v3.3.1 (2026-08-25)
 - 🚫 @exclude 黑名单（classify.list 支持 @exclude=*.part 排除，两处 find 均生效）
 - 📂 分类规则页（编辑 @src/@dest/@exclude/@map 规则 + 保存）
