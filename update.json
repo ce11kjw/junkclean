@@ -1,6 +1,6 @@
 {
-  "version": "4.0.0",
-  "versionCode": 400,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.0.0.zip",
-  "changelog": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/CHANGELOG.md"
+  "version": "4.2.1",
+  "versionCode": 421,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.2.1.zip",
+  "changelog": "v4.2.1 自动构建更新"
 }
