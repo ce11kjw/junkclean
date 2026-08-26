@@ -843,6 +843,8 @@ static void *monitor_thread(void *p){
                 log_msg("INFO","monitor: classify %s",line); system(cl);
                 char ml[600]; snprintf(ml,sizeof(ml),"%s/monitor.log",ADR); FILE *lf=fopen(ml,"a");
                 if(lf){ time_t t=time(NULL); struct tm*tm=localtime(&t); fprintf(lf,"[%04d-%02d-%02d %02d:%02d:%02d] %s\n",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec,line); fclose(lf); }
+                /* 媒体库刷新（清理后通知系统） */
+                { char bm[300]; snprintf(bm,sizeof(bm),"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s >/dev/null 2>&1",line); system(bm); }
             } fclose(rf); unlink(tmp);
         }
         char t[700]; snprintf(t,sizeof(t),"touch %s",marker); system(t);
