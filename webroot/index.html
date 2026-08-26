@@ -145,6 +145,13 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-grad
 @keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
 
+.bar-hero{text-align:center;padding:6px 0 2px}
+.bar-num{font-size:42px;font-weight:800;background:linear-gradient(135deg,#fff,#2dd4a7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.bar-label{font-size:11px;color:#5c5c6a;text-transform:uppercase;letter-spacing:.16em;margin-top:2px}
+.bar-track{height:16px;border-radius:99px;background:#ffffff12;overflow:hidden;box-shadow:inset 0 2px 6px rgba(0,0,0,.45);margin:14px 0}
+.bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#2dd4a7,#7c5cff);border-radius:99px;box-shadow:0 0 18px #2dd4a766;transition:width .7s cubic-bezier(.32,.72,0,1)}
+.bar-meta{display:flex;justify-content:space-between;font-size:12px;color:#9a9aa8}
+
 </style>
 </head>
 <body>
@@ -161,18 +168,16 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-grad
   </header>
 
   <section class="card" id="storageCard">
-    <div class="ring-wrap">
-      <svg viewBox="0 0 160 160" class="ring">
-        <circle class="ring-bg" cx="80" cy="80" r="68"></circle>
-        <circle class="ring-fg" id="ringFg" cx="80" cy="80" r="68" stroke-dasharray="427" stroke-dashoffset="427"></circle>
-        <g id="ringTicks" stroke="rgba(255,255,255,.1)" stroke-width="1.5"></g>
-      </svg>
-      <div class="ring-center"><span id="usedPct">--</span><span class="ring-label">已用</span></div>
-    </div>
-    <div class="storage-info">
-      <div class="storage-row"><span>总量</span><span id="totalDisk">--</span></div>
-      <div class="storage-row"><span>已用</span><span id="usedDisk">--</span></div>
-      <div class="storage-row"><span>可用</span><span id="freeDisk">--</span></div>
+    <div class="bar-hero">
+      <div class="bar-num" id="freeDisk">--</div>
+      <div class="bar-label">可用空间</div>
+      <div class="bar-track"><div class="bar-fill" id="fillDisk"></div></div>
+      <div class="bar-meta">
+        <span>已用 <b id="usedDisk" style="color:var(--text)">--</b></span>
+        <span id="usedPct" style="color:var(--accent)">--%</span>
+        <span>总量 <b id="totalDisk" style="color:var(--text)
+">--</b></span>
+      </div>
     </div>
   </section>
 
@@ -261,21 +266,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 let state = { cats: [], selected: new Set() };
 
 // ---------- storage ring ----------
-function buildTicks() {
-  const g = document.getElementById('ringTicks');
-  if (!g) return;
-  let s = '';
-  for (let i = 0; i < 60; i++) {
-    const a = i * 6 * Math.PI / 180;
-    const r1 = i % 5 === 0 ? 58 : 62;
-    const r2 = 64;
-    s += `<line x1="${80 + r1 * Math.cos(a)}" y1="${80 + r1 * Math.sin(a)}" x2="${80 + r2 * Math.cos(a)}" y2="${80 + r2 * Math.sin(a)}"/>`;
-  }
-  g.innerHTML = s;
-}
-function renderRing(pct) {
-  const C = 2 * Math.PI * 68; // 427.26
-  $('ringFg').style.strokeDashoffset = C * (1 - Math.min(pct,100)/100);
+function renderBar(pct) {
+  $('fillDisk').style.width = Math.min(pct,100) + '%';
   $('usedPct').textContent = Math.round(pct) + '%';
 }
 function renderDisk(d) {
@@ -283,8 +275,9 @@ function renderDisk(d) {
   $('totalDisk').textContent = fmt(d.total);
   $('usedDisk').textContent = fmt(d.used);
   $('freeDisk').textContent = fmt(d.free);
-  renderRing(d.percent);
+  renderBar(d.percent);
 }
+
 
 // ---------- status ----------
 async function refreshStatus() {
@@ -495,7 +488,6 @@ $('saveCfgBtn').onclick = async () => {
 };
 
 // ---------- init ----------
-buildTicks();
 $('scanBtn').onclick = () => startScan(false);
 $('forceScanBtn').onclick = () => startScan(true);
 refreshStatus();
