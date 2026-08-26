@@ -18,11 +18,11 @@ import (
 	"time"
 )
 
-//go:embed web
+//go:embed webroot
 var webFS embed.FS
 
 const (
-	ver      = "3.5.1"
+	ver      = "4.0.0"
 	verCode  = 351
 	port     = "46780"
 	stateDir = "/data/adb/junkclean"
@@ -422,9 +422,26 @@ func tailLog(n int) []string {
 // ----- HTTP handlers -----
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(v)
+}
+
+// 预检请求放行（WebView 跨域 fetch）
+func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.WriteHeader(204)
+			return
+		}
+		next(w, r)
+	}
 }
 
 func apiStatus(w http.ResponseWriter, r *http.Request) {
@@ -524,37 +541,6 @@ func apiConfig(w http.ResponseWriter, r *http.Request) {
 
 func apiLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"logs": tailLog(300)})
-}
-
-// ----- OTA update check (APatch/KSU/Magisk 均无按钮，WebUI 自建) -----
-
-func apiUpdate(w http.ResponseWriter, r *http.Request) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get("https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json")
-	if err != nil {
-		writeJSON(w, 502, map[string]string{"error": "网络错误: " + err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-	var up struct {
-		Version     string `json:"version"`
-		VersionCode int    `json:"versionCode"`
-		ZipURL      string `json:"zipUrl"`
-		Changelog   string `json:"changelog"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&up); err != nil {
-		writeJSON(w, 502, map[string]string{"error": "update.json 解析失败"})
-		return
-	}
-	writeJSON(w, 200, map[string]any{
-		"currentVersion": ver,
-		"currentCode":    verCode,
-		"remoteVersion":  up.Version,
-		"remoteCode":     up.VersionCode,
-		"zipUrl":         up.ZipURL,
-		"changelog":      up.Changelog,
-		"hasUpdate":      up.VersionCode > verCode,
-	})
 }
 
 // ----- AI analysis (optional) -----
@@ -667,19 +653,18 @@ func main() {
 	}
 	os.MkdirAll(stateDir, 0700)
 	loadConfig()
-	webSub, err := fs.Sub(webFS, "web")
+	webSub, err := fs.Sub(webFS, "webroot")
 	if err != nil {
 		log.Fatal(err)
 	}
 	http.Handle("/", http.FileServer(http.FS(webSub)))
-	http.HandleFunc("/api/status", apiStatus)
-	http.HandleFunc("/api/scan", apiScan)
-	http.HandleFunc("/api/result", apiResult)
-	http.HandleFunc("/api/clean", apiClean)
-	http.HandleFunc("/api/config", apiConfig)
-	http.HandleFunc("/api/logs", apiLogs)
-	http.HandleFunc("/api/ai", apiAI)
-	http.HandleFunc("/api/update", apiUpdate)
+	http.HandleFunc("/api/status", corsMiddleware(apiStatus))
+	http.HandleFunc("/api/scan", corsMiddleware(apiScan))
+	http.HandleFunc("/api/result", corsMiddleware(apiResult))
+	http.HandleFunc("/api/clean", corsMiddleware(apiClean))
+	http.HandleFunc("/api/config", corsMiddleware(apiConfig))
+	http.HandleFunc("/api/logs", corsMiddleware(apiLogs))
+	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
 	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
 	log.Fatal(http.ListenAndServe("127.0.0.1:"+port, nil))
 }

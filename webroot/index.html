@@ -180,9 +180,6 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
     <input id="aiModel" placeholder="gpt-4o-mini">
   </label>
   <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
-  <h2 style="margin-top:8px">更新</h2>
-  <button class="btn btn-secondary" id="checkUpdateBtn" style="width:100%">🔍 检查更新</button>
-  <div id="updateResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
   <h2 style="margin-top:8px">操作日志</h2>
   <div class="log-area" id="logArea">加载中...</div>
 </div>
@@ -195,8 +192,9 @@ const fmt = b => {
   if (b >= 1<<10) return (b/(1<<10)).toFixed(0)+' KB';
   return b+' B';
 };
+// 绝对地址：WebView(ksu:///ap://) 与浏览器(http://127.0.0.1:46780) 双通道可用
 const api = async (path, opts={}) => {
-  const r = await fetch('/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
+  const r = await fetch('http://127.0.0.1:46780/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
   return r.json();
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -376,17 +374,6 @@ $('settingsBtn').onclick = async () => {
 $('closeDrawer').onclick = $('drawerBackdrop').onclick = () => {
   $('drawer').hidden = true;
   $('drawerBackdrop').hidden = true;
-};
-$('checkUpdateBtn').onclick = async () => {
-  const el = $('updateResult');
-  el.textContent = '检查中...';
-  const r = await api('/update');
-  if (r.error) { el.textContent = '❌ ' + r.error; return; }
-  if (r.hasUpdate) {
-    el.innerHTML = `✅ 发现新版本 <b style="color:var(--accent)">v${r.remoteVersion}</b>（当前 v${r.currentVersion}）<br>${esc(r.changelog)}<br><a href="${r.zipUrl}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">⬇ 下载更新</a>`;
-  } else {
-    el.textContent = `✅ 已是最新版本 v${r.currentVersion}（${r.currentCode}）`;
-  }
 };
 $('saveCfgBtn').onclick = async () => {
   await api('/config', {method:'POST', body: JSON.stringify({

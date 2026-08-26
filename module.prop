@@ -1,7 +1,9 @@
 id=junkclean
 name=JunkClean
-version=3.5.1
-versionCode=351
-author=ce11kjw
-description=轻量级垃圾清理模块 · Go 单二进制 · 内嵌 WebUI
+version=4.0.0
+versionCode=400
+author=CE11KJW
+description=智能垃圾清理+存储维护：体检/清理/整理/监控/AI建议 · KSU/AP/Magisk · 零数据采集
 updateJson=https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json
+actionIcon=icon/icon-jc.png
+webuiIcon=icon/icon-jc.png

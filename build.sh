@@ -25,7 +25,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bui
 # 打包
 rm -f JunkClean-*.zip
 ZIP="JunkClean-v${VER}.zip"
-zip -r "$ZIP" module.prop system META-INF scripts >/dev/null
+zip -r "$ZIP" module.prop system META-INF scripts customize.sh action.sh service.sh uninstall.sh webroot icon >/dev/null
 
 # update.json（OTA）
 cat > update.json <<EOF
