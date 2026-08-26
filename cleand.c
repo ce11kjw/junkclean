@@ -603,6 +603,8 @@ static void timer_loop(void){
 /* void *api_ai_threaded(void *p); */
 void *handle_threaded(void *p);
 void *timer_thread_wrap(void *p);
+static void api_monitor(int fd, const char *method, const char *q, const char *body);
+static void *monitor_thread(void *p);
 
 /* ponytail: API 路由用线性 if 链（<20 个可接受）。天花板：新增 API 需改此链。升级路径：函数指针路由表（API 数超过 20 时再考虑）。 */
 /* ---- connection handler: parse first line + body, route ---- */
@@ -714,6 +716,7 @@ static void handle(int fd){
     }
     else if(!strncmp(base,"/api/fstrim",11)){ char *c=strdup("fstrim"); bg(c); http_json(fd,"{\"ok\":1}"); }
     else if(!strncmp(base,"/api/rescan",11)){ char *c=strdup("rescan"); bg(c); http_json(fd,"{\"ok\":1}"); }
+    else if(!strncmp(base,"/api/monitor",12)) api_monitor(fd, method, q?q:"", (char*)body);
     else serve_file(fd, base);
     close(fd);
 }
@@ -732,6 +735,7 @@ int main(int argc, char**argv){
     /* ensure runtime dirs */
     char p[600]; snprintf(p,sizeof(p),"%s/rules",ADR); mkdir(p,0755);
     pthread_t timer; if(pthread_create(&timer,NULL,(void*(*)(void*))timer_thread_wrap,NULL)!=0){ log_msg("ERR","pthread_create timer failed"); }
+    pthread_t mth; if(pthread_create(&mth,NULL,monitor_thread,NULL)!=0){ log_msg("ERR","pthread_create monitor failed"); } else pthread_detach(mth);
     int lfd=socket(AF_INET,SOCK_STREAM,0);
     int one=1; setsockopt(lfd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one));
     struct sockaddr_in sa; memset(&sa,0,sizeof(sa));
@@ -756,6 +760,97 @@ int main(int argc, char**argv){
         pthread_detach(ht);
     }
 }
+static void api_monitor(int fd, const char *method, const char *q, const char *body){
+    (void)q;
+    char p[600]; snprintf(p,sizeof(p),"%s/config.conf",ADR);
+    /* GET */
+    if(!strcmp(method,"GET")){
+        int on=0; char dirs[512]="",logbuf[600]="";
+        FILE *f=fopen(p,"r");
+        if(f){ char line[600];
+            while(fgets(line,sizeof(line),f)){
+                if(!strncmp(line,"monitor=1",9)) on=1;
+                if(!strncmp(line,"monitor_dirs=",13)){ char *v=line+13; v[strcspn(v,"\r\n")]=0; if(strlen(v)){ if(dirs[0]) strncat(dirs,",",sizeof(dirs)-strlen(dirs)-1); strncat(dirs,v,sizeof(dirs)-strlen(dirs)-1); } }
+            } fclose(f);
+        }
+        char ml[600]; snprintf(ml,sizeof(ml),"%s/monitor.log",ADR);
+        FILE *lf=fopen(ml,"r"); if(lf){ int n=fread(logbuf,1,sizeof(logbuf)-1,lf); fclose(lf); logbuf[n]=0; }
+        char out[1300]; snprintf(out,sizeof(out),"{\"on\":%d,\"dirs\":\"%s\",\"log\":\"%s\"}",on,dirs,logbuf);
+        http_json(fd,out); return;
+    }
+    /* POST */
+    if(!strcmp(method,"POST")&&body&&*body){
+        char dirs[1024]="";
+        FILE *rf=fopen(p,"r");
+        if(rf){ char line[600]; while(fgets(line,sizeof(line),rf)){
+            if(!strncmp(line,"monitor_dirs=",13)){ char *v=line+13; v[strcspn(v,"\r\n")]=0; snprintf(dirs,sizeof(dirs),"%s",v); }
+        } fclose(rf); }
+        /* add */
+        const char *ad=strstr(body,"\"add\":\"");
+        if(ad){ ad+=7; const char *de=strchr(ad,'"'); char path[300]={0}; if(de&&de-ad<300){ memcpy(path,ad,de-ad);
+            if(strncmp(path,"/sdcard/",8)&&strncmp(path,"/storage/emulated/",18)){ http_err(fd,400,"{\"e\":\"bad\"}"); return; }
+            if(!strstr(dirs,path)){ if(dirs[0]) strncat(dirs,",",sizeof(dirs)-strlen(dirs)-1); strncat(dirs,path,sizeof(dirs)-strlen(dirs)-1); }
+        }}
+        /* remove */
+        const char *rm=strstr(body,"\"remove\":\"");
+        if(rm&&dirs[0]){ rm+=10; const char *re=strchr(rm,'"'); char path[300]={0}; if(re&&re-rm<300){ memcpy(path,rm,re-rm);
+            char nd[1024]=""; const char *st=dirs; while(*st){ const char *c=strchr(st,','); int len=c?(int)(c-st):(int)strlen(st);
+                char seg[512]={0}; memcpy(seg,st,len);
+                if(strcmp(seg,path)){ if(nd[0]) strncat(nd,",",sizeof(nd)-strlen(nd)-1); strncat(nd,seg,sizeof(nd)-strlen(nd)-1); }
+                if(!c)break; st=c+1; }
+            snprintf(dirs,sizeof(dirs),"%s",nd);
+        }}
+        int set_mon=-1;
+        if(strstr(body,"\"on\":1")) set_mon=1; else if(strstr(body,"\"on\":0")) set_mon=0;
+        /* fgets 逐行重建 */
+        char tmp[600]; snprintf(tmp,sizeof(tmp),"%s.tmp",p);
+        FILE *wi=fopen(tmp,"w"); if(!wi){ http_err(fd,500,"{\"e\":\"write\"}"); return; }
+        FILE *rd=fopen(p,"r");
+        int wrote_mon=0, wrote_dirs=0;
+        if(rd){ char ln[600]; while(fgets(ln,sizeof(ln),rd)){
+            if(!strncmp(ln,"monitor=",8)){ wrote_mon=1; if(set_mon>=0) fprintf(wi,"monitor=%d\n",set_mon); else fputs(ln,wi); }
+            else if(!strncmp(ln,"monitor_dirs=",13)){ wrote_dirs=1; if(dirs[0]) fprintf(wi,"monitor_dirs=%s\n",dirs); else fputs(ln,wi); }
+            else fputs(ln,wi);
+        } fclose(rd); }
+        if(!wrote_mon && set_mon>=0) fprintf(wi,"monitor=%d\n",set_mon);
+        if(!wrote_dirs && (strstr(body,"add")||strstr(body,"remove"))) fprintf(wi,"monitor_dirs=%s\n",dirs[0]?dirs:"");
+        fclose(wi);
+        if(rename(tmp,p)!=0){ http_err(fd,500,"{\"e\":\"rename\"}"); return; }
+        chmod(p,0600);
+        http_json(fd,"{\"ok\":1}"); return;
+    }
+    http_err(fd,400,"{\"e\":\"method\"}");
+}
+
+/* monitor 轮询线程（30s 扫新文件→classify） */
+static void *monitor_thread(void *p){
+    (void)p;
+    char marker[600]; snprintf(marker,sizeof(marker),"%s/.mon_marker",ADR);
+    for(;;){
+        char cp[600]; snprintf(cp,sizeof(cp),"%s/config.conf",ADR);
+        FILE *cf=fopen(cp,"r"); int on=0; char dirs[16][512]; int nd=0;
+        if(cf){ char line[600]; while(fgets(line,sizeof(line),cf)){
+            if(!strncmp(line,"monitor=1",9)) on=1;
+            if(!strncmp(line,"monitor_dirs=",13)){ char *v=line+13; v[strcspn(v,"\r\n")]=0; if(nd<16) snprintf(dirs[nd++],512,"%s",v); }
+        } fclose(cf); }
+        if(!on||nd==0){ sleep(30); continue; }
+        for(int i=0;i<nd;i++){ char cmd[1100]; snprintf(cmd,sizeof(cmd),"find %s -maxdepth 1 -type f -newer %s 2>/dev/null | head -20",dirs[i],marker);
+            char tmp[64]; snprintf(tmp,sizeof(tmp),"/tmp/jcmon%d",getpid()); char full[1100]; snprintf(full,sizeof(full),"%s > %s 2>/dev/null",cmd,tmp);
+            system(full); FILE *rf=fopen(tmp,"r"); if(!rf) continue;
+            char line[1024]; while(fgets(line,sizeof(line),rf)){ line[strcspn(line,"\r\n")]=0; if(!*line) continue;
+                const char *bn=strrchr(line,'/'); bn=bn?bn+1:line; if(bn[0]=='.'||strstr(bn,".part")||strstr(bn,".tmp")) continue;
+                char cl[1100]; snprintf(cl,sizeof(cl),"MON_FILE='%s' %s classify",line,SH);
+                log_msg("INFO","monitor: classify %s",line); system(cl);
+                char ml[600]; snprintf(ml,sizeof(ml),"%s/monitor.log",ADR); FILE *lf=fopen(ml,"a");
+                if(lf){ time_t t=time(NULL); struct tm*tm=localtime(&t); fprintf(lf,"[%04d-%02d-%02d %02d:%02d:%02d] %s\n",tm->tm_year+1900,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec,line); fclose(lf); }
+            } fclose(rf); unlink(tmp);
+        }
+        char t[700]; snprintf(t,sizeof(t),"touch %s",marker); system(t);
+        sleep(30);
+    }
+    return NULL;
+}
+
 void *timer_thread_wrap(void*p){ (void)p; timer_loop(); return NULL; }
 void *handle_threaded(void *p){ long fd=(long)p; handle((int)fd); return NULL; }
 

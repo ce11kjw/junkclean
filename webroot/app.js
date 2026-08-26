@@ -10,7 +10,7 @@ const I18N={zh:{nav_home:'首页',nav_clean:'清理',nav_settings:'设置',sub:'
   execute:'执行',refresh:'刷新',
   cat_cache:'应用缓存',cat_junk:'系统垃圾',cat_apk:'安装包',cat_zip:'压缩包',cat_thumb:'缩略图',
   cat_log:'日志',cat_temp:'临时文件',cat_uninst:'卸载残留',cat_zero:'空文件',cat_empty:'空文件夹',
-  cat_social:'社交专项',cat_sqlite:'SQLite',cat_big:'大文件',files:'文件',count:'个',last_scan:'上次扫描',no_scan:'暂无扫描·点击开始体检',days_ago:'天前',next_clean:'下次清理',hours_after:'小时后',every:'每',hours:'小时',daily:'每日',cleaned_done:'清理完成，释放',selected:'已选',items:'项',guard_on:'守护中'},
+  cat_social:'社交专项',cat_sqlite:'SQLite',cat_big:'大文件',files:'文件',count:'个',last_scan:'上次扫描',no_scan:'暂无扫描·点击开始体检',days_ago:'天前',next_clean:'下次清理',hours_after:'小时后',every:'每',hours:'小时',daily:'每日',cleaned_done:'清理完成，释放',selected:'已选',items:'项',guard_on:'守护中',monitor:'📡 自动监控',monitor_ttl:'总控开关',mon_dirs:'监控目录',mon_log:'最近动作',mon_on:'监控中',mon_off:'已关闭',mon_empty:'暂无监控目录',mon_add:'添加',mon_remove:'移除',mon_status:'状态',mon_pending:'待处理'},
   en:{nav_home:'Home',nav_clean:'Clean',nav_settings:'Settings',sub:'NEON HUD v3',
   free:'Available',scan_now:'⚡ Start Scan',
   scanning:'Deep Scan',review:'Review',cleaning:'Cleaning…',done:'Done',
@@ -20,7 +20,7 @@ const I18N={zh:{nav_home:'首页',nav_clean:'清理',nav_settings:'设置',sub:'
   execute:'Run',refresh:'Refresh',
   cat_cache:'App Cache',cat_junk:'System Junk',cat_apk:'APK',cat_zip:'Archive',cat_thumb:'Thumbnails',
   cat_log:'Logs',cat_temp:'Temps',cat_uninst:'Uninstall',cat_zero:'Empty Files',cat_empty:'Empty Folders',
-  cat_social:'Social',cat_sqlite:'SQLite',cat_big:'Big Files',files:'files',count:'',last_scan:'Last scan',no_scan:'No scan data·Start now',days_ago:'d ago',next_clean:'Next clean',hours_after:'h later',every:'Every',hours:'h',daily:'Daily',cleaned_done:'Cleaned, freed',selected:'Selected',items:'items',guard_on:'Running'}};
+  cat_social:'Social',cat_sqlite:'SQLite',cat_big:'Big Files',files:'files',count:'',last_scan:'Last scan',no_scan:'No scan data·Start now',days_ago:'d ago',next_clean:'Next clean',hours_after:'h later',every:'Every',hours:'h',daily:'Daily',cleaned_done:'Cleaned, freed',selected:'Selected',items:'items',guard_on:'Running',monitor:'📡 Auto Monitor',monitor_ttl:'Master Switch',mon_dirs:'Watch Dirs',mon_log:'Recent Actions',mon_on:'Active',mon_off:'Inactive',mon_empty:'No watch dirs',mon_add:'Add',mon_remove:'Remove',mon_status:'Status',mon_pending:'Pending'}};
 function T(k){return (I18N[LANG]||I18N.zh)[k]||k;}
 const $=id=>document.getElementById(id);
 const CATS={cache:[T('cat_cache'),'🗄'],junk:[T('cat_junk'),'🧩'],apk:[T('cat_apk'),'📦'],zip:[T('cat_zip'),'🗜'],thumb:[T('cat_thumb'),'🖼'],log:[T('cat_log'),'📋'],temp:[T('cat_temp'),'⏳'],uninst:[T('cat_uninst'),'🗑'],zero:[T('cat_zero'),'📄'],empty:[T('cat_empty'),'📂'],social:[T('cat_social'),'💬'],sqlite:[T('cat_sqlite'),'🗃'],big:[T('cat_big'),'📈']};
@@ -85,12 +85,41 @@ function showTab(t){
 function gotoHome(){ showTab('home'); loadHome(); }
 function gotoClean(){ showTab('clean'); showView('scan'); }
 function gotoSettings(){ showTab('settings'); showView('settings'); loadCatSwitches(); loadTasks(); }
+
+
+/* ===== 自动监控 ===== */
+monTimer=null;
+async function loadMonitor(){
+  const r=await api('/api/monitor'); if(!r) return;
+  $('mon-on').classList.toggle('on',!!r.on);
+  $('mon-status').textContent=r.on?(T('on')+' · '+(r.log||'').split('\n').filter(Boolean).length+' '+T('items')):T('off');
+  const dirs=(r.dirs||'').split(',').filter(Boolean);
+  $('mon-dirs').innerHTML=dirs.length?dirs.map(d=>'<div class="setrow"><span class="lbl" style="font-family:ui-monospace;font-size:12px">'+d+'</span><button class="sw" onclick="monRemove(\''+d+'\')">'+T('remove')+'</button></div>').join(''):'<div class="empty">'+T('no_dir')+'</div>';
+  $('mon-log').textContent=r.log||'';
+}
+async function monToggle(){
+  const on=!$('mon-on').classList.contains('on');
+  await api('/api/monitor',{method:'POST',body:JSON.stringify({on:on?1:0})});
+  loadMonitor();
+}
+async function monAdd(){
+  const v=$('mon-add').value.trim(); if(!v) return;
+  await api('/api/monitor',{method:'POST',body:JSON.stringify({add:v})});
+  $('mon-add').value=''; loadMonitor();
+}
+async function monRemove(path){
+  await api('/api/monitor',{method:'POST',body:JSON.stringify({remove:path})});
+  loadMonitor();
+}
+
 function goView(v){
   showTab('settings'); showView(v);
+  if(v==='monitor'){ loadMonitor(); clearInterval(monTimer); monTimer=setInterval(loadMonitor,5000); }
+  else clearInterval(monTimer);
   if(v==='organize'){ loadCatSwitches(); }
   else if(v==='ai'){ loadAI(); }
   else if(v==='tasks'){ loadTasks(); }
-  else if(v==='log'){ loadLog(); }
+  else if(v==='monitor'){ loadMonitor(); if(monTimer) clearInterval(monTimer); monTimer=setInterval(loadMonitor,5000); } else if(v==='log'){ loadLog(); }
   else if(v==='whitelist'){ loadWhitelist(); }
 }
 function showView(v){
@@ -508,6 +537,40 @@ async function doImport(){
     }
     toast('✔ 导入 '+Object.keys(data).length+' 项'); const d=$('import-json').closest('div[style]'); if(d) d.remove();
   }catch(e){ toast('✗ JSON 格式错误'); }
+}
+/* ===== 监控 ===== */
+monTimer=null;
+async function loadMonitor(){
+  const r=await api('/api/monitor');
+  if(!r) return;
+  $('mon-on').classList.toggle('on',!!r.on);
+  $('mon-status').innerHTML=r.on?'<span style="color:var(--ok)">● '+T('mon_on')+'</span>':'<span style="color:var(--sub)">○ '+T('mon_off')+'</span>';
+  const dirs=$('mon-dirs'); if(!dirs) return;
+  dirs.innerHTML='';
+  if(r.dirs&&r.dirs.length){
+    r.dirs.split(',').filter(Boolean).forEach(d=>{
+      const row=document.createElement('div'); row.className='setrow';
+      row.innerHTML='<span class="lbl" style="font-size:12px;font-family:monospace">'+escapeHtml(d)+'</span><button class="sw">'+T('mon_remove')+'</button>';
+      row.querySelector('button').onclick=()=>monRemove(d);
+      dirs.appendChild(row);
+    });
+  }
+  if(!dirs.children.length) dirs.innerHTML='<div class="muted" style="padding:8px;text-align:center">'+T('mon_empty')+'</div>';
+  const log=$('mon-log'); if(log) log.textContent=r.log||'';
+}
+async function toggleMon(){
+  const on=$('mon-on').classList.contains('on');
+  const r=await api('/api/monitor',{method:'POST',body:JSON.stringify({on:on?0:1})});
+  if(r.ok) loadMonitor();
+}
+async function monAdd(){
+  const input=$('mon-add'); const path=input.value.trim(); if(!path) return;
+  await api('/api/monitor',{method:'POST',body:JSON.stringify({add:path})});
+  input.value=''; loadMonitor();
+}
+async function monRemove(path){
+  await api('/api/monitor',{method:'POST',body:JSON.stringify({remove:path})});
+  loadMonitor();
 }
 /* ===== 日志 ===== */
 async function loadLog(kind){
