@@ -26,7 +26,7 @@ import (
 var webFS embed.FS
 
 const (
-	ver      = "4.0.0"
+	ver      = "4.1.0"
 	verCode  = 351
 	port     = "46780"
 	stateDir = "/data/adb/junkclean"
@@ -818,6 +818,8 @@ func main() {
 	http.HandleFunc("/api/logs", corsMiddleware(apiLogs))
 	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
 	http.HandleFunc("/api/hotupdate", corsMiddleware(apiHotupdate))
+	registerFeatures(http.DefaultServeMux)
+	startScheduler()
 	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
 	// 端口被占时等待旧进程退出（热更新重启场景），最多 5s
 	ln, err := net.Listen("tcp", "127.0.0.1:"+port)

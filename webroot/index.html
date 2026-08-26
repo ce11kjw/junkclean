@@ -103,6 +103,42 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
 @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+
+/* 工具箱 */
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.tool-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1);font-size:12px;color:var(--muted)}
+.tool-card:hover{background:var(--card2);transform:translateY(-2px);color:var(--text)}
+.tool-card .ti{font-size:22px}
+.tool-card.on{background:rgba(45,212,167,.12);border-color:rgba(45,212,167,.4);color:var(--accent)}
+.panel{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(14px);z-index:250;display:flex;flex-direction:column;animation:fadeIn .25s}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.panel-head h3{font-size:16px}
+.panel-close{background:var(--card);border:1px solid var(--border);border-radius:999px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:16px}
+.panel-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.panel-body .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.panel-body input,.panel-body select{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;flex:1;min-width:100px}
+.panel-body button{background:var(--card);border:1px solid var(--border);border-radius:999px;padding:8px 16px;color:var(--text);font-size:13px;cursor:pointer;transition:all .25s}
+.panel-body button.primary{background:linear-gradient(135deg,var(--accent),#059669);border:none;color:#fff}
+.panel-body button.danger{background:linear-gradient(135deg,var(--danger),#e11d48);border:none;color:#fff}
+.panel-body button:disabled{opacity:.4;cursor:default}
+.panel-list{display:flex;flex-direction:column;gap:8px}
+.panel-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13px;display:flex;align-items:center;gap:8px}
+.panel-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-item .sz{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.panel-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+.panel-note{font-size:11px;color:var(--muted);line-height:1.6}
+.panel-empty{text-align:center;color:var(--muted);padding:24px 0;font-size:13px}
+.bars{display:flex;align-items:flex-end;gap:8px;height:120px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:14px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%}
+.bar .b{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:6px 6px 2px 2px;min-height:2px;transition:height .6s cubic-bezier(.32,.72,0,1)}
+.bar .bl{font-size:9px;color:var(--muted)}
+.switch{position:relative;width:44px;height:24px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;background:var(--card2);border-radius:99px;transition:.3s;cursor:pointer}
+.switch .sl:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked + .sl{background:var(--accent)}
+.switch input:checked + .sl:before{transform:translateX(20px)}
+
 </style>
 </head>
 <body>
@@ -145,6 +181,14 @@ body{background:var(--bg);color:var(--text);min-height:100dvh;padding:16px 12px 
     <div class="section-title"><span>扫描结果</span><span id="totalSize" style="color:var(--accent)"></span></div>
     <div id="catList"></div>
   </section>
+</div>
+
+<div class="panel" id="toolPanel" hidden>
+  <div class="panel-head">
+    <h3 id="toolTitle">工具箱</h3>
+    <button class="panel-close" id="toolClose">✕</button>
+  </div>
+  <div class="panel-body" id="toolBody"></div>
 </div>
 
 <div class="bottom-bar" id="bottomBar" hidden>
@@ -405,6 +449,326 @@ $('saveCfgBtn').onclick = async () => {
 $('scanBtn').onclick = startScan;
 refreshStatus();
 setInterval(refreshStatus, 5000);
+
+// ========== 工具箱 ==========
+const TOOLS = [
+  {id:'big', icon:'📁', name:'大文件'}, {id:'empty', icon:'📄', name:'空文件'},
+  {id:'thumb', icon:'🖼️', name:'缩略图'}, {id:'classify', icon:'📂', name:'整理中心'},
+  {id:'duplicate', icon:'👯', name:'重复文件'}, {id:'trash', icon:'🗑️', name:'回收站'},
+  {id:'cleanapp', icon:'📱', name:'应用清理'}, {id:'schedule', icon:'⏰', name:'定时任务'},
+  {id:'monitor', icon:'📡', name:'监控'}, {id:'stats', icon:'📊', name:'统计'},
+  {id:'fstrim', icon:'⚡', name:'fstrim'}, {id:'ai', icon:'🤖', name:'AI建议'},
+];
+function initTools() {
+  const g = $('toolsGrid');
+  g.innerHTML = TOOLS.map(t => `<div class="tool-card" data-tool="${t.id}"><div class="ti">${t.icon}</div>${t.name}</div>`).join('');
+  g.querySelectorAll('.tool-card').forEach(c => c.onclick = () => openTool(c.dataset.tool));
+}
+function openPanel(title, html) {
+  $('toolTitle').textContent = title;
+  $('toolBody').innerHTML = html;
+  $('toolPanel').hidden = false;
+}
+$('toolClose').onclick = () => $('toolPanel').hidden = true;
+$('toolPanel').onclick = e => { if (e.target === $('toolPanel')) $('toolPanel').hidden = true; };
+
+// 通用：勾选列表工具
+function renderCheckList(items, elId) {
+  const el = $(elId);
+  if (!items.length) { el.innerHTML = '<div class="panel-empty">未发现</div>'; return; }
+  el.innerHTML = items.map((it,i) => `
+    <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('');
+}
+function checkedPaths(elId) {
+  const out = [];
+  $(elId).querySelectorAll('input:checked').forEach(cb => {
+    const it = $(elId).querySelectorAll('.panel-item')[+cb.dataset.i];
+    out.push(it.querySelector('.nm').textContent);
+  });
+  return out;
+}
+
+// --- 大文件 ---
+function toolBig() {
+  openPanel('📁 大文件', `
+    <div class="row">
+      <select id="bigMin"><option value="52428800">≥50MB</option><option value="104857600">≥100MB</option><option value="209715200">≥200MB</option></select>
+      <input id="bigExt" placeholder="扩展名筛选(留空=全部)" style="flex:.6">
+      <button class="primary" id="bigScan">扫描</button>
+    </div>
+    <div class="panel-list" id="bigList"></div>
+    <div class="row"><button class="danger" id="bigDel">删除选中</button><button id="bigTrash">移入回收站</button></div>`);
+  $('bigScan').onclick = async () => {
+    const items = await api('/big?min=' + $('bigMin').value + '&ext=' + encodeURIComponent($('bigExt').value.trim()));
+    renderCheckList(items.items||[], 'bigList');
+  };
+    $('bigDel').onclick = async () => {
+    const paths = checkedPaths('bigList');
+    if (!paths.length) return;
+    if (!confirm('确认删除 ' + paths.length + ' 个文件？')) return;
+    const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    alert('已删除，释放 ' + fmt(r.freed||0));
+    $('bigScan').onclick();
+  };
+    $('bigTrash').onclick = async () => {
+    const paths = checkedPaths('bigList');
+    if (!paths.length) return;
+    const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:true})});
+    alert('已移入回收站，释放 ' + fmt(r.freed||0));
+    $('bigScan').onclick();
+  };
+}
+
+// --- 空文件 ---
+function toolEmpty() {
+  openPanel('📄 空文件', `
+    <div class="row"><button class="primary" id="emptyScan">扫描 0 字节文件</button></div>
+    <div class="panel-list" id="emptyList"></div>
+    <div class="row"><button class="danger" id="emptyDel">清理选中</button></div>`);
+  $('emptyScan').onclick = async () => {
+    const items = await api('/empty');
+    renderCheckList(items.items||[], 'emptyList');
+  };
+    $('emptyDel').onclick = async () => {
+    const paths = checkedPaths('emptyList');
+    if (!paths.length) return;
+    if (!confirm('确认删除 ' + paths.length + ' 个空文件？')) return;
+    const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    alert('已清理，释放 ' + fmt(r.freed||0));
+    $('emptyScan').onclick();
+  };
+}
+
+// --- 缩略图 ---
+function toolThumb() {
+  openPanel('🖼️ 缩略图缓存', `
+    <div class="row"><button class="primary" id="thumbScan">扫描缩略图</button></div>
+    <div class="panel-list" id="thumbList"></div>
+    <div class="row"><button class="danger" id="thumbDel">清理选中</button></div>`);
+  $('thumbScan').onclick = async () => {
+    const items = await api('/thumb');
+    renderCheckList(items.items||[], 'thumbList');
+  };
+    $('thumbDel').onclick = async () => {
+    const paths = checkedPaths('thumbList');
+    if (!paths.length) return;
+    if (!confirm('确认删除 ' + paths.length + ' 个缩略图目录？')) return;
+    const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    alert('已清理，释放 ' + fmt(r.freed||0));
+    $('thumbScan').onclick();
+  };
+}
+
+function openTool(id) {
+  ({big:toolBig, empty:toolEmpty, thumb:toolThumb, classify:toolClassify, duplicate:toolDuplicate, trash:toolTrash, cleanapp:toolCleanapp, schedule:toolSchedule, monitor:toolMonitor, stats:toolStats, fstrim:toolFstrim, ai:toolAI})[id]();
+}
+initTools();
+
+
+// --- 整理中心 ---
+function toolClassify() {
+  openPanel('📂 整理中心', `
+    <div class="panel-note">按规则把 Download 里的文件分类整理到对应目录（图片/视频/音乐/文档/安装包/压缩包）</div>
+    <div class="row">
+      <button class="primary" id="clPreview">预览</button>
+      <button id="clRun">执行整理</button>
+      <button id="clGet">读取规则</button>
+    </div>
+    <div class="panel-list" id="clList"></div>`);
+  const render = (moves) => {
+    const el = $('clList');
+    el.innerHTML = (moves||[]).length ? moves.map(m=>`<div class="panel-item"><span class="nm">${esc(m)}</span></div>`).join('')
+      : '<div class="panel-empty">无待整理文件</div>';
+  };
+  $('clPreview').onclick = async () => {
+    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'preview'})});
+    render(r.moves);
+  };
+  $('clRun').onclick = async () => {
+    if (!confirm('确认执行整理？文件会被移动到分类目录')) return;
+    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'run'})});
+    render(r.moves);
+    alert('已整理 ' + r.count + ' 个文件');
+  };
+  $('clGet').onclick = async () => {
+    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'get'})});
+    const txt = (r.rules||[]).map(ru => `Src: ${ru.src}\nDest: ${ru.dest}\n` + Object.entries(ru.map||{}).map(([k,v])=>`  ${k} → ${v}`).join('\n')).join('\n\n');
+    alert(txt || '无规则');
+  };
+}
+
+// --- 重复文件 ---
+function toolDuplicate() {
+  openPanel('👯 重复文件', `
+    <div class="row"><button class="primary" id="dupScan">扫描重复文件</button></div>
+    <div class="panel-list" id="dupList"></div>
+    <div class="row"><button class="danger" id="dupDel">删除多余副本</button><button id="dupArc">归档副本</button></div>`);
+  $('dupScan').onclick = async () => {
+    const r = await api('/duplicate', {method:'POST', body: JSON.stringify({action:'preview'})});
+    const el = $('dupList');
+    const gs = r.groups||[];
+    el.innerHTML = gs.length ? gs.map((g,gi) => `
+      <div class="panel-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;gap:8px;align-items:center"><span class="nm">${g.files[0].split('/').pop()}</span><span class="sz">${g.size} × ${g.files.length} 份</span></div>
+        ${g.files.map((f,i)=>`<label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="radio" name="dup-keep-${gi}" value="${esc(f)}" ${i===0?'checked':''}><span class="nm" style="font-size:11px">${esc(f)}</span><span style="color:var(--accent);font-size:10px">${i===0?'保留':''}</span></label>`).join('')}
+      </div>`).join('') : '<div class="panel-empty">无重复文件</div>';
+  };
+  $('dupDel').onclick = async () => {
+    const keeps = [];
+    document.querySelectorAll('[name^="dup-keep-"]:checked').forEach(r=>keeps.push(r.value));
+    const r = await api('/duplicate', {method:'POST', body: JSON.stringify({action:'delete', keep: keeps})});
+    alert('已删除 ' + r.deleted + ' 份，释放 ' + fmt(r.freed||0));
+    $('dupScan').onclick();
+  };
+  $('dupArc').onclick = async () => {
+    const r = await api('/duplicate', {method:'POST', body: JSON.stringify({action:'archive'})});
+    alert('已归档 ' + r.moved + ' 份到 下载/Duplicates');
+  };
+}
+
+// --- 回收站 ---
+function toolTrash() {
+  openPanel('🗑️ 回收站', `
+    <div class="row"><button class="primary" id="trashList">查看回收站</button><button class="danger" id="trashEmpty">清空</button></div>
+    <div class="panel-list" id="trashItems"></div>
+    <div class="row"><button id="trashRestore">恢复选中</button><button class="danger" id="trashDel">彻底删除选中</button></div>`);
+  const load = async () => {
+    const r = await api('/trash', {method:'POST', body: JSON.stringify({action:'list'})});
+    const items = r.items||[];
+    const el = $('trashItems');
+    el.innerHTML = items.length ? items.map((it,i)=>`
+      <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.orig)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
+      : '<div class="panel-empty">回收站为空</div>';
+    return items;
+  };
+  $('trashList').onclick = load;
+  $('trashRestore').onclick = async () => {
+    const items = await load();
+    const paths = [];
+    $('trashItems').querySelectorAll('input:checked').forEach(cb=>paths.push(items[+cb.dataset.i].path));
+    if (!paths.length) return;
+    await api('/trash', {method:'POST', body: JSON.stringify({action:'restore', paths})});
+    load();
+  };
+  $('trashDel').onclick = async () => {
+    const items = await load();
+    const paths = [];
+    $('trashItems').querySelectorAll('input:checked').forEach(cb=>paths.push(items[+cb.dataset.i].path));
+    if (!paths.length) return;
+    if (!confirm('彻底删除选中项？不可恢复')) return;
+    await api('/trash', {method:'POST', body: JSON.stringify({action:'delete', paths})});
+    load();
+  };
+  $('trashEmpty').onclick = async () => {
+    if (!confirm('清空回收站？不可恢复')) return;
+    await api('/trash', {method:'POST', body: JSON.stringify({action:'empty'})});
+    load();
+  };
+}
+
+// --- 应用清理 ---
+function toolCleanapp() {
+  openPanel('📱 应用级清理', `
+    <div class="panel-note">输入包名，清理该应用的缓存/code_cache/WebView（如 com.tencent.mm）</div>
+    <div class="row"><input id="caPkg" placeholder="包名，如 com.tencent.mm"><button class="primary" id="caGo">清理</button></div>
+    <div id="caResult" class="panel-note"></div>`);
+  $('caGo').onclick = async () => {
+    const pkg = $('caPkg').value.trim();
+    if (!pkg) { $('caResult').textContent = '请输入包名'; return; }
+    const r = await api('/cleanapp', {method:'POST', body: JSON.stringify({package:pkg})});
+    $('caResult').textContent = r.error ? '❌ ' + r.error : '✅ 释放 ' + fmt(r.freed||0);
+  };
+}
+
+
+// --- 定时任务 ---
+function toolSchedule() {
+  openPanel('⏰ 定时任务', `
+    <div class="row">
+      <select id="scType"><option value="daily">每日</option><option value="hourly">每小时</option></select>
+      <input id="scHour" type="number" min="0" max="23" value="3" placeholder="时">
+      <button class="primary" id="scAdd">添加</button>
+    </div>
+    <div class="panel-list" id="scList"></div>`);
+  const load = async () => {
+    const r = await api('/schedule', {method:'POST', body: JSON.stringify({action:'list'})});
+    const tasks = r.tasks||[];
+    $('scList').innerHTML = tasks.length ? tasks.map((t,i) => `
+      <div class="panel-item"><span class="nm">${esc(t.name)}</span><span class="sz">${t.every ? '每'+t.every+'h' : '每日'+t.hour+'时'}</span><button data-id="${t.id}" style="background:var(--danger);color:#fff;padding:4px 10px;font-size:11px;border:none;border-radius:99px;cursor:pointer">删除</button></div>`).join('')
+      : '<div class="panel-empty">无定时任务</div>';
+    $('scList').querySelectorAll('[data-id]').forEach(b => b.onclick = async () => {
+      await api('/schedule', {method:'POST', body: JSON.stringify({action:'remove', task:{id:b.dataset.id}})});
+      load();
+    });
+  };
+  $('scAdd').onclick = async () => {
+    const t = $('scType').value === 'hourly'
+      ? {name:'每小时清理', every:1}
+      : {name:'每日清理', hour: +$('scHour').value || 3};
+    await api('/schedule', {method:'POST', body: JSON.stringify({action:'add', task:t})});
+    load();
+  };
+  load();
+}
+
+// --- 监控 ---
+function toolMonitor() {
+  openPanel('📡 自动监控', `
+    <div class="row"><span>自动整理监控</span><label class="switch"><input type="checkbox" id="monitorSw"><span class="sl"></span></label></div>
+    <div class="panel-note">开启后每 30 秒自动整理 Download 文件到分类目录（按 classify 规则）</div>
+    <div id="monitorStatus" class="panel-note"></div>`);
+  const refresh = async () => {
+    const r = await api('/monitor', {method:'POST', body: JSON.stringify({action:'status'})});
+    $('monitorSw').checked = r.status === 'on';
+    $('monitorStatus').textContent = r.status === 'on' ? '🟢 监控运行中' : '⚪ 监控未启动';
+  };
+  $('monitorSw').onchange = async () => {
+    const action = $('monitorSw').checked ? 'start' : 'stop';
+    await api('/monitor', {method:'POST', body: JSON.stringify({action})});
+    refresh();
+  };
+  refresh();
+}
+
+// --- 统计 ---
+function toolStats() {
+  openPanel('📊 清理统计', `<div class="bars" id="statsBars"></div>`);
+  api('/stats').then(r => {
+    const days = r.days||[];
+    const max = Math.max(1, ...days.map(d=>d.items));
+    $('statsBars').innerHTML = days.map(d => `
+      <div class="bar"><div class="b" style="height:${(d.items/max*100).toFixed(0)}%"></div><div class="bl">${d.date}</div><div class="bl" style="font-size:8px;color:var(--text)">${d.items||''}</div></div>`).join('');
+  });
+}
+
+// --- fstrim ---
+function toolFstrim() {
+  openPanel('⚡ fstrim（文件系统优化）', `
+    <div class="row"><button class="primary" id="fsGo">执行 fstrim /data</button></div>
+    <div id="fsResult" class="panel-note"></div>`);
+  $('fsGo').onclick = async () => {
+    $('fsResult').textContent = '执行中...';
+    const r = await api('/fstrim');
+    $('fsResult').textContent = r.error ? '❌ ' + r.error : '✅ ' + (r.output||'完成');
+  };
+}
+
+// --- AI 建议（已有 /api/ai） ---
+function toolAI() {
+  openPanel('🤖 AI 智能建议', `
+    <div class="panel-note">先扫描垃圾，然后 AI 分析给出清理建议</div>
+    <div class="row"><button class="primary" id="aiAsk">分析扫描结果</button></div>
+    <div class="panel-list" id="aiResult"></div>`);
+  $('aiAsk').onclick = async () => {
+    const res = await api('/result');
+    const cats = res.categories||[];
+    const summary = cats.map(c => c.name + ': ' + c.items.length + '项 ' + fmt(c.total)).join('; ');
+    if (!summary) { $('aiResult').innerHTML = '<div class="panel-empty">先扫描</div>'; return; }
+    const r = await api('/ai', {method:'POST', body: JSON.stringify({summary})});
+    $('aiResult').innerHTML = '<div class="panel-item" style="white-space:pre-wrap;line-height:1.6">' + esc(r.advice||'AI 未配置，请在设置中填写 AI 端点/key') + '</div>';
+  };
+}
+
 </script>
 </body>
 </html>
