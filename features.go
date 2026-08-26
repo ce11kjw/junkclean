@@ -40,6 +40,8 @@ func registerFeatures(mux *http.ServeMux) {
 	mux.HandleFunc("/api/fstrim", corsMiddleware(apiFstrim))
 	mux.HandleFunc("/api/stats", corsMiddleware(apiStats))
 	mux.HandleFunc("/api/rules", corsMiddleware(apiRules))
+	mux.HandleFunc("/api/apps", corsMiddleware(apiApps))
+	mux.HandleFunc("/api/rollback", corsMiddleware(apiRollback))
 	mux.HandleFunc("/api/delete", corsMiddleware(apiDelete))
 }
 
@@ -331,10 +333,45 @@ func apiDuplicate(w http.ResponseWriter, r *http.Request) {
 // ---------- 整理中心 classify ----------
 
 type ClassifyRule struct {
-	Src     string            `json:"src"`
-	Dest    string            `json:"dest"`
-	Exclude string            `json:"exclude"`
-	Map     map[string]string `json:"map"` // 文件名模式 → 目标子目录
+	Src       string            `json:"src"`
+	Dest      string            `json:"dest"`
+	Exclude   string            `json:"exclude"`
+	Map       map[string]string `json:"map"`
+	Recurse   bool              `json:"recurse"`
+	Integrity bool              `json:"integrity"`
+	MinSize   int64             `json:"minSize"`
+	MinDays   int               `json:"minDays"`
+	Rename    string            `json:"rename"`
+}
+
+var incompleteSuffix = []string{".part", ".crdownload", ".tmp", ".partial", ".downloading", ".!q", ".aria2"}
+
+func isIncomplete(name string) bool {
+	lower := strings.ToLower(name)
+	for _, s := range incompleteSuffix {
+		if strings.HasSuffix(lower, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func uniqueDest(dir, name, strategy string) string {
+	if strategy == "add" {
+		base := strings.TrimSuffix(name, filepath.Ext(name))
+		ext := filepath.Ext(name)
+		for i := 1; ; i++ {
+			cand := filepath.Join(dir, fmt.Sprintf("%s.%d%s", base, i, ext))
+			if _, err := os.Stat(cand); err != nil {
+				return cand
+			}
+		}
+	} else if strategy == "skip" {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return ""
+		}
+	}
+	return filepath.Join(dir, name)
 }
 
 var defaultClassifyRules = []ClassifyRule{
@@ -366,59 +403,6 @@ func saveClassifyRules(rules []ClassifyRule) {
 }
 
 // doClassify 执行整理：匹配 @src 下文件 → 按 @map 移到 @dest/<子目录>
-func doClassify(rules []ClassifyRule, dryRun bool) ([]string, int64) {
-	var moves []string
-	var total int64
-	for _, rule := range rules {
-		if rule.Src == "" || rule.Dest == "" {
-			continue
-		}
-		var exts []string
-		var dirs []string
-		for pat, sub := range rule.Map {
-			_ = sub
-			if strings.Contains(pat, "*") {
-				exts = append(exts, strings.ToLower(strings.TrimPrefix(pat, "*")))
-			}
-		}
-		_ = dirs
-		entries, err := os.ReadDir(rule.Src)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			if rule.Exclude != "" && matchGlob(rule.Exclude, name) {
-				continue
-			}
-			// 找匹配的 map 条目
-			for pat, sub := range rule.Map {
-				if matchGlob(pat, name) {
-					dest := filepath.Join(rule.Dest, sub)
-					os.MkdirAll(dest, 0755)
-					srcPath := filepath.Join(rule.Src, name)
-					dstPath := filepath.Join(dest, name)
-					if dryRun {
-						moves = append(moves, srcPath+" → "+dstPath)
-					} else if err := os.Rename(srcPath, dstPath); err == nil {
-						info, _ := os.Stat(dstPath)
-						if info != nil {
-							total += info.Size()
-						}
-						moves = append(moves, srcPath+" → "+dstPath)
-					}
-					break
-				}
-			}
-		}
-	}
-	return moves, total
-}
-
-// matchGlob 简易 glob：支持 * 通配（* 在任意位置）
 func matchGlob(pattern, name string) bool {
 	if !strings.Contains(pattern, "*") {
 		return pattern == name
@@ -614,10 +598,12 @@ func apiDelete(w http.ResponseWriter, r *http.Request) {
 // ---------- 定时任务 ----------
 
 type Task struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Every int    `json:"every"` // 小时；0=每日
-	Hour  int    `json:"hour"`  // 每日触发时间
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Every      int    `json:"every"`
+	Hour       int    `json:"hour"`
+	OnlyCharge bool   `json:"onlyCharge"`
+	OnlyWifi   bool   `json:"onlyWifi"`
 }
 
 var taskLock sync.Mutex
@@ -635,25 +621,6 @@ func saveTasks(tasks []Task) {
 }
 
 // startScheduler 启动定时扫描（daemon 启动时调用）
-func startScheduler() {
-	taskTicker = time.NewTicker(time.Minute)
-	go func() {
-		for range taskTicker.C {
-			now := time.Now()
-			for _, t := range loadTasks() {
-				if t.Every > 0 {
-					if now.Hour() == 0 && now.Minute() < 5 { // 每小时粒度粗略触发
-						go autoRun()
-					}
-				} else if t.Hour == now.Hour() && now.Minute() < 5 {
-					go autoRun()
-				}
-			}
-		}
-	}()
-}
-
-// autoRun 定时自动清理：扫描 + 清理安全分类
 func autoRun() {
 	if scanSt.running {
 		return
@@ -720,33 +687,6 @@ func apiSchedule(w http.ResponseWriter, r *http.Request) {
 var monitorOn bool
 var monitorStop chan bool
 
-func monitorStart() bool {
-	if monitorOn {
-		return false
-	}
-	monitorOn = true
-	monitorStop = make(chan bool)
-	go func() {
-		t := time.NewTicker(30 * time.Second)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				rules := loadClassifyRules()
-				if len(rules) > 0 {
-					moves, _ := doClassify(rules, false)
-					if len(moves) > 0 {
-						logLine(fmt.Sprintf("monitor: auto-classify %d files", len(moves)))
-					}
-				}
-			case <-monitorStop:
-				return
-			}
-		}
-	}()
-	return true
-}
-
 func apiMonitor(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, 405, map[string]string{"error": "POST only"})
@@ -767,50 +707,21 @@ func apiMonitor(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, map[string]any{"status": "off"})
 	case "status":
-		writeJSON(w, 200, map[string]any{"status": map[bool]string{true: "on", false: "off"}[monitorOn]})
+		writeJSON(w, 200, map[string]any{"status": map[bool]string{true: "on", false: "off"}[monitorOn], "count": monitorCount, "last": monitorLast})
 	default:
 		writeJSON(w, 400, map[string]string{"error": "action: start|stop|status"})
 	}
 }
 
-// ---------- fstrim ----------
-
-func apiFstrim(w http.ResponseWriter, r *http.Request) {
-	out, err := exec.Command("fstrim", "/data").CombinedOutput()
-	if err != nil {
-		writeJSON(w, 500, map[string]any{"error": err.Error(), "output": string(out)})
-		return
-	}
-	logLine("fstrim /data done")
-	writeJSON(w, 200, map[string]any{"status": "ok", "output": string(out)})
-}
-
 // ---------- 统计 ----------
 
 func recordStat(items int) {
-	data, _ := os.ReadFile(statsFile)
-	stats := map[string]int{}
-	json.Unmarshal(data, &stats)
-	key := time.Now().Format("2006-01-02")
-	stats[key] += items
-	os.WriteFile(statsFile, mustJSON(stats), 0600)
+	s := loadStats()
+	s.Daily[time.Now().Format("2006-01-02")] += items
+	s.Total["items"] += int64(items)
+	os.WriteFile(statsFile, mustJSON(s), 0600)
 }
 
-func apiStats(w http.ResponseWriter, r *http.Request) {
-	data, _ := os.ReadFile(statsFile)
-	stats := map[string]int{}
-	json.Unmarshal(data, &stats)
-	// 最近 7 天
-	keys := []string{}
-	for i := 6; i >= 0; i-- {
-		keys = append(keys, time.Now().AddDate(0, 0, -i).Format("2006-01-02"))
-	}
-	days := []map[string]any{}
-	for _, k := range keys {
-		days = append(days, map[string]any{"date": k[5:], "items": stats[k]})
-	}
-	writeJSON(w, 200, map[string]any{"days": days})
-}
 
 // ---------- 规则管理（分类规则增删，规则文件） ----------
 
@@ -832,4 +743,313 @@ func apiRules(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, 400, map[string]string{"error": "action: list|reset"})
 	}
+}
+
+// doClassify 增强版：递归/完整性/过滤/重名策略
+func doClassify(rules []ClassifyRule, dryRun bool) ([]string, int64) {
+	var moves []string
+	var total int64
+	for _, rule := range rules {
+		if rule.Src == "" || rule.Dest == "" {
+			continue
+		}
+		var process func(dir string)
+		process = func(dir string) {
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				return
+			}
+			for _, e := range entries {
+				path := filepath.Join(dir, e.Name())
+				if e.IsDir() {
+					if rule.Recurse && !strings.HasPrefix(e.Name(), ".") {
+						process(path)
+					}
+					continue
+				}
+				classifyFile(path, rule, &moves, &total, dryRun)
+			}
+		}
+		process(rule.Src)
+	}
+	return moves, total
+}
+
+// classifyFile 单文件分类：排除/完整性/大小/时间/重名
+func classifyFile(srcPath string, rule ClassifyRule, moves *[]string, total *int64, dryRun bool) {
+	name := filepath.Base(srcPath)
+	if rule.Exclude != "" && matchGlob(rule.Exclude, name) {
+		return
+	}
+	if rule.Integrity && isIncomplete(name) {
+		return
+	}
+	info, err := os.Stat(srcPath)
+	if err != nil || info.IsDir() {
+		return
+	}
+	if rule.MinSize > 0 && info.Size() < rule.MinSize {
+		return
+	}
+	if rule.MinDays > 0 && time.Since(info.ModTime()) < time.Duration(rule.MinDays)*24*time.Hour {
+		return
+	}
+	for pat, sub := range rule.Map {
+		if !matchGlob(pat, name) {
+			continue
+		}
+		dest := filepath.Join(rule.Dest, sub)
+		os.MkdirAll(dest, 0755)
+		dstPath := uniqueDest(dest, name, rule.Rename)
+		if dstPath == "" {
+			return // skip 且目标已存在
+		}
+		if dryRun {
+			*moves = append(*moves, srcPath+" → "+dstPath)
+		} else if err := os.Rename(srcPath, dstPath); err == nil {
+			*total += info.Size()
+			*moves = append(*moves, srcPath+" → "+dstPath)
+		}
+		return
+	}
+}
+
+// ---------- 应用列表（各应用缓存大小） ----------
+
+func scanApps() []map[string]any {
+	seen := map[string]bool{}
+	var apps []map[string]any
+	for _, root := range pkgRoots {
+		entries, _ := os.ReadDir(root)
+		for _, e := range entries {
+			if !e.IsDir() || seen[e.Name()] {
+				continue
+			}
+			seen[e.Name()] = true
+			var total int64
+			for _, sub := range []string{"cache", "code_cache", "app_webview"} {
+				sz, _ := dirSize(filepath.Join(root, e.Name(), sub))
+				total += sz
+			}
+			if total > 0 {
+				apps = append(apps, map[string]any{
+					"package": e.Name(), "size": total,
+				})
+			}
+		}
+	}
+	sort.Slice(apps, func(a, b int) bool {
+		sa, _ := apps[a]["size"].(int64)
+		sb, _ := apps[b]["size"].(int64)
+		return sa > sb
+	})
+	if len(apps) > 100 {
+		apps = apps[:100]
+	}
+	return apps
+}
+
+func apiApps(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"apps": scanApps()})
+}
+
+
+// ---------- fstrim 增强（多分区 + 记录上次结果） ----------
+
+func apiFstrim(w http.ResponseWriter, r *http.Request) {
+	var parts []string
+	if v := r.URL.Query().Get("parts"); v != "" {
+		parts = strings.Split(v, ",")
+	} else {
+		parts = []string{"/data"}
+	}
+	out := []string{}
+	for _, p := range parts {
+		o, err := exec.Command("fstrim", p).CombinedOutput()
+		if err != nil {
+			writeJSON(w, 500, map[string]any{"error": err.Error(), "output": string(o)})
+			return
+		}
+		out = append(out, string(o))
+	}
+	cfgLock.Lock()
+	cfg.LastTrim = time.Now().Format("2006-01-02 15:04")
+	cfgLock.Unlock()
+	saveConfig()
+	logLine("fstrim " + strings.Join(parts, ",") + " done")
+	writeJSON(w, 200, map[string]any{"status": "ok", "output": strings.Join(out, "\n")})
+}
+
+// ---------- 统计增强（累计 + 分类） ----------
+
+type StatData struct {
+	Daily map[string]int   `json:"daily"`
+	Total map[string]int64 `json:"total"`
+	Cats  map[string]int   `json:"cats"`
+}
+
+func loadStats() StatData {
+	var s StatData
+	data, _ := os.ReadFile(statsFile)
+	json.Unmarshal(data, &s)
+	if s.Daily == nil {
+		s.Daily = map[string]int{}
+	}
+	if s.Total == nil {
+		s.Total = map[string]int64{}
+	}
+	if s.Cats == nil {
+		s.Cats = map[string]int{}
+	}
+	return s
+}
+
+func apiStats(w http.ResponseWriter, r *http.Request) {
+	s := loadStats()
+	keys := []string{}
+	for i := 6; i >= 0; i-- {
+		keys = append(keys, time.Now().AddDate(0, 0, -i).Format("2006-01-02"))
+	}
+	days := []map[string]any{}
+	for _, k := range keys {
+		days = append(days, map[string]any{"date": k[5:], "items": s.Daily[k]})
+	}
+	var totalItems int
+	var totalSize int64
+	for _, v := range s.Total {
+		totalSize += v
+	}
+	for _, v := range s.Daily {
+		totalItems += v
+	}
+	writeJSON(w, 200, map[string]any{
+		"days": days, "totalItems": totalItems, "totalSize": totalSize, "cats": s.Cats,
+	})
+}
+
+func isCharging() bool {
+	data, err := os.ReadFile("/sys/class/power_supply/battery/status")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "Charging") || strings.Contains(string(data), "Full")
+}
+
+func isWifi() bool {
+	data, err := os.ReadFile("/sys/class/net/wlan0/operstate")
+	return err == nil && strings.TrimSpace(string(data)) == "up"
+}
+
+func startScheduler() {
+	taskTicker = time.NewTicker(time.Minute)
+	go func() {
+		for range taskTicker.C {
+			now := time.Now()
+			// 回收站自动清理
+			if cfg.AutoTrashDays > 0 && now.Hour() == 0 && now.Minute() < 5 {
+				go autoEmptyTrash()
+			}
+			for _, t := range loadTasks() {
+				triggered := false
+				if t.Every > 0 {
+					if now.Hour() == 0 && now.Minute() < 5 {
+						triggered = true
+					}
+				} else if t.Hour == now.Hour() && now.Minute() < 5 {
+					triggered = true
+				}
+				if !triggered {
+					continue
+				}
+				if t.OnlyCharge && !isCharging() {
+					continue
+				}
+				if t.OnlyWifi && !isWifi() {
+					continue
+				}
+				go autoRun()
+			}
+		}
+	}()
+}
+
+func autoEmptyTrash() {
+	items := loadTrashMeta()
+	var kept []TrashItem
+	for _, it := range items {
+		if time.Now().Unix()-it.Time > int64(cfg.AutoTrashDays)*86400 {
+			os.RemoveAll(it.Path)
+			continue
+		}
+		kept = append(kept, it)
+	}
+	saveTrashMeta(kept)
+}
+
+// ---------- 热更新回滚 ----------
+
+func apiRollback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	bak := "/data/adb/junkclean/junkclean.bak"
+	data, err := os.ReadFile(bak)
+	if err != nil {
+		writeJSON(w, 404, map[string]string{"error": "无备份文件"})
+		return
+	}
+	modDir := "/data/adb/modules/junkclean"
+	os.MkdirAll(modDir+"/system/bin", 0755)
+	os.WriteFile(modDir+"/system/bin/junkclean", data, 0755)
+	shPath := "/system/bin/sh"
+	if _, err := os.Stat(shPath); err != nil {
+		shPath = "/bin/sh"
+	}
+	cmd := exec.Command(shPath, "-c",
+		"setsid "+modDir+"/system/bin/junkclean daemon >> /data/adb/junkclean/daemon.log 2>&1 &")
+	if err := cmd.Start(); err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	logLine("rollback: 已恢复备份并重启")
+	writeJSON(w, 200, map[string]string{"status": "ok", "msg": "已回滚，daemon 重启中"})
+	go func() {
+		time.Sleep(600 * time.Millisecond)
+		os.Exit(0)
+	}()
+}
+
+// ---------- 监控状态 ----------
+
+var monitorCount int64
+var monitorLast string
+
+func monitorStart() bool {
+	if monitorOn {
+		return false
+	}
+	monitorOn = true
+	monitorStop = make(chan bool)
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				rules := loadClassifyRules()
+				if len(rules) > 0 {
+					moves, _ := doClassify(rules, false)
+					if len(moves) > 0 {
+						monitorCount += int64(len(moves))
+						monitorLast = time.Now().Format("2006-01-02 15:04")
+						logLine(fmt.Sprintf("monitor: auto-classify %d files", len(moves)))
+					}
+				}
+			case <-monitorStop:
+				return
+			}
+		}
+	}()
+	return true
 }

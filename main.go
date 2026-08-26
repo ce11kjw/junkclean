@@ -26,7 +26,7 @@ import (
 var webFS embed.FS
 
 const (
-	ver      = "4.1.0"
+	ver      = "4.2.0"
 	verCode  = 351
 	port     = "46780"
 	stateDir = "/data/adb/junkclean"
@@ -43,12 +43,14 @@ type JunkFile struct {
 }
 
 type JunkItem struct {
-	ID    string     `json:"id"`
-	Path  string     `json:"path"`
-	Name  string     `json:"name"`
-	Size  int64      `json:"size"`
-	Count int        `json:"count"`
-	Files []JunkFile `json:"files,omitempty"`
+	ID        string     `json:"id"`
+	Path      string     `json:"path"`
+	Name      string     `json:"name"`
+	Size      int64      `json:"size"`
+	Count     int        `json:"count"`
+	Files     []JunkFile `json:"files,omitempty"`
+	Recurse   bool       `json:"recurse"`   // 子目录递归（默认关）
+	Integrity bool       `json:"integrity"` // 完整性检测（默认开）
 }
 
 type Category struct {
@@ -62,10 +64,14 @@ type Category struct {
 }
 
 type Config struct {
-	Whitelist  []string `json:"whitelist"`
-	AIEndpoint string   `json:"aiEndpoint"`
-	AIKey      string   `json:"aiKey"`
-	AIModel    string   `json:"aiModel"`
+	Whitelist     []string        `json:"whitelist"`
+	Cats          map[string]bool `json:"cats"`
+	AIEndpoint    string          `json:"aiEndpoint"`
+	AIKey         string          `json:"aiKey"`
+	AIModel       string          `json:"aiModel"`
+	AutoClean     bool            `json:"autoClean"`
+	AutoTrashDays int             `json:"autoTrashDays"`
+	LastTrim      string          `json:"lastTrim"`
 }
 
 type ScanState struct {
@@ -78,6 +84,7 @@ type ScanState struct {
 	categories []Category
 	total      int64
 	done       bool
+	lastScan   time.Time
 }
 
 var (
@@ -270,7 +277,13 @@ func (s *ScanState) run() {
 
 	var cats []Category
 	var total int64
+	cfgLock.RLock()
+	catsOn := cfg.Cats
+	cfgLock.RUnlock()
 	for _, r := range rules {
+		if catsOn != nil && !catsOn[r.id] {
+			continue // 分类开关关闭
+		}
 		cat := Category{ID: r.id, Name: r.name, Icon: r.icon,
 			Desc: r.desc, Careful: r.careful}
 		for _, d := range r.dirs {
@@ -310,6 +323,7 @@ func (s *ScanState) run() {
 	s.mu.Lock()
 	s.categories, s.total = cats, total
 	s.stage, s.done, s.running = "done", true, false
+	s.lastScan = time.Now()
 	s.mu.Unlock()
 	saveState()
 	logLine("scan done: "+fmt.Sprintf("%d categories, %s", len(cats), fmtSize(total)))
@@ -379,6 +393,10 @@ func loadConfig() {
 	data, err := os.ReadFile(confF)
 	if err == nil {
 		json.Unmarshal(data, &cfg)
+	}
+	// 默认分类全开
+	if cfg.Cats == nil {
+		cfg.Cats = map[string]bool{"cache": true, "webview": true, "logs": true, "temp": true, "remnant": true}
 	}
 	cfgLock.Lock()
 	whitelistM = map[string]bool{}
@@ -471,9 +489,14 @@ func apiStatus(w http.ResponseWriter, r *http.Request) {
 func apiScan(w http.ResponseWriter, r *http.Request) {
 	scanSt.mu.Lock()
 	running := scanSt.running
+	cached := scanSt.done && time.Since(scanSt.lastScan) < 60*time.Second
 	scanSt.mu.Unlock()
 	if running {
 		writeJSON(w, 409, map[string]string{"error": "scan already running"})
+		return
+	}
+	if cached && r.URL.Query().Get("force") != "1" {
+		writeJSON(w, 200, map[string]string{"status": "cached"}) // 60s 内用缓存
 		return
 	}
 	go scanSt.run()
@@ -508,12 +531,15 @@ func apiClean(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 409, map[string]string{"error": "scan not done"})
 		return
 	}
+	before := diskInfo("/data")
 	freed, errs := scanSt.clean(req.IDs)
 	scanSt.done, scanSt.categories = false, nil
 	scanSt.mu.Unlock()
 	saveState()
+	after := diskInfo("/data")
+	recordStat(len(req.IDs))
 	logLine(fmt.Sprintf("clean done: freed %s", fmtSize(freed)))
-	writeJSON(w, 200, map[string]any{"freed": freed, "errors": errs})
+	writeJSON(w, 200, map[string]any{"freed": freed, "errors": errs, "before": before, "after": after})
 }
 
 func apiConfig(w http.ResponseWriter, r *http.Request) {
@@ -695,6 +721,52 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+// ----- 一键全清（安全分类） -----
+
+func apiCleanall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	scanSt.mu.Lock()
+	if !scanSt.done {
+		scanSt.mu.Unlock()
+		writeJSON(w, 409, map[string]string{"error": "请先扫描"})
+		return
+	}
+	var ids []string
+	for _, c := range scanSt.categories {
+		if c.Careful {
+			continue
+		}
+		for _, it := range c.Items {
+			ids = append(ids, it.ID)
+		}
+	}
+	before := diskInfo("/data")
+	freed, errs := scanSt.clean(ids)
+	scanSt.done, scanSt.categories = false, nil
+	scanSt.mu.Unlock()
+	saveState()
+	after := diskInfo("/data")
+	recordStat(len(ids))
+	logLine(fmt.Sprintf("cleanall: %d items, freed %s", len(ids), fmtSize(freed)))
+	writeJSON(w, 200, map[string]any{"freed": freed, "items": len(ids), "errors": errs, "before": before, "after": after})
+}
+
+// ----- 路径存在性检查 -----
+
+func apiCheck(w http.ResponseWriter, r *http.Request) {
+	var req struct{ Paths []string `json:"paths"` }
+	json.NewDecoder(r.Body).Decode(&req)
+	result := map[string]bool{}
+	for _, p := range req.Paths {
+		_, err := os.Stat(p)
+		result[p] = err == nil
+	}
+	writeJSON(w, 200, map[string]any{"exist": result})
+}
+
 // ----- AI analysis (optional) -----
 
 func apiAI(w http.ResponseWriter, r *http.Request) {
@@ -818,6 +890,8 @@ func main() {
 	http.HandleFunc("/api/logs", corsMiddleware(apiLogs))
 	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
 	http.HandleFunc("/api/hotupdate", corsMiddleware(apiHotupdate))
+	http.HandleFunc("/api/cleanall", corsMiddleware(apiCleanall))
+	http.HandleFunc("/api/check", corsMiddleware(apiCheck))
 	registerFeatures(http.DefaultServeMux)
 	startScheduler()
 	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
