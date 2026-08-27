@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.2.8 (2026-08-27)
+- 修复: display:flex 覆盖 hidden 导致面板/清理栏/确认层常显关不掉
+
 ## v4.2.7 (2026-08-27)
 - 前端审核修复: checkedPaths删除失效/P0 + api错误处理 + big多扩展名+days
 
