@@ -714,6 +714,7 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 
 	modDir := "/data/adb/modules/junkclean"
 	tmpZip := "/data/local/tmp/jc-hot.zip"
+	downloaded := false
 	tmpDir := "/data/local/tmp/jc-hot"
 
 	if req.URL != "" {
@@ -735,6 +736,7 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 		}
 		io.Copy(f, resp.Body)
 		f.Close()
+		downloaded = true
 	} else if req.Path != "" {
 		tmpZip = req.Path
 	} else {
@@ -753,7 +755,9 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 		}
 		sum := fmt.Sprintf("%x", sha256.Sum256(data))
 		if !strings.EqualFold(sum, req.SHA256) {
-			os.Remove(tmpZip)
+			if downloaded {
+				os.Remove(tmpZip)
+			}
 			writeJSON(w, 400, map[string]string{"error": "SHA256 校验失败，已丢弃"})
 			return
 		}
