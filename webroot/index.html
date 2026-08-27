@@ -440,6 +440,25 @@ function toast(msg, type) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
+function bindLongPressWhitelist(containerId) {
+  const el = $(containerId);
+  if (!el) return;
+  el.querySelectorAll('.panel-item[data-name]').forEach(item => {
+    let timer;
+    const start = () => { timer = setTimeout(async () => {
+      const nm = item.dataset.name;
+      if (!nm) return;
+      const r = await api('/whitelist/add', {method:'POST', body: JSON.stringify({name: nm})});
+      if (r.error) { toast(r.error, 'err'); return; }
+      toast(r.status === 'exists' ? '已在白名单' : '已加入白名单: ' + nm, 'success');
+      item.style.opacity = '.4';
+    }, 700); };
+    const cancel = () => clearTimeout(timer);
+    item.addEventListener('touchstart', start, {passive:true});
+    item.addEventListener('mousedown', start);
+    ['touchend','touchmove','mouseup','mouseleave'].forEach(ev => item.addEventListener(ev, cancel));
+  });
+}
 const ck = (r, msg) => { if (r && r.error) { toast((msg||'操作') + '失败: ' + r.error, 'err'); return true; } return false; };
 function applyTheme(t) { document.documentElement.dataset.theme = t || 'dark'; }
 function applyAccent(a) { document.documentElement.dataset.accent = a || 'emerald'; }
@@ -576,6 +595,18 @@ function renderResults() {
       const row = document.createElement('div');
       row.className = 'item-row';
       row.innerHTML = `<input type="checkbox" data-key="${ci}:${ii}" ${cat.careful?'':'checked'}><span class="item-name">${esc(it.name)}</span><span class="item-size">${fmt(it.size)}</span>`;
+      let lpTimer;
+      const lpStart = () => { lpTimer = setTimeout(async () => {
+        const r = await api('/whitelist/add', {method:'POST', body: JSON.stringify({name: it.name})});
+        if (r.error) { toast(r.error, 'err'); return; }
+        toast(r.status === 'exists' ? '已在白名单' : '已加白: ' + it.name, 'success');
+        row.style.opacity = '.35';
+        row.querySelector('input').checked = false;
+      }, 700); };
+      const lpCancel = () => clearTimeout(lpTimer);
+      row.addEventListener('touchstart', lpStart, {passive:true});
+      row.addEventListener('mousedown', lpStart);
+      ['touchend','touchmove','mouseup','mouseleave'].forEach(ev => row.addEventListener(ev, lpCancel));
       itemsBox.appendChild(row);
     });
     card.querySelector('.cat-hdr').addEventListener('click', e => {
@@ -686,8 +717,10 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dat
   $('hotBtn').onclick = async () => {
   const info = await api('/updateinfo');
   if (ck(info, '检查更新')) return;
-  if (!info.hasUpdate) { toast('已是最新版本 v' + info.remote); return; }
-  toast('发现新版本 v' + info.remote + '，更新中...');
+  if (!info.hasUpdate) { toast('已是最新版本 v' + info.remote, 'success'); return; }
+  const cl = info.changelog ? '\n\n更新内容:\n' + info.changelog : '';
+  if (!confirm('发现新版本 v' + info.remote + ' (当前 v' + info.current + ')' + cl + '\n\n是否更新？')) return;
+  toast('更新中...', 'info');
   $('hotBtn').disabled = true;
   const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url: info.zipUrl})});
   $('hotBtn').disabled = false;
@@ -807,7 +840,7 @@ function toolBig() {
     list = list.filter(filterType);
     const el = $('bigList');
     el.innerHTML = list.length ? list.map((it,i) => `
-      <div class="panel-item" data-path="${esc(it.path)}"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
+      <div class="panel-item" data-path="${esc(it.path)}" data-name="${esc(it.name)}"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
       : '<div class="panel-empty">未发现大文件</div>';
   };
   $('bigAll').onclick = () => $('bigList').querySelectorAll('input').forEach(c=>c.checked=true);
@@ -877,6 +910,19 @@ function openTool(id) {
 if (!document.documentElement.dataset.theme) {
   applyTheme('dark');
 }
+// 启动时静默检查更新，有新版显示红点
+api('/updateinfo').then(info => {
+  if (info && info.hasUpdate) {
+    const tab = document.querySelector('.tab[data-tab="settings"]');
+    if (tab && !tab.querySelector('.dot')) {
+      const d = document.createElement('span');
+      d.className = 'dot';
+      d.style.cssText = 'position:absolute;top:6px;right:14px;width:7px;height:7px;border-radius:50%;background:var(--danger);box-shadow:0 0 6px var(--danger)';
+      tab.style.position = 'relative';
+      tab.appendChild(d);
+    }
+  }
+}).catch(() => {});
 initTools();
 
 
@@ -1012,7 +1058,7 @@ function toolTrash() {
     $('trSize').textContent = items.length + ' 项 · 占用 ' + fmt(total);
     const el = $('trItems');
     el.innerHTML = list.length ? list.map((it,i) => `
-      <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.orig)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
+      <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.orig)}</span><span class="sz">${fmt(it.size)}${it.left >= 0 ? ' · 剩'+it.left+'天' : ''}</span></div>`).join('')
       : '<div class="panel-empty">回收站为空</div>';
     return list;
   };
@@ -1054,7 +1100,7 @@ function toolCleanapp() {
       <button class="primary" id="caScan">扫描缓存</button>
     </div>
     <div class="panel-list" id="caList"></div>
-    <div class="row"><button id="caClearAll" style="flex:1">🧹 一键清全部缓存</button></div>`);
+    <div class="row"><button id="caClearSel" style="flex:1">清选中</button><button id="caClearAll" style="flex:1">🧹 清全部</button></div>`);
   let apps = [];
   const render = () => {
     const el = $('caList');
@@ -1062,6 +1108,7 @@ function toolCleanapp() {
     const list = apps.filter(a => !kw || a.package.toLowerCase().includes(kw));
     el.innerHTML = list.length ? list.map((a,i) => `
       <div class="panel-item">
+        <input type="checkbox" data-pkg="${esc(a.package)}">
         <img src="ksu://icon/${a.package}" onerror="this.style.display='none'" style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.05)">
         <span class="nm">${esc(a.package)}</span>
         <span class="sz">${fmt(a.size)}</span>
@@ -1082,6 +1129,19 @@ function toolCleanapp() {
   };
   $('caScan').onclick = load;
   $('caSearch').oninput = render;
+  $('caClearSel').onclick = async () => {
+    const pkgs = [];
+    $('caList').querySelectorAll('input[data-pkg]:checked').forEach(cb => pkgs.push(cb.dataset.pkg));
+    if (!pkgs.length) { toast('未选中应用', 'warn'); return; }
+    if (!confirm('清理 ' + pkgs.length + ' 个应用的缓存？')) return;
+    let freed = 0;
+    for (const p of pkgs) {
+      const r = await api('/cleanapp', {method:'POST', body: JSON.stringify({package:p})});
+      freed += r.freed || 0;
+    }
+    toast('已清理 ' + pkgs.length + ' 个应用 · 释放 ' + fmt(freed), 'success');
+    load();
+  };
   $('caClearAll').onclick = async () => {
     if (!confirm('清理全部应用缓存？缓存会重建，安全')) return;
     let total = 0;

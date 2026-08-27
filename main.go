@@ -923,6 +923,8 @@ func main() {
 	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
 	http.HandleFunc("/api/hotupdate", corsMiddleware(apiHotupdate))
 	http.HandleFunc("/api/updateinfo", corsMiddleware(apiUpdateinfo))
+	http.HandleFunc("/api/whitelist/add", corsMiddleware(apiWhitelistAdd))
+	http.HandleFunc("/api/apkcheck", corsMiddleware(apiApkCheck))
 	http.HandleFunc("/api/cleanall", corsMiddleware(apiCleanall))
 	http.HandleFunc("/api/check", corsMiddleware(apiCheck))
 	registerFeatures(http.DefaultServeMux)

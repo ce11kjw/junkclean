@@ -2,6 +2,7 @@
 package main
 
 import (
+	"regexp"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -498,6 +499,7 @@ type TrashItem struct {
 	Orig string `json:"orig"`
 	Size int64  `json:"size"`
 	Time int64  `json:"time"`
+	Left int    `json:"left"` // 剩余保留天数，-1=不自动删
 }
 
 func trashMeta() string { return trashDir + "/.meta.json" }
@@ -549,7 +551,22 @@ func apiTrash(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&req)
 	switch req.Action {
 	case "list":
-		writeJSON(w, 200, map[string]any{"items": loadTrashMeta()})
+		items := loadTrashMeta()
+		if cfg.AutoTrashDays > 0 {
+			now := time.Now().Unix()
+			for i := range items {
+				left := cfg.AutoTrashDays - int((now-items[i].Time)/86400)
+				if left < 0 {
+					left = 0
+				}
+				items[i].Left = left
+			}
+		} else {
+			for i := range items {
+				items[i].Left = -1
+			}
+		}
+		writeJSON(w, 200, map[string]any{"items": items})
 	case "restore":
 		items := loadTrashMeta()
 		var rest int
@@ -1074,6 +1091,66 @@ func startScheduler() {
 			}
 		}
 	}()
+}
+
+// ----- 白名单快捷添加 -----
+
+func apiWhitelistAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]string{"error": "POST only"})
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.Name == "" {
+		writeJSON(w, 400, map[string]string{"error": "name 必填"})
+		return
+	}
+	for _, x := range cfg.Whitelist {
+		if x == req.Name {
+			writeJSON(w, 200, map[string]string{"status": "exists"})
+			return
+		}
+	}
+	cfg.Whitelist = append(cfg.Whitelist, req.Name)
+	saveConfig()
+	writeJSON(w, 200, map[string]any{"status": "ok", "count": len(cfg.Whitelist)})
+}
+
+// ----- APK 已安装检测（包名提取 + pm 校验） -----
+
+func apiApkCheck(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Paths []string `json:"paths"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	out, _ := exec.Command("sh", "-c", "pm list packages 2>/dev/null | sed 's/package://'").Output()
+	installed := map[string]bool{}
+	for _, l := range strings.Split(string(out), "\n") {
+		if p := strings.TrimSpace(l); p != "" {
+			installed[p] = true
+		}
+	}
+	type apkInfo struct {
+		Path      string `json:"path"`
+		Package   string `json:"package"`
+		Installed bool   `json:"installed"`
+	}
+	var res []apkInfo
+	for _, p := range req.Paths {
+		if !strings.HasSuffix(strings.ToLower(p), ".apk") {
+			continue
+		}
+		pkgOut, _ := exec.Command("aapt", "dump", "badging", p).Output()
+		pkgName := ""
+		if m := regexp.MustCompile(`package: name='([^']+)'`).FindSubmatch(pkgOut); len(m) > 1 {
+			pkgName = string(m[1])
+		}
+		res = append(res, apkInfo{Path: p, Package: pkgName, Installed: pkgName != "" && installed[pkgName]})
+	}
+	writeJSON(w, 200, map[string]any{"apks": res})
 }
 
 func autoEmptyTrash() {
