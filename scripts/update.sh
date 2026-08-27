@@ -4,7 +4,15 @@
 MODDIR=${1:-/data/adb/modules/junkclean}
 mkdir -p /data/adb/junkclean
 
-fetch_ver() { curl -s --max-time 8 https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json 2>/dev/null; }
+if command -v curl >/dev/null 2>&1; then
+  get() { curl -s --max-time 8 "$1" 2>/dev/null; }
+  dl() { curl -s -L --max-time 60 -o "$2" "$1" 2>/dev/null; }
+else
+  get() { busybox wget -q -O - -T 8 "$1" 2>/dev/null; }
+  dl() { busybox wget -q -O "$2" -T 60 "$1" 2>/dev/null; }
+fi
+
+fetch_ver() { get https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json; }
 
 NEW=$(fetch_ver | grep -o '"versionCode": *[0-9]*' | grep -o '[0-9]*')
 CUR=$(grep '^versionCode=' "$MODDIR/module.prop" 2>/dev/null | cut -d= -f2)
@@ -17,7 +25,7 @@ ZIP=$(fetch_ver | grep -o '"zipUrl": *"[^"]*"' | cut -d'"' -f4)
 TMP=/data/local/tmp/jc-update
 TMPZIP=/data/local/tmp/jc-update.zip
 rm -rf "$TMP" "$TMPZIP"
-curl -s -L --max-time 60 -o "$TMPZIP" "$ZIP" || { echo "下载失败"; exit 1; }
+dl "$ZIP" "$TMPZIP" || { echo "下载失败"; exit 1; }
 mkdir -p "$TMP"
 unzip -o -q "$TMPZIP" -d "$TMP" 2>/dev/null || { rm -rf "$TMP" "$TMPZIP"; echo "解压失败"; exit 1; }
 # 校验 zip 完整性（防损坏覆盖）

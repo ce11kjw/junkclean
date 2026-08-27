@@ -647,6 +647,7 @@ type Task struct {
 	OnlyWifi   bool   `json:"onlyWifi"`
 	LastRun    string `json:"lastRun"`
 	LastResult string `json:"lastResult"`
+	LastUnix   int64  `json:"lastUnix"`
 }
 
 var taskLock sync.Mutex
@@ -1008,7 +1009,7 @@ func startScheduler() {
 			for _, t := range loadTasks() {
 				triggered := false
 				if t.Every > 0 {
-					if now.Hour() == 0 && now.Minute() < 5 {
+					if t.LastUnix == 0 || now.Unix()-t.LastUnix >= int64(t.Every)*3600 {
 						triggered = true
 					}
 				} else if t.Hour == now.Hour() && now.Minute() < 5 {
@@ -1031,6 +1032,7 @@ func startScheduler() {
 						if tasks[i].ID == id {
 							tasks[i].LastRun = ts
 							tasks[i].LastResult = "ok"
+							tasks[i].LastUnix = time.Now().Unix()
 						}
 					}
 					saveTasks(tasks)
