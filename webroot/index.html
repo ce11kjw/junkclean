@@ -161,9 +161,9 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .page-head{display:flex;flex-direction:column;gap:2px;margin:6px 0 16px}
 .page-eyebrow{font-size:10px;letter-spacing:.22em;color:#5c5c6a;text-transform:uppercase;font-weight:700}
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,#fff,#2dd4a7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;width:fit-content}
-.tabnav{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:3px;background:rgba(12,12,22,.82);border:1px solid var(--line);border-radius:99px;padding:3px;backdrop-filter:blur(24px);z-index:120;box-shadow:0 8px 32px rgba(0,0,0,.45)}
-.tab{display:flex;align-items:center;gap:4px;padding:5px 11px;border:none;border-radius:99px;background:transparent;color:#9a9aa8;font-size:11px;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1)}
-.tab .ti{font-size:12px}
+.tabnav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:4px;background:rgba(12,12,22,.82);border:1px solid var(--line);border-radius:99px;padding:4px;backdrop-filter:blur(24px);z-index:120;box-shadow:0 8px 32px rgba(0,0,0,.45)}
+.tab{display:flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:99px;background:transparent;color:#9a9aa8;font-size:14px;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1)}
+.tab .ti{font-size:16px}
 .tab.active{background:linear-gradient(135deg,#2dd4a7,#059669);color:#fff;box-shadow:0 3px 14px rgba(45,212,167,.35)}
 .tab:active{transform:scale(.95)}
 #page-settings .card{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
@@ -713,32 +713,71 @@ initTools();
 // --- 整理中心 ---
 function toolClassify() {
   const b = $('body-classify');
-  b.innerHTML = '';
-  const load = async () => {
-    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'get'})});
-    const rules = r.rules||[];
-    const dest = rules.length ? rules[0].dest : '/sdcard/下载';
-    let html = '<div class="panel-note" style="margin-bottom:12px">📁 统一目标: <b style="color:var(--text)">' + esc(dest) + '</b></div>';
-    html += '<div class="row"><button class="primary" id="clPreview">🔍 预览</button><button id="clRun">⚡ 执行整理</button></div>';
+  b.innerHTML = '<div class="panel-empty">加载规则...</div>';
+  const getRules = async () => (await api('/classify', {method:'POST', body: JSON.stringify({action:'get'})})).rules||[];
+  const render = (rules) => {
+    const dest = rules.length ? rules[0].dest : '';
+    let h = '<div class="panel-note" style="margin-bottom:6px">📁 统一目标（所有规则共用）</div>';
+    h += '<div class="row"><input id="clDest" value="' + esc(dest) + '" placeholder="/sdcard/下载"><button id="clSaveDest" style="flex:0">保存</button></div>';
+    h += '<div class="row" style="margin-top:8px"><button class="primary" id="clPreview">🔍 预览</button><button id="clRun">⚡ 执行</button><button id="clAddRule">＋ 新增规则</button></div>';
     rules.forEach((rule, ri) => {
-      const maps = Object.entries(rule.map||{}).map(([k,v]) => k+'→'+v).join(' · ');
-      html += '<div class="tool-panel" style="margin:10px 0;padding:14px">';
-      html += '<div class="row"><span>📂 源: <b>'+esc(rule.src)+'</b></span></div>';
-      html += '<div class="panel-note" style="font-size:12px;margin:4px 0">'+esc(maps)+'</div>';
-      html += '<div class="row" style="margin-top:6px">';
-      html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">🔄 处理子项目<input type="checkbox" data-ri="'+ri+'" class="cl-switch" '+(rule.recurse?'checked':'')+'></label>';
-      html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">🛡 完整性检测<input type="checkbox" data-ri="'+ri+'" class="cl-int" '+(rule.integrity?'checked':'')+'></label>';
-      html += '</div></div>';
+      const maps = Object.entries(rule.map||{}).map(([k,v]) => k+'→'+v).join('\n');
+      h += '<div class="tool-panel" style="margin:10px 0;padding:14px">';
+      h += '<div class="row"><span style="font-size:12px;color:#9a9aa8;flex:0">源路径</span><input data-ri="'+ri+'" class="cl-src" value="'+esc(rule.src)+'" placeholder="/sdcard/Download"></div>';
+      h += '<textarea data-ri="'+ri+'" class="cl-maps" rows="3" style="margin:8px 0" placeholder="映射，每行一个：*.jpg→图片">'+esc(maps)+'</textarea>';
+      h += '<div class="row" style="justify-content:space-between">';
+      h += '<div class="row"><span style="font-size:12px;color:#9a9aa8">🔄 子项目</span><label class="switch"><input type="checkbox" data-ri="'+ri+'" class="cl-rec" '+(rule.recurse?'checked':'')+'><span class="sl"></span></label>';
+      h += '<span style="font-size:12px;color:#9a9aa8">🛡 完整性</span><label class="switch"><input type="checkbox" data-ri="'+ri+'" class="cl-int" '+(rule.integrity?'checked':'')+'><span class="sl"></span></label></div>';
+      h += '<div class="row"><button data-ri="'+ri+'" class="cl-save" style="padding:6px 14px">保存</button><button data-ri="'+ri+'" class="cl-del" style="background:rgba(251,113,133,.15);color:#fb7185;padding:6px 12px;border:none">删除</button></div>';
+      h += '</div></div>';
     });
-    html += '<div class="panel-list" id="clList"></div>';
-    b.innerHTML = html;
-    document.querySelectorAll('.cl-switch,.cl-int').forEach(cb => cb.onchange = async () => {
-      const rules2 = await (await fetch('http://127.0.0.1:46780/api/classify', {method:'POST', body: JSON.stringify({action:'get'})})).json();
-      const rs = rules2.rules||[];
-      document.querySelectorAll('.cl-switch').forEach((c,i) => { if(rs[i]) rs[i].recurse = c.checked; });
-      document.querySelectorAll('.cl-int').forEach((c,i) => { if(rs[i]) rs[i].integrity = c.checked; });
+    h += '<div class="panel-list" id="clList"></div>';
+    b.innerHTML = h;
+    bind(rules);
+  };
+  const bind = (rules) => {
+    // 统一目标保存
+    $('clSaveDest').onclick = async () => {
+      const rs = await getRules();
+      rs.forEach(r => r.dest = $('clDest').value.trim() || r.dest);
       await api('/classify', {method:'POST', body: JSON.stringify({action:'save', rules: rs})});
+      alert('已保存统一目标 ✓');
+    };
+    // 每条规则独立保存（Src + 映射 + 开关一起）
+    document.querySelectorAll('.cl-save').forEach(bn => bn.onclick = async () => {
+      const ri = +bn.dataset.ri;
+      const rs = await getRules();
+      if (!rs[ri]) return;
+      rs[ri].src = document.querySelectorAll('.cl-src')[ri].value.trim();
+      const map = {};
+      document.querySelectorAll('.cl-maps')[ri].value.split('\n').forEach(l => {
+        const i = l.indexOf('→');
+        if (i > 0) map[l.slice(0,i).trim()] = l.slice(i+1).trim();
+      });
+      rs[ri].map = map;
+      rs[ri].recurse = document.querySelectorAll('.cl-rec')[ri].checked;
+      rs[ri].integrity = document.querySelectorAll('.cl-int')[ri].checked;
+      await api('/classify', {method:'POST', body: JSON.stringify({action:'save', rules: rs})});
+      alert('已保存 ✓');
     });
+    // 删除规则
+    document.querySelectorAll('.cl-del').forEach(bn => bn.onclick = async () => {
+      if (!confirm('删除这条规则？')) return;
+      const rs = await getRules();
+      rs.splice(+bn.dataset.ri, 1);
+      await api('/classify', {method:'POST', body: JSON.stringify({action:'save', rules: rs})});
+      render(rs);
+    });
+    // 新增规则（顶部临时表单）
+    $('clAddRule').onclick = async () => {
+      const src = prompt('源路径（如 /sdcard/Download）:');
+      if (!src) return;
+      const rs = await getRules();
+      rs.push({src, dest: $('clDest').value.trim(), map: {}, recurse: false, integrity: true});
+      await api('/classify', {method:'POST', body: JSON.stringify({action:'save', rules: rs})});
+      render(rs);
+    };
+    // 预览/执行
     $('clPreview').onclick = async () => {
       const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'preview'})});
       $('clList').innerHTML = (r.moves||[]).length ? r.moves.map(m => '<div class="panel-item"><span class="nm">'+esc(m)+'</span></div>').join('') : '<div class="panel-empty">无待整理文件</div>';
@@ -750,7 +789,7 @@ function toolClassify() {
       $('clList').innerHTML = (r.moves||[]).map(m => '<div class="panel-item"><span class="nm">'+esc(m)+'</span></div>').join('');
     };
   };
-  load();
+  getRules().then(render);
 }
 
 function toolDuplicate() {
