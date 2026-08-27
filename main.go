@@ -26,8 +26,8 @@ import (
 var webFS embed.FS
 
 const (
-	ver      = "4.2.2"
-	verCode  = 422
+	ver      = "4.2.3"
+	verCode  = 423
 	port     = "46780"
 	stateDir = "/data/adb/junkclean"
 	logFile  = stateDir + "/junkclean.log"
