@@ -72,6 +72,7 @@ type Config struct {
 	AutoClean     bool            `json:"autoClean"`
 	AutoTrashDays int             `json:"autoTrashDays"`
 	LastTrim      string          `json:"lastTrim"`
+	BGUrl         string          `json:"bgUrl"`
 }
 
 type ScanState struct {

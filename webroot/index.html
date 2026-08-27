@@ -155,6 +155,25 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#2dd4a7,#7c5cff);border-radius:99px;box-shadow:0 0 18px #2dd4a766;transition:width .7s cubic-bezier(.32,.72,0,1)}
 .bar-meta{display:flex;justify-content:space-between;font-size:12px;color:#9a9aa8}
 
+/* 三 Tab */
+.page{animation:pageIn .4s cubic-bezier(.32,.72,0,1)}
+.page[hidden]{display:none}
+.page-head{display:flex;flex-direction:column;gap:2px;margin:6px 0 16px}
+.page-eyebrow{font-size:10px;letter-spacing:.22em;color:#5c5c6a;text-transform:uppercase;font-weight:700}
+.page-title{font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,#fff,#2dd4a7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;width:fit-content}
+.tabnav{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:4px;background:rgba(12,12,22,.82);border:1px solid var(--line);border-radius:99px;padding:5px;backdrop-filter:blur(24px);z-index:120;box-shadow:0 8px 32px rgba(0,0,0,.45)}
+.tab{display:flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:99px;background:transparent;color:#9a9aa8;font-size:13px;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1)}
+.tab .ti{font-size:15px}
+.tab.active{background:linear-gradient(135deg,#2dd4a7,#059669);color:#fff;box-shadow:0 3px 14px rgba(45,212,167,.35)}
+.tab:active{transform:scale(.95)}
+#page-settings .card{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+#page-settings .card h3{font-size:14px;font-weight:700}
+#page-settings label{font-size:13px;color:#9a9aa8;display:flex;flex-direction:column;gap:4px}
+#page-settings input,#page-settings textarea{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:12px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;width:100%;box-sizing:border-box}
+#page-settings input:focus,#page-settings textarea:focus{outline:none;border-color:#2dd4a7}
+#page-settings .log-area{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:11px;font-family:monospace;color:#9a9aa8;max-height:180px;overflow-y:auto;white-space:pre-wrap}
+@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
 </style>
 </head>
 <body>
@@ -162,11 +181,12 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2dd4a7"/><stop offset="100%" stop-color="#7c5cff"/></linearGradient>
 </defs></svg>
 <div id="app">
+  <div class="page" id="page-home">
   <header class="hdr">
     <div class="hdr-logo">🧹<span>JunkClean</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <span class="badge" id="rootBadge">root</span>
-      <button class="hdr-btn" id="settingsBtn" title="设置">⚙</button>
+      
     </div>
   </header>
 
@@ -196,7 +216,47 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
     <div class="section-title"><span>扫描结果</span><span id="totalSize" style="color:var(--accent)"></span></div>
     <div id="catList"></div>
   </section>
+  </div>
+
+  <div class="page" id="page-tools" hidden>
+    <div class="page-head"><span class="page-eyebrow">TOOLS</span><h2 class="page-title">工具箱</h2></div>
+    <div class="tools" id="toolsGrid"></div>
+  </div>
+
+  <div class="page" id="page-settings" hidden>
+    <div class="page-head"><span class="page-eyebrow">SETTINGS</span><h2 class="page-title">设置</h2></div>
+    <div id="settingsBody">
+      <div class="card"><label>背景图片直链<input id="bgUrl" placeholder="https://... 直链" style="margin-top:4px"></label></div>
+<label>白名单包名（每行一个，跳过不扫描）
+    <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
+  </label>
+  <label>AI 端点
+    <input id="aiEndpoint" placeholder="https://api.openai.com/v1">
+  </label>
+  <label>AI Key
+    <input id="aiKey" type="password" placeholder="sk-...">
+  </label>
+  <label>AI 模型
+    <input id="aiModel" placeholder="gpt-4o-mini">
+  </label>
+  <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
+  <h2 style="margin-top:8px">热更新</h2>
+  <input id="hotUrl" placeholder="zip 下载地址" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;width:100%;box-sizing:border-box">
+  <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
+  <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
+  <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
+  <h2 style="margin-top:8px">操作日志</h2>
+  <div class="log-area" id="logArea">加载中...</div>
+
+    </div>
+  </div>
 </div>
+
+<nav class="tabnav" id="tabnav">
+  <button class="tab active" data-tab="home"><span class="ti">◉</span>首页</button>
+  <button class="tab" data-tab="tools"><span class="ti">▦</span>工具箱</button>
+  <button class="tab" data-tab="settings"><span class="ti">⚙</span>设置</button>
+</nav>
 
 <div class="panel" id="toolPanel" hidden>
   <div class="panel-head">
@@ -223,31 +283,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   </div>
 </div>
 
-<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
-<div class="drawer" id="drawer" hidden>
-  <button class="close-btn" id="closeDrawer">✕</button>
-  <h2>设置</h2>
-  <label>白名单包名（每行一个，跳过不扫描）
-    <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
-  </label>
-  <label>AI 端点
-    <input id="aiEndpoint" placeholder="https://api.openai.com/v1">
-  </label>
-  <label>AI Key
-    <input id="aiKey" type="password" placeholder="sk-...">
-  </label>
-  <label>AI 模型
-    <input id="aiModel" placeholder="gpt-4o-mini">
-  </label>
-  <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
-  <h2 style="margin-top:8px">热更新</h2>
-  <input id="hotUrl" placeholder="zip 下载地址" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;width:100%;box-sizing:border-box">
-  <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
-  <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
-  <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
-  <h2 style="margin-top:8px">操作日志</h2>
-  <div class="log-area" id="logArea">加载中...</div>
-</div>
+
 <script>
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -446,21 +482,30 @@ $('selectAll').onchange = e => {
 };
 
 // ---------- settings drawer ----------
-$('settingsBtn').onclick = async () => {
+async function loadSettings() {
   const c = await api('/config');
   $('wlInput').value = (c.whitelist||[]).join('\n');
   $('aiEndpoint').value = c.aiEndpoint||'';
   $('aiKey').value = c.aiKey||'';
   $('aiModel').value = c.aiModel||'';
+  $('bgUrl').value = c.bgUrl||'';
+  applyBg(c.bgUrl);
   const lg = await api('/logs');
   $('logArea').textContent = (lg.logs||[]).join('\n') || '暂无日志';
-  $('drawer').hidden = false;
-  $('drawerBackdrop').hidden = false;
-};
-$('closeDrawer').onclick = $('drawerBackdrop').onclick = () => {
-  $('drawer').hidden = true;
-  $('drawerBackdrop').hidden = true;
-};
+}
+function applyBg(url) {
+  let s = document.getElementById('bgStyle');
+  if (!s) { s = document.createElement('style'); s.id = 'bgStyle'; document.head.appendChild(s); }
+  const u = (url||'').trim();
+  s.textContent = u ? 'body::before{background:#050509 url("' + u + '") center/cover no-repeat fixed!important}' : '';
+}
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(p => { p.hidden = p.id !== 'page-' + name; });
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  if (name === 'settings') loadSettings();
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+
   $('hotBtn').onclick = async () => {
     const el = $('hotResult');
     const url = $('hotUrl').value.trim();
@@ -484,8 +529,10 @@ $('saveCfgBtn').onclick = async () => {
     whitelist: $('wlInput').value.split('\n').map(s=>s.trim()).filter(Boolean),
     aiEndpoint: $('aiEndpoint').value.trim(),
     aiKey: $('aiKey').value.trim(),
-    aiModel: $('aiModel').value.trim()
+    aiModel: $('aiModel').value.trim(),
+    bgUrl: $('bgUrl').value.trim()
   })});
+  applyBg($('bgUrl').value);
   alert('已保存 ✓');
 };
 
