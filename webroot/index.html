@@ -244,6 +244,33 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .type-tab:hover{color:var(--text)}
 .type-tab.active{background:linear-gradient(135deg,var(--accent),#059669);border-color:transparent;color:#fff}
 
+/* 可访问性：reduced-motion 降级 */
+@media (prefers-reduced-motion: reduce){
+  .card,.tool-panel,.page,#page-home .btn{animation:none!important}
+  .btn:active,.tab:active,.tab{transition:none!important}
+}
+/* 跟随系统主题（用户未设置 data-theme 时） */
+@media (prefers-color-scheme: light){:root:not([data-theme]):not([data-theme="dark"]):not([data-theme="oled"]){--bg:#f5f6fa;--bg2:#fff;--surface:rgba(0,0,0,.04);--line:rgba(0,0,0,.08);--text:#1a1a23;--muted:#6e6e7a;--accent:#14b88f;--accent2:#5c3eff}}
+/* focus-visible 聚焦环 */
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 对比度增强：muted 提亮 */
+:root{--muted:#b8b8c4}
+/* OLED 真省电：去掉装饰 */
+:root[data-theme="oled"] .card,.root[data-theme="oled"] .tool-panel{box-shadow:none!important}
+:root[data-theme="oled"] .bar-fill{box-shadow:none!important}
+/* 条形凹陷 + 凸起 */
+.bar-track{box-shadow:inset 0 2px 4px rgba(0,0,0,.5)}
+.bar-fill{box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 0 8px rgba(45,212,167,.35)}
+/* 滚动条隐藏 */
+::-webkit-scrollbar{display:none}
+/* toast 类型 + 位置 */
+.toast{bottom:30px;top:auto;transform:translateX(-50%) translateY(20px)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.info{border-color:var(--line2)}
+.toast.success{border-color:rgba(45,212,167,.4)}
+.toast.warn{border-color:rgba(251,191,36,.4)}
+.toast.err{border-color:rgba(251,113,133,.4)}
+
 </style>
 </head>
 <body>
@@ -275,6 +302,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 
   <button class="btn btn-primary" id="scanBtn">🔍&nbsp;开始扫描</button>
   <div style="text-align:center;margin-top:-8px"><a href="javascript:void(0)" id="forceScanBtn" style="color:var(--muted);font-size:12px">60s 内复用上次结果 · 强制重扫</a></div>
+  <div id="dailyBadge" style="text-align:center;margin-top:6px;font-size:11px;color:var(--dim)"></div>
 
   <div class="bottom-bar" id="bottomBar" hidden>
   <label class="select-all"><input type="checkbox" id="selectAll">全选</label>
@@ -340,6 +368,23 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
   <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
   <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
+  <div class="card" style="margin-top:12px">
+      <h3 style="font-size:14px;font-weight:700">关于</h3>
+      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用 · GitHub: ce11kjw/junkclean</div>
+    </div>
+    <div class="card" style="margin-top:12px"><h3 style="font-size:14px;font-weight:700">关于</h3><div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div></div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:14px;font-weight:700">关于</h3>
+      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:14px;font-weight:700">关于</h3>
+      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div>
+    </div>
+  <div class="card" style="margin-top:12px">
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:6px">关于</h3>
+    <div class="panel-note" style="font-size:12px;line-height:1.8">JunkClean · 模块化垃圾清理<br>KSU / APatch / Magisk 通用<br><a href="https://github.com/ce11kjw/junkclean" style="color:var(--accent)">GitHub 仓库</a></div>
+  </div>
   <h2 style="margin-top:8px">操作日志</h2>
   <div class="log-area" id="logArea">加载中...</div>
 
@@ -386,16 +431,16 @@ const api = async (path, opts={}) => {
   } catch(e) { return {error: '网络错误: ' + e.message}; }
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function toast(msg, err) {
+function toast(msg, type) {
   let t = document.getElementById('toastBox');
   if (!t) { t = document.createElement('div'); t.id = 'toastBox'; t.className = 'toast'; document.body.appendChild(t); }
   t.textContent = msg;
-  t.className = 'toast' + (err ? ' err' : '');
+  t.className = 'toast ' + (type || 'info');
   requestAnimationFrame(() => t.classList.add('show'));
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
-const ck = (r, msg) => { if (r && r.error) { toast((msg||'操作') + '失败: ' + r.error, true); return true; } return false; };
+const ck = (r, msg) => { if (r && r.error) { toast((msg||'操作') + '失败: ' + r.error, 'err'); return true; } return false; };
 function applyTheme(t) { document.documentElement.dataset.theme = t || 'dark'; }
 function applyAccent(a) { document.documentElement.dataset.accent = a || 'emerald'; }
 
@@ -430,6 +475,15 @@ function renderDisk(d) {
 
 
 // ---------- status ----------
+async function updateDailyBadge() {
+  api('/stats').then(s => {
+    const days = s.days || [];
+    const today = days.length ? (days[days.length-1].items || 0) : 0;
+    const total = days.reduce((sum, d) => sum + (d.items || 0), 0);
+    const b = $('dailyBadge');
+    if (b) b.textContent = today || total ? ('今日 ' + today + ' 项 · 累计 ' + total + ' 项') : '';
+  }).catch(() => {});
+}
 async function refreshStatus() {
   const s = await api('/status');
   if (s.error) {
@@ -438,6 +492,7 @@ async function refreshStatus() {
     return;
   }
   if (s.disk) renderDisk(s.disk);
+  updateDailyBadge();
   $('rootBadge').textContent = s.root ? 'root' : '⚠ 非root';
   $('rootBadge').className = 'badge ' + (s.root ? 'badge-safe' : 'badge-warn');
   return s;
@@ -461,7 +516,7 @@ async function startScan(force) {
 async function pollProgress() {
   const s = await api('/status');
   const sc = s.scan;
-  if (sc.done) { finishScan(); return; }
+  if (sc.done) { finishScan(); updateBadge(); return; }
   $('progressPath').textContent = sc.curPath || '...';
   $('progressText').textContent = `已发现 ${fmt(sc.bytes)} · 共 ${sc.found} 项`;
   scanTimer = setTimeout(pollProgress, 700);
@@ -623,6 +678,7 @@ function applyBg(url) {
 function switchTab(name) {
   document.querySelectorAll('.page').forEach(p => { p.hidden = p.id !== 'page-' + name; });
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  window.scrollTo({top: 0, behavior: 'smooth'});
   if (name === 'settings') loadSettings();
 }
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
@@ -818,6 +874,9 @@ function toolThumb() {
 function openTool(id) {
   ({big:toolBig, empty:toolEmpty, thumb:toolThumb, classify:toolClassify, duplicate:toolDuplicate, trash:toolTrash, cleanapp:toolCleanapp, schedule:toolSchedule, monitor:toolMonitor, stats:toolStats, fstrim:toolFstrim, ai:toolAI})[id]();
 }
+if (!document.documentElement.dataset.theme) {
+  applyTheme('dark');
+}
 initTools();
 
 
@@ -976,10 +1035,14 @@ function toolTrash() {
     await api('/trash', {method:'POST', body: JSON.stringify({action:'delete', paths})});
     load();
   };
+  $('trEmpty').onmousedown = $('trEmpty').ontouchstart = () => { $('trEmpty')._lp = setTimeout(() => $('trEmpty')._pressed = true, 800); };
+  ['mouseup','mouseleave','touchend','touchmove'].forEach(ev => $('trEmpty').addEventListener(ev, () => clearTimeout($('trEmpty')._lp)));
   $('trEmpty').onclick = async () => {
+    if (!$('trEmpty')._pressed) { toast('请长按 0.8 秒确认清空', 'warn'); return; }
+    $('trEmpty')._pressed = false;
     if (!confirm('清空回收站？不可恢复')) return;
     await api('/trash', {method:'POST', body: JSON.stringify({action:'empty'})});
-    load();
+    load(); toast('回收站已清空', 'success');
   };
   load();
 }
