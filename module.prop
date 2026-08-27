@@ -4,6 +4,7 @@ version=4.2.4
 versionCode=424
 author=CE11KJW
 description=智能垃圾清理+存储维护：体检/清理/整理/监控/AI建议 · KSU/AP/Magisk · 零数据采集
+autoupdate=1
 updateJson=https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json
 actionIcon=icon/icon-jc.png
 webuiIcon=icon/icon-jc.png

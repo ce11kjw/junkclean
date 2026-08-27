@@ -54,4 +54,39 @@ else
 fi
 
 ui_print "✓ 运行时目录就绪: $ADR"
-ui_print "• JunkClean 安装完成，重启生效"
+
+# ========== 立即部署到最终目录（安装即生效，不重启手机） ==========
+INSTALL=/data/adb/modules/junkclean
+mkdir -p "$INSTALL"
+cp -rf "$MODPATH/." "$INSTALL/" 2>/dev/null
+chmod -R 777 "$INSTALL" 2>/dev/null
+
+# ========== 自动升级检查（autoupdate=1 开启） ==========
+if [ "$(grep '^autoupdate=' "$INSTALL/module.prop" 2>/dev/null | cut -d= -f2)" = "1" ]; then
+  ui_print "• 检查最新版本..."
+  NEW=$(curl -s --max-time 8 https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json 2>/dev/null | grep -o '"versionCode":[0-9]*' | grep -o '[0-9]*')
+  CUR=$(grep '^versionCode=' "$INSTALL/module.prop" 2>/dev/null | cut -d= -f2)
+  if [ -n "$NEW" ] && [ "$NEW" -gt "${CUR:-0}" ]; then
+    ui_print "• 发现新版本 v$NEW，下载中..."
+    ZIP=$(curl -s --max-time 8 https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json 2>/dev/null | grep -o '"zipUrl":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$ZIP" ]; then
+      curl -s -L --max-time 60 -o /data/local/tmp/jc-latest.zip "$ZIP" 2>/dev/null
+      unzip -o -q /data/local/tmp/jc-latest.zip -d "$INSTALL" 2>/dev/null         && ui_print "• 已升级到 v$NEW" || ui_print "• 升级失败，使用当前版本"
+      rm -f /data/local/tmp/jc-latest.zip
+    fi
+  else
+    ui_print "• 已是最新版本"
+  fi
+fi
+
+# ========== 重启 daemon（不重启手机） ==========
+pkill -f "junkclean[ ]daemon" 2>/dev/null
+sleep 0.5
+setsid "$INSTALL/system/bin/junkclean" daemon >/dev/null 2>&1 &
+sleep 1
+if pgrep -f "junkclean[ ]daemon" >/dev/null 2>&1; then
+  ui_print "✅ 模块已生效（daemon 运行中），无需重启手机"
+else
+  ui_print "⚠ daemon 启动失败（重启后模块仍会正常生效）"
+fi
+ui_print "• JunkClean 安装完成"
