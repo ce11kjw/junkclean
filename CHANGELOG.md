@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.2.6 (2026-08-27)
+- 审核修复: 原子更新(临时目录+校验)/去重复/动态版本/config补全/setsid
+
 ## v4.2.5 (2026-08-27)
 - 安装即生效(不重启手机): customize立即部署+自动升级+重启daemon + action.sh update命令
 
