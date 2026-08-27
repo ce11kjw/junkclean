@@ -157,7 +157,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 
 /* 三 Tab */
 .page{animation:pageIn .4s cubic-bezier(.32,.72,0,1)}
-.page[hidden]{display:none}
+.page[hidden],.panel[hidden],.bottom-bar[hidden],.overlay[hidden]{display:none}
 .page-head{display:flex;flex-direction:column;gap:2px;margin:6px 0 16px}
 .page-eyebrow{font-size:10px;letter-spacing:.22em;color:#5c5c6a;text-transform:uppercase;font-weight:700}
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,#fff,#2dd4a7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;width:fit-content}
