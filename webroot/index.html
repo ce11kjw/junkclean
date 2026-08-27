@@ -301,7 +301,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   </label>
   <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
   <h2 style="margin-top:8px">热更新</h2>
-  <input id="hotUrl" placeholder="zip 下载地址" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;width:100%;box-sizing:border-box">
+  
   <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
   <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
   <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
@@ -589,18 +589,17 @@ function switchTab(name) {
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
 
   $('hotBtn').onclick = async () => {
-    const el = $('hotResult');
-    const url = $('hotUrl').value.trim();
-    if (!url) { el.textContent = '⚠ 请输入 zip 下载地址'; return; }
-    el.textContent = '⏳ 下载中...';
-    $('hotBtn').disabled = true;
-    try {
-      const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url})});
-      if (r.error) { el.textContent = '❌ ' + r.error; $('hotBtn').disabled = false; }
-      else { el.textContent = '✅ ' + r.msg + '，刷新页面即可'; }
-    } catch(e) { el.textContent = '❌ 请求失败: ' + e; $('hotBtn').disabled = false; }
-  };
-  $('hotRollback').onclick = async () => {
+  const info = await api('/updateinfo');
+  if (ck(info, '检查更新')) return;
+  if (!info.hasUpdate) { toast('已是最新版本 v' + info.remote); return; }
+  toast('发现新版本 v' + info.remote + '，更新中...');
+  $('hotBtn').disabled = true;
+  const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url: info.zipUrl})});
+  $('hotBtn').disabled = false;
+  if (r.error) { toast(r.error, true); return; }
+  toast(r.msg || '更新完成');
+};
+$('hotRollback').onclick = async () => {
     if (!confirm('回滚到备份版本？')) return;
     const r = await api('/rollback', {method:'POST', body:'{}'});
     alert(r.msg || '回滚成功，页面将刷新');

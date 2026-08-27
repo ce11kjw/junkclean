@@ -574,6 +574,34 @@ func apiLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"logs": tailLog(300)})
 }
 
+// ----- 更新信息（自动获取最新 zipUrl，用户无需填） -----
+
+func apiUpdateinfo(w http.ResponseWriter, r *http.Request) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json")
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": "网络错误: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	var up struct {
+		Version     string `json:"version"`
+		VersionCode int    `json:"versionCode"`
+		ZipURL      string `json:"zipUrl"`
+		Changelog   string `json:"changelog"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&up); err != nil {
+		writeJSON(w, 502, map[string]string{"error": "update.json 解析失败"})
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"current": ver, "currentCode": verCode,
+		"remote": up.Version, "remoteCode": up.VersionCode,
+		"zipUrl": up.ZipURL, "changelog": up.Changelog,
+		"hasUpdate": up.VersionCode > verCode,
+	})
+}
+
 // ----- 热更新：下载 zip → 覆盖模块文件 → 重启 daemon（不重启手机） -----
 
 func unzipTo(zipPath, dest string) error {
@@ -891,6 +919,7 @@ func main() {
 	http.HandleFunc("/api/logs", corsMiddleware(apiLogs))
 	http.HandleFunc("/api/ai", corsMiddleware(apiAI))
 	http.HandleFunc("/api/hotupdate", corsMiddleware(apiHotupdate))
+	http.HandleFunc("/api/updateinfo", corsMiddleware(apiUpdateinfo))
 	http.HandleFunc("/api/cleanall", corsMiddleware(apiCleanall))
 	http.HandleFunc("/api/check", corsMiddleware(apiCheck))
 	registerFeatures(http.DefaultServeMux)
