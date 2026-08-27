@@ -9,8 +9,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{background:var(--bg)}
 body{color:var(--text);min-height:100dvh;padding:16px 12px 0;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
-body::before{content:"";position:fixed;inset:0;z-index:-2;background:#050509 url("https://aplm123.eu.cc/file/img:AgACAgUAAxkDAAIBWGpbkgABXVwUc5_tkiIL9U3H0-iUhQAC8Q9rGzGM4FZooVhJqx_M7wEAAwIAA3cAAz0E.jpg") center/cover no-repeat fixed;filter:brightness(.7)}
-body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:rgba(5,5,9,.35);backdrop-filter:blur(2px)}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:#050509 url("https://aplm123.eu.cc/file/img:AgACAgUAAxkDAAIBWGpbkgABXVwUc5_tkiIL9U3H0-iUhQAC8Q9rGzGM4FZooVhJqx_M7wEAAwIAA3cAAz0E.jpg") center/cover no-repeat fixed;filter:brightness(.85)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:rgba(5,5,9,.15)}
 #app{max-width:480px;margin:0 auto;width:100%;flex:1;padding-bottom:0}
 .card{position:relative;background:rgba(255,255,255,.045);border-radius:18px;padding:20px;z-index:1;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
 .card::before{content:"";position:absolute;inset:-1.5px;border-radius:22px;background:rgba(255,255,255,.02);border:1px solid var(--line);z-index:-1;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 20px rgba(0,0,0,.3);transition:border-color .4s var(--ease),box-shadow .4s var(--ease)}
@@ -532,7 +532,7 @@ function applyBg(url) {
   let s = document.getElementById('bgStyle');
   if (!s) { s = document.createElement('style'); s.id = 'bgStyle'; document.head.appendChild(s); }
   const u = (url||'').trim();
-  s.textContent = u ? 'body::before{background:#050509 url("' + u + '") center/cover no-repeat fixed!important}' : '';
+  s.textContent = u ? 'body::before{background:#050509 url("' + u + '") center/cover no-repeat fixed!important;filter:brightness(.85)}' : '';
 }
 function switchTab(name) {
   document.querySelectorAll('.page').forEach(p => { p.hidden = p.id !== 'page-' + name; });
