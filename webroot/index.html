@@ -848,6 +848,7 @@ function toolCleanapp() {
     const list = apps.filter(a => !kw || a.package.toLowerCase().includes(kw));
     el.innerHTML = list.length ? list.map((a,i) => `
       <div class="panel-item">
+        <img src="ksu://icon/${a.package}" onerror="this.style.display='none'" style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.05)">
         <span class="nm">${esc(a.package)}</span>
         <span class="sz">${fmt(a.size)}</span>
         <button data-i="${i}" style="background:var(--danger);color:#fff;padding:3px 8px;font-size:11px;border:none;border-radius:99px;cursor:pointer">清</button>
@@ -892,7 +893,14 @@ function toolSchedule() {
     const r = await api('/schedule', {method:'POST', body: JSON.stringify({action:'list'})});
     const tasks = r.tasks||[];
     $('scList').innerHTML = tasks.length ? tasks.map((t,i) => `
-      <div class="panel-item"><span class="nm">${esc(t.name)}</span><span class="sz">${t.every ? '每'+t.every+'h' : '每日'+t.hour+'时'}</span><button data-id="${t.id}" style="background:var(--danger);color:#fff;padding:4px 10px;font-size:11px;border:none;border-radius:99px;cursor:pointer">删除</button></div>`).join('')
+      <div class="panel-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="nm" style="font-weight:600">${esc(t.name)}</span>
+          <span class="sz">${t.every ? '每'+t.every+'h' : '每日'+t.hour+'时'}</span>
+          <button data-id="${t.id}" style="background:var(--danger);color:#fff;padding:4px 10px;font-size:11px;border:none;border-radius:99px;cursor:pointer">删除</button>
+        </div>
+        ${t.lastRun ? '<div class="panel-note" style="font-size:11px">上次: '+esc(t.lastRun)+' · '+esc(t.lastResult||'ok')+'</div>' : ''}
+      </div>`).join('')
       : '<div class="panel-empty">无定时任务</div>';
     $('scList').querySelectorAll('[data-id]').forEach(b => b.onclick = async () => {
       await api('/schedule', {method:'POST', body: JSON.stringify({action:'remove', task:{id:b.dataset.id}})});
@@ -911,24 +919,34 @@ function toolSchedule() {
 
 // --- 监控 ---
 function toolMonitor() {
-  openPanel('📡 自动监控', `
-    <div class="row"><span>自动整理监控</span><label class="switch"><input type="checkbox" id="monitorSw"><span class="sl"></span></label></div>
-    <div class="panel-note">开启后每 30 秒自动整理 Download 文件到分类目录（按 classify 规则）</div>
-    <div id="monitorStatus" class="panel-note"></div>`);
+  const b = $('body-monitor');
+  b.innerHTML = `
+    <div class="row">
+      <span style="font-size:13px">自动整理监控</span>
+      <label class="switch"><input type="checkbox" id="monitorSw"><span class="sl"></span></label>
+      <span style="font-size:13px;margin-left:auto">暂停</span>
+      <label class="switch"><input type="checkbox" id="monitorPauseSw"><span class="sl"></span></label>
+    </div>
+    <div class="panel-note">开启后每 30 秒自动整理 Download 文件（按 classify 规则）；暂停时跳过整理但不关闭监控</div>
+    <div id="monitorStatus" class="panel-note"></div>`;
   const refresh = async () => {
     const r = await api('/monitor', {method:'POST', body: JSON.stringify({action:'status'})});
-    $('monitorSw').checked = r.status === 'on';
-    $('monitorStatus').textContent = r.status === 'on' ? '🟢 监控运行中' : '⚪ 监控未启动';
+    const st = r.status;
+    $('monitorSw').checked = st === 'on' || st === 'paused';
+    $('monitorPauseSw').checked = st === 'paused';
+    const map = {on:'🟢 运行中', paused:'⏸ 已暂停', off:'⚪ 未启动'};
+    $('monitorStatus').textContent = map[st] + (r.count ? ' · 已整理 '+r.count+' 个' : '') + (r.last ? ' · 最近 '+r.last : '');
   };
   $('monitorSw').onchange = async () => {
-    const action = $('monitorSw').checked ? 'start' : 'stop';
-    await api('/monitor', {method:'POST', body: JSON.stringify({action})});
+    await api('/monitor', {method:'POST', body: JSON.stringify({action: $('monitorSw').checked ? 'start' : 'stop'})});
+    refresh();
+  };
+  $('monitorPauseSw').onchange = async () => {
+    await api('/monitor', {method:'POST', body: JSON.stringify({action: $('monitorPauseSw').checked ? 'pause' : 'resume'})});
     refresh();
   };
   refresh();
 }
-
-// --- 统计 ---
 function toolStats() {
   openPanel('📊 清理统计', `
     <div class="panel-note" id="stTotal"></div>

@@ -145,6 +145,23 @@ func apiBig(w http.ResponseWriter, r *http.Request) {
 
 func scanEmpty() []JunkItem {
 	var items []JunkItem
+	// 空目录（跳过隐藏/系统目录）
+	root := sdcardRoots[0]
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() || p == root {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+		entries, _ := os.ReadDir(p)
+		if len(entries) == 0 {
+			items = append(items, JunkItem{ID: "emptydir:" + p, Path: p,
+				Name: filepath.Base(p), Size: 0, Count: 0})
+		}
+		return nil
+	})
+	// 空文件（0 字节）
 	walkSdcard(func(h fileHit) {
 		if h.size == 0 {
 			items = append(items, JunkItem{ID: "empty:" + h.path, Path: h.path,
@@ -156,6 +173,7 @@ func scanEmpty() []JunkItem {
 	}
 	return items
 }
+
 
 func apiEmpty(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"items": scanEmpty()})
@@ -627,6 +645,8 @@ type Task struct {
 	Hour       int    `json:"hour"`
 	OnlyCharge bool   `json:"onlyCharge"`
 	OnlyWifi   bool   `json:"onlyWifi"`
+	LastRun    string `json:"lastRun"`
+	LastResult string `json:"lastResult"`
 }
 
 var taskLock sync.Mutex
@@ -729,8 +749,21 @@ func apiMonitor(w http.ResponseWriter, r *http.Request) {
 			monitorOn = false
 		}
 		writeJSON(w, 200, map[string]any{"status": "off"})
+	case "pause":
+		monitorPaused = true
+		writeJSON(w, 200, map[string]any{"status": "paused"})
+	case "resume":
+		monitorPaused = false
+		writeJSON(w, 200, map[string]any{"status": "on"})
 	case "status":
-		writeJSON(w, 200, map[string]any{"status": map[bool]string{true: "on", false: "off"}[monitorOn], "count": monitorCount, "last": monitorLast})
+		st := "off"
+		if monitorOn {
+			st = "on"
+		}
+		if monitorPaused {
+			st = "paused"
+		}
+		writeJSON(w, 200, map[string]any{"status": st, "count": monitorCount, "last": monitorLast})
 	default:
 		writeJSON(w, 400, map[string]string{"error": "action: start|stop|status"})
 	}
@@ -990,7 +1023,18 @@ func startScheduler() {
 				if t.OnlyWifi && !isWifi() {
 					continue
 				}
-				go autoRun()
+				go func(id string) {
+					ts := time.Now().Format("2006-01-02 15:04")
+					autoRun()
+					tasks := loadTasks()
+					for i := range tasks {
+						if tasks[i].ID == id {
+							tasks[i].LastRun = ts
+							tasks[i].LastResult = "ok"
+						}
+					}
+					saveTasks(tasks)
+				}(t.ID)
 			}
 		}
 	}()
@@ -1047,6 +1091,7 @@ func apiRollback(w http.ResponseWriter, r *http.Request) {
 
 var monitorCount int64
 var monitorLast string
+var monitorPaused bool
 
 func monitorStart() bool {
 	if monitorOn {
@@ -1060,6 +1105,9 @@ func monitorStart() bool {
 		for {
 			select {
 			case <-t.C:
+				if monitorPaused {
+					continue
+				}
 				rules := loadClassifyRules()
 				if len(rules) > 0 {
 					moves, _ := doClassify(rules, false)
