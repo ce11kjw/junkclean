@@ -80,7 +80,11 @@ func walkSdcard(fn func(h fileHit)) {
 			fn(fileHit{path: filepath.Join(dir, e.Name()), size: info.Size(), mod: info.ModTime()})
 		}
 	}
-	for _, root := range sdcardRoots {
+	roots := append([]string{}, sdcardRoots...)
+	if cfg.ScanRoot != "" && cfg.ScanRoot != sdcardRoots[0] {
+		roots = append(roots, cfg.ScanRoot)
+	}
+	for _, root := range roots {
 		if st, err := os.Stat(root); err == nil && st.IsDir() {
 			walk(root)
 		}

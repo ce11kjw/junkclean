@@ -240,6 +240,10 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .accent-btn:hover{transform:scale(1.1)}
 .accent-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 
+.type-tab{padding:5px 10px;font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:99px;color:var(--muted);cursor:pointer;transition:all .2s cubic-bezier(.32,.72,0,1)}
+.type-tab:hover{color:var(--text)}
+.type-tab.active{background:linear-gradient(135deg,var(--accent),#059669);border-color:transparent;color:#fff}
+
 </style>
 </head>
 <body>
@@ -604,6 +608,7 @@ async function loadSettings() {
   $('aiKey').value = c.aiKey||'';
   $('aiModel').value = c.aiModel||'';
   $('bgUrl').value = c.bgUrl||'';
+  $('scanRoot').value = c.scanRoot||'';
   applyBg(c.bgUrl);
   const lg = await api('/logs');
   $('logArea').textContent = (lg.logs||[]).join('\n') || '暂无日志';
@@ -646,6 +651,7 @@ $('saveCfgBtn').onclick = async () => {
     aiKey: $('aiKey').value.trim(),
     aiModel: $('aiModel').value.trim(),
     bgUrl: $('bgUrl').value.trim(),
+    scanRoot: $('scanRoot').value.trim(),
     theme: document.documentElement.dataset.theme || 'dark',
     accent: document.documentElement.dataset.accent || 'emerald'
   })});
@@ -722,13 +728,17 @@ function toolBig() {
       <input id="bigMin" type="number" value="50" placeholder="阈值MB" style="flex:.4">
       <input id="bigExt" placeholder="扩展名(逗号,如 jpg,mp4)" style="flex:1">
     </div>
-    <div class="row">
-      <select id="bigDays" style="flex:.5"><option value="0">不限时间</option><option value="1">1天前</option><option value="7">7天前</option><option value="30">30天前</option></select>
-      <button class="primary" id="bigScan" style="flex:1">🔍 扫描</button>
-    </div>
+<div class="row" style="justify-content:space-between"><div class="row" style="gap:4px;flex-wrap:wrap"><button class="type-tab active" data-type="all">全部</button><button class="type-tab" data-type="img">图片</button><button class="type-tab" data-type="vid">视频</button><button class="type-tab" data-type="doc">文档</button><button class="type-tab" data-type="zip">压缩包</button></div><select id="bigDays" style="flex:0"><option value="0">不限</option><option value="7">7天前</option><option value="30">30天前</option></select></div><button class="primary" id="bigScan" style="width:100%">🔍 扫描</button>
     <div class="panel-list" id="bigList"></div>
     <div class="row"><button class="danger" id="bigDel">删除选中</button><button id="bigTrash">移入回收站</button><button id="bigAll">全选</button></div>`);
   let bigItems = [];
+  const TYPE_MAP = {"img": ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "svg", "avif"], "vid": ["mp4", "mkv", "mov", "avi", "webm", "3gp", "m4v", "wmv", "flv", "mpeg", "ts"], "doc": ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "epub", "csv"], "zip": ["zip", "7z", "rar", "tar", "gz", "xz", "bz2", "tgz", "tbz", "zst", "iso", "apk"]};
+  let currentType = 'all';
+  document.querySelectorAll('.type-tab').forEach(b => b.onclick = () => {
+    currentType = b.dataset.type;
+    document.querySelectorAll('.type-tab').forEach(x => x.classList.toggle('active', x === b));
+    renderBig(bigItems);
+  });
   $('bigScan').onclick = async () => {
     const min = (($('bigMin').value||50) * 1048576);
     const ext = encodeURIComponent($('bigExt').value.trim());
@@ -738,6 +748,7 @@ function toolBig() {
     renderBig(bigItems);
   };
   const renderBig = (list) => {
+    list = list.filter(filterType);
     const el = $('bigList');
     el.innerHTML = list.length ? list.map((it,i) => `
       <div class="panel-item" data-path="${esc(it.path)}"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
@@ -1119,7 +1130,7 @@ function toolFstrim() {
 function toolAI() {
   openPanel('🤖 AI 智能建议', `
     <div class="panel-note">先扫描垃圾，然后 AI 分析给出清理建议</div>
-    <div class="row"><button class="primary" id="aiAsk">分析扫描结果</button></div>
+    <div class="row"><button class="primary" id="aiAsk" style="flex:1">分析扫描结果</button><button id="aiApply" style="flex:1">✅ 一键采纳</button></div>
     <div class="panel-list" id="aiResult"></div>`);
   $('aiAsk').onclick = async () => {
     const res = await api('/result');
@@ -1128,6 +1139,13 @@ function toolAI() {
     if (!summary) { $('aiResult').innerHTML = '<div class="panel-empty">先扫描</div>'; return; }
     const r = await api('/ai', {method:'POST', body: JSON.stringify({summary})});
     $('aiResult').innerHTML = '<div class="panel-item" style="white-space:pre-wrap;line-height:1.6">' + esc(r.advice||'AI 未配置，请在设置中填写 AI 端点/key') + '</div>';
+  };
+  $('aiApply').onclick = async () => {
+    if (!confirm('采纳 AI 建议，清理所有安全分类？')) return;
+    const r = await api('/cleanall', {method:'POST', body:'{}'});
+    if (r.error) { toast(r.error, true); return; }
+    toast('AI 建议已采纳 · 释放 ' + fmt(r.freed||0));
+    refreshStatus();
   };
 }
 

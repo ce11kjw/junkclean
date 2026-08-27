@@ -72,7 +72,8 @@ type Config struct {
 	AutoClean     bool            `json:"autoClean"`
 	AutoTrashDays int             `json:"autoTrashDays"`
 	LastTrim      string          `json:"lastTrim"`
-	BGUrl         string          `json:"bgUrl"`
+	BGUrl         string          
+	ScanRoot      string           // 自定义扫描根目录`json:"bgUrl"`
 	Theme         string          `json:"theme"`
 	Accent        string          `json:"accent"`
 }
