@@ -205,6 +205,29 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .switch input:checked + .sl{background:linear-gradient(135deg,#2dd4a7,#059669)}
 .switch input:checked + .sl:before{transform:translateX(20px)}
 
+.tool-panel{animation:cardIn .5s cubic-bezier(.32,.72,0,1) both}
+.tool-panel:nth-child(2){animation-delay:.06s}
+.tool-panel:nth-child(3){animation-delay:.12s}
+.tool-panel:nth-child(4){animation-delay:.18s}
+.tool-panel:nth-child(5){animation-delay:.24s}
+.tool-panel:nth-child(6){animation-delay:.30s}
+.tool-panel:nth-child(7){animation-delay:.36s}
+.tool-panel:nth-child(8){animation-delay:.42s}
+.tool-panel:nth-child(9){animation-delay:.48s}
+.tool-panel:nth-child(10){animation-delay:.54s}
+.tool-panel:nth-child(11){animation-delay:.60s}
+.tool-panel:nth-child(12){animation-delay:.66s}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.card,#page-home .btn{animation:cardIn .45s cubic-bezier(.32,.72,0,1) both}
+.panel-empty{text-align:center;color:#5c5c6a;padding:28px 0;font-size:13px;line-height:2}
+.panel-empty:before{content:"✦";display:block;font-size:26px;opacity:.4;margin-bottom:6px}
+.switch .sl:before{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(16,16,28,.92);border:1px solid var(--line2);border-radius:14px;padding:10px 18px;font-size:13px;color:var(--text);z-index:400;opacity:0;pointer-events:none;transition:all .35s cubic-bezier(.32,.72,0,1);backdrop-filter:blur(16px);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{border-color:rgba(251,113,133,.4)}
+
 </style>
 </head>
 <body>
@@ -328,7 +351,16 @@ const api = async (path, opts={}) => {
   } catch(e) { return {error: '网络错误: ' + e.message}; }
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ck = (r, msg) => { if (r && r.error) { alert((msg||'操作') + '失败: ' + r.error); return true; } return false; };
+function toast(msg, err) {
+  let t = document.getElementById('toastBox');
+  if (!t) { t = document.createElement('div'); t.id = 'toastBox'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.className = 'toast' + (err ? ' err' : '');
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+const ck = (r, msg) => { if (r && r.error) { toast((msg||'操作') + '失败: ' + r.error, true); return true; } return false; };
 
 // ---------- state ----------
 let state = { cats: [], selected: new Set() };
@@ -338,11 +370,23 @@ function renderBar(pct) {
   $('fillDisk').style.width = Math.min(pct,100) + '%';
   $('usedPct').textContent = Math.round(pct) + '%';
 }
+let lastFree = 0;
+function animateNum(el, target) {
+  const from = lastFree || 0;
+  const start = performance.now(), dur = 600;
+  function step(t) {
+    const p = Math.min(1, (t - start) / dur);
+    const v = from + (target - from) * (1 - Math.pow(1 - p, 3));
+    el.textContent = fmt(v);
+    if (p < 1) requestAnimationFrame(step); else lastFree = target;
+  }
+  requestAnimationFrame(step);
+}
 function renderDisk(d) {
   if (!d) return;
   $('totalDisk').textContent = fmt(d.total);
   $('usedDisk').textContent = fmt(d.used);
-  $('freeDisk').textContent = fmt(d.free);
+  animateNum($('freeDisk'), d.free);
   renderBar(d.percent);
 }
 

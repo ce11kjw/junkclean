@@ -611,8 +611,8 @@ func apiDelete(w http.ResponseWriter, r *http.Request) {
 	var errs []string
 	var toTrash []string
 	for _, p := range req.Paths {
-		if !strings.HasPrefix(p, root+"/") && p != root {
-			errs = append(errs, "拒绝: "+p+"（不在 sdcard 内）")
+		if (!strings.HasPrefix(p, root+"/") && p != root) || strings.Contains(p, "..") {
+			errs = append(errs, "拒绝: "+p+"（路径不合法）")
 			continue
 		}
 		info, err := os.Stat(p)
@@ -707,6 +707,12 @@ func apiSchedule(w http.ResponseWriter, r *http.Request) {
 	case "add":
 		if req.Task.Name == "" {
 			req.Task.Name = fmt.Sprintf("任务%d", len(tasks)+1)
+		}
+		for _, t := range tasks {
+			if t.Name == req.Task.Name {
+				writeJSON(w, 400, map[string]string{"error": "同名任务已存在"})
+				return
+			}
 		}
 		req.Task.ID = fmt.Sprintf("t%d", time.Now().Unix())
 		tasks = append(tasks, req.Task)
