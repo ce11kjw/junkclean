@@ -648,6 +648,7 @@ type Task struct {
 	LastRun    string `json:"lastRun"`
 	LastResult string `json:"lastResult"`
 	LastUnix   int64  `json:"lastUnix"`
+	Action     string `json:"action"`
 }
 
 var taskLock sync.Mutex
@@ -665,6 +666,13 @@ func saveTasks(tasks []Task) {
 }
 
 // startScheduler 启动定时扫描（daemon 启动时调用）
+func runAction(action string) {
+	autoRun()
+	if action == "both" || action == "classify" {
+		classifyAuto()
+	}
+}
+
 func autoRun() {
 	if scanSt.running {
 		return
@@ -714,6 +722,9 @@ func apiSchedule(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if req.Task.Action == "" {
+			req.Task.Action = "both"
+		}
 		req.Task.ID = fmt.Sprintf("t%d", time.Now().Unix())
 		tasks = append(tasks, req.Task)
 		saveTasks(tasks)
@@ -731,6 +742,19 @@ func apiSchedule(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "action: list|add|remove"})
 	}
 }
+
+func classifyAuto() {
+	rules := loadClassifyRules()
+	if len(rules) == 0 {
+		return
+	}
+	moves, _ := doClassify(rules, false)
+	if len(moves) > 0 {
+		logLine(fmt.Sprintf("classifyAuto: %d files", len(moves)))
+	}
+}
+
+
 
 // ---------- 监控（轮询自动整理；ponytail: 轮询替代 inotify，效率敏感时换 fsnotify） ----------
 
@@ -1030,9 +1054,9 @@ func startScheduler() {
 				if t.OnlyWifi && !isWifi() {
 					continue
 				}
-				go func(id string) {
+				go func(id, action string) {
 					ts := time.Now().Format("2006-01-02 15:04")
-					autoRun()
+					runAction(action)
 					tasks := loadTasks()
 					for i := range tasks {
 						if tasks[i].ID == id {
@@ -1042,7 +1066,7 @@ func startScheduler() {
 						}
 					}
 					saveTasks(tasks)
-				}(t.ID)
+				}(t.ID, t.Action)
 			}
 		}
 	}()

@@ -1025,6 +1025,7 @@ function toolSchedule() {
   openPanel('⏰ 定时任务', `
     <div class="row">
       <select id="scType"><option value="daily">每日</option><option value="hourly">每小时</option></select>
+      <select id="scAction" style="flex:1"><option value="both">清理+整理</option><option value="clean">仅清理</option><option value="organize">仅整理</option></select>
       <input id="scHour" type="number" min="0" max="23" value="3" placeholder="时">
       <button class="primary" id="scAdd">添加</button>
     </div>
@@ -1034,10 +1035,11 @@ function toolSchedule() {
     const tasks = r.tasks||[];
     $('scList').innerHTML = tasks.length ? tasks.map((t,i) => `
       <div class="panel-item" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="nm" style="font-weight:600">${esc(t.name)}</span>
           <span class="sz">${t.every ? '每'+t.every+'h' : '每日'+t.hour+'时'}</span>
-          <button data-id="${t.id}" style="background:var(--danger);color:#fff;padding:4px 10px;font-size:11px;border:none;border-radius:99px;cursor:pointer">删除</button>
+          <span class="badge" style="font-size:10px">${t.action||'both'}</span>
+          <button data-id="${t.id}" style="background:var(--danger);color:#fff;padding:4px 10px;font-size:11px;border:none;border-radius:99px;cursor:pointer;margin-left:auto">删除</button>
         </div>
         ${t.lastRun ? '<div class="panel-note" style="font-size:11px">上次: '+esc(t.lastRun)+' · '+esc(t.lastResult||'ok')+'</div>' : ''}
       </div>`).join('')
@@ -1048,9 +1050,10 @@ function toolSchedule() {
     });
   };
   $('scAdd').onclick = async () => {
+    const action = $('scAction').value;
     const t = $('scType').value === 'hourly'
-      ? {name:'每小时清理', every:1}
-      : {name:'每日清理', hour: +$('scHour').value || 3};
+      ? {name:'每小时'+action, every:1, action}
+      : {name:'每日'+action, hour: +$('scHour').value || 3, action};
     await api('/schedule', {method:'POST', body: JSON.stringify({action:'add', task:t})});
     load();
   };
