@@ -328,6 +328,7 @@ const api = async (path, opts={}) => {
   } catch(e) { return {error: '网络错误: ' + e.message}; }
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ck = (r, msg) => { if (r && r.error) { alert((msg||'操作') + '失败: ' + r.error); return true; } return false; };
 
 // ---------- state ----------
 let state = { cats: [], selected: new Set() };
@@ -401,6 +402,7 @@ async function finishScan() {
     $('cleanallBtn').textContent = '清理中...';
     const r = await api('/cleanall', {method:'POST', body:'{}'});
     $('cleanallBtn').disabled = false;
+    if (ck(r, '一键清理')) return;
     $('cleanallBtn').textContent = '一键全清';
     const f = r.freed || 0;
     const b = r.before; const a = r.after;
@@ -497,6 +499,7 @@ async function doClean() {
     btn.disabled = true;
     btn.textContent = '清理中...';
     const r = await api('/clean', {method:'POST', body: JSON.stringify({ids})});
+    if (ck(r, '清理')) { btn.disabled = false; btn.textContent = '清理 (0 B)'; return; }
     const f = r.freed || 0;
     const b = r.before; const a = r.after;
     let msg = '已释放 ' + fmt(f);
@@ -651,6 +654,7 @@ function toolBig() {
     if (!paths.length) return;
     if (!confirm('确认删除 ' + paths.length + ' 个文件？')) return;
     const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    if (ck(r, '删除')) return;
     alert('已删除，释放 ' + fmt(r.freed||0));
     $('bigScan').onclick();
   };
@@ -658,6 +662,7 @@ function toolBig() {
     const paths = checkedPaths('bigList');
     if (!paths.length) return;
     const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:true})});
+    if (ck(r, '移入回收站')) return;
     alert('已移入回收站，释放 ' + fmt(r.freed||0));
     $('bigScan').onclick();
   };
@@ -677,6 +682,7 @@ function toolEmpty() {
     if (!paths.length) return;
     if (!confirm('确认删除 ' + paths.length + ' 个空文件？')) return;
     const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    if (ck(r, '清理')) return;
     alert('已清理，释放 ' + fmt(r.freed||0));
     $('emptyScan').onclick();
   };
@@ -697,6 +703,7 @@ function toolThumb() {
     if (!paths.length) return;
     if (!confirm('确认删除 ' + paths.length + ' 个缩略图目录？')) return;
     const r = await api('/delete', {method:'POST', body: JSON.stringify({paths, toTrash:false})});
+    if (ck(r, '清理')) return;
     alert('已清理，释放 ' + fmt(r.freed||0));
     $('thumbScan').onclick();
   };
@@ -809,6 +816,7 @@ function toolDuplicate() {
     const keeps = [];
     document.querySelectorAll('[name^="dup-keep-"]:checked').forEach(r=>keeps.push(r.value));
     const r = await api('/duplicate', {method:'POST', body: JSON.stringify({action:'delete', keep: keeps})});
+    if (ck(r, '删除重复')) return;
     alert('已删除 ' + r.deleted + ' 份，释放 ' + fmt(r.freed||0));
     $('dupScan').onclick();
   };
