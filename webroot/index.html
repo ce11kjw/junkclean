@@ -6,6 +6,11 @@
 <title>JunkClean</title>
 <style>
 :root{--bg:#050509;--bg2:#0a0a13;--surface:rgba(255,255,255,.045);--surface2:rgba(255,255,255,.08);--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);--text:#f2f2f7;--muted:#9a9aa8;--dim:#5c5c6a;--accent:#2dd4a7;--accent2:#7c5cff;--accentSoft:rgba(45,212,167,.14);--warn:#fbbf24;--danger:#fb7185;--glow:0 0 24px rgba(45,212,167,.18);--r-lg:22px;--r-md:14px;--ease:cubic-bezier(.32,.72,0,1);font:500 15px/1.5 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+:root[data-theme="oled"]{--bg:#000;--bg2:#000;--surface:rgba(255,255,255,.02);--surface2:rgba(255,255,255,.04);--line:rgba(255,255,255,.06)}
+:root[data-theme="light"]{--bg:#f5f6fa;--bg2:#ffffff;--surface:rgba(0,0,0,.04);--surface2:rgba(0,0,0,.07);--line:rgba(0,0,0,.08);--line2:rgba(0,0,0,.14);--text:#1a1a23;--muted:#6e6e7a;--dim:#9090a0;--accent:#14b88f;--accent2:#5c3eff;--accentSoft:rgba(20,184,143,.14);--warn:#d97706;--danger:#dc2626;--glow:0 0 24px rgba(20,184,143,.2)}
+:root[data-accent="violet"]{--accent:#7c5cff;--accent2:#5c3eff;--accentSoft:rgba(124,92,255,.14);--glow:0 0 24px rgba(124,92,255,.18)}
+:root[data-accent="blue"]{--accent:#4a9eff;--accent2:#2563eb;--accentSoft:rgba(74,158,255,.14);--glow:0 0 24px rgba(74,158,255,.18)}
+:root[data-accent="pink"]{--accent:#ff7eb6;--accent2:#ff5c8a;--accentSoft:rgba(255,126,182,.14);--glow:0 0 24px rgba(255,126,182,.18)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{background:var(--bg)}
 body{color:var(--text);min-height:100dvh;padding:16px 12px 0;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
@@ -228,6 +233,13 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{border-color:rgba(251,113,133,.4)}
 
+.theme-btn{padding:5px 10px;font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:99px;color:var(--muted);cursor:pointer;transition:all .25s cubic-bezier(.32,.72,0,1)}
+.theme-btn:hover{color:var(--text)}
+.theme-btn.active{background:linear-gradient(135deg,var(--accent),#059669);border-color:transparent;color:#fff}
+.accent-btn{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;transition:all .2s cubic-bezier(.32,.72,0,1)}
+.accent-btn:hover{transform:scale(1.1)}
+.accent-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+
 </style>
 </head>
 <body>
@@ -286,7 +298,26 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   <div class="page" id="page-settings" hidden>
     <div class="page-head"><span class="page-eyebrow">SETTINGS</span><h2 class="page-title">设置</h2></div>
     <div id="settingsBody">
-      <div class="card"><label>背景图片直链<input id="bgUrl" placeholder="https://... 直链" style="margin-top:4px"></label></div>
+      <div class="card">
+  <div class="row" style="justify-content:space-between">
+    <span style="font-size:13px;font-weight:600">主题</span>
+    <div class="row" style="gap:6px">
+      <button class="theme-btn" data-theme="dark">深色</button>
+      <button class="theme-btn" data-theme="oled">OLED</button>
+      <button class="theme-btn" data-theme="light">浅色</button>
+    </div>
+  </div>
+  <div class="row" style="justify-content:space-between;margin-top:10px">
+    <span style="font-size:13px;font-weight:600">强调色</span>
+    <div class="row" style="gap:8px">
+      <button class="accent-btn" data-accent="emerald" style="background:#2dd4a7"></button>
+      <button class="accent-btn" data-accent="violet" style="background:#7c5cff"></button>
+      <button class="accent-btn" data-accent="blue" style="background:#4a9eff"></button>
+      <button class="accent-btn" data-accent="pink" style="background:#ff7eb6"></button>
+    </div>
+  </div>
+</div>
+<div class="card"><label>背景图片直链<input id="bgUrl" placeholder="https://... 直链" style="margin-top:4px"></label></div>
 <label>白名单包名（每行一个，跳过不扫描）
     <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
   </label>
@@ -361,6 +392,9 @@ function toast(msg, err) {
   t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 const ck = (r, msg) => { if (r && r.error) { toast((msg||'操作') + '失败: ' + r.error, true); return true; } return false; };
+function applyTheme(t) { document.documentElement.dataset.theme = t || 'dark'; }
+function applyAccent(a) { document.documentElement.dataset.accent = a || 'emerald'; }
+
 
 // ---------- state ----------
 let state = { cats: [], selected: new Set() };
@@ -611,9 +645,13 @@ $('saveCfgBtn').onclick = async () => {
     aiEndpoint: $('aiEndpoint').value.trim(),
     aiKey: $('aiKey').value.trim(),
     aiModel: $('aiModel').value.trim(),
-    bgUrl: $('bgUrl').value.trim()
+    bgUrl: $('bgUrl').value.trim(),
+    theme: document.documentElement.dataset.theme || 'dark',
+    accent: document.documentElement.dataset.accent || 'emerald'
   })});
   applyBg($('bgUrl').value);
+  applyTheme(document.documentElement.dataset.theme);
+  applyAccent(document.documentElement.dataset.accent);
   alert('已保存 ✓');
 };
 
@@ -622,6 +660,20 @@ $('scanBtn').onclick = () => startScan(false);
 $('forceScanBtn').onclick = () => startScan(true);
 refreshStatus();
 setInterval(refreshStatus, 5000);
+// 主题/强调色切换
+document.querySelectorAll('.theme-btn').forEach(b => {
+  b.onclick = () => {
+    applyTheme(b.dataset.theme);
+    document.querySelectorAll('.theme-btn').forEach(x => x.classList.toggle('active', x === b));
+  };
+});
+document.querySelectorAll('.accent-btn').forEach(b => {
+  b.onclick = () => {
+    applyAccent(b.dataset.accent);
+    document.querySelectorAll('.accent-btn').forEach(x => x.classList.toggle('active', x === b));
+  };
+});
+
 
 // ========== 工具箱 ==========
 const TOOLS = [

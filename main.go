@@ -73,6 +73,8 @@ type Config struct {
 	AutoTrashDays int             `json:"autoTrashDays"`
 	LastTrim      string          `json:"lastTrim"`
 	BGUrl         string          `json:"bgUrl"`
+	Theme         string          `json:"theme"`
+	Accent        string          `json:"accent"`
 }
 
 type ScanState struct {
