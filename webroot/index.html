@@ -6,12 +6,12 @@
 <title>JunkClean</title>
 <style>
 :root{--bg:#050509;--bg2:#0a0a13;--surface:rgba(255,255,255,.045);--surface2:rgba(255,255,255,.08);--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);--text:#f2f2f7;--muted:#9a9aa8;--dim:#5c5c6a;--accent:#2dd4a7;--accent2:#7c5cff;--accentSoft:rgba(45,212,167,.14);--warn:#fbbf24;--danger:#fb7185;--glow:0 0 24px rgba(45,212,167,.18);--r-lg:22px;--r-md:14px;--ease:cubic-bezier(.32,.72,0,1);font:500 15px/1.5 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{background:var(--bg)}
 body{color:var(--text);min-height:100dvh;padding:16px 12px 0;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
 body::before{content:"";position:fixed;inset:0;z-index:-2;background:#050509 url("https://aplm123.eu.cc/file/img:AgACAgUAAxkDAAIBWGpbkgABXVwUc5_tkiIL9U3H0-iUhQAC8Q9rGzGM4FZooVhJqx_M7wEAAwIAA3cAAz0E.jpg") center/cover no-repeat fixed;filter:brightness(.7)}
 body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:rgba(5,5,9,.35);backdrop-filter:blur(2px)}
-#app{max-width:480px;margin:0 auto;width:100%;flex:1;padding-bottom:84px}
+#app{max-width:480px;margin:0 auto;width:100%;flex:1;padding-bottom:0}
 .card{position:relative;background:rgba(255,255,255,.045);border-radius:18px;padding:20px;z-index:1;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
 .card::before{content:"";position:absolute;inset:-1.5px;border-radius:22px;background:rgba(255,255,255,.02);border:1px solid var(--line);z-index:-1;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 20px rgba(0,0,0,.3);transition:border-color .4s var(--ease),box-shadow .4s var(--ease)}
 .card:hover{transform:translateY(-2px)}
@@ -84,7 +84,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .progress-path{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* 底部栏 */
-.bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(6,6,12,.82);backdrop-filter:blur(24px);border-top:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:8px;box-shadow:0 -8px 30px rgba(0,0,0,.3)}
+.bottom-bar{position:static;width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(16px)}
 .select-all{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
 .select-all input{width:18px;height:18px;accent-color:var(--accent)}
 
@@ -161,9 +161,9 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .page-head{display:flex;flex-direction:column;gap:2px;margin:6px 0 16px}
 .page-eyebrow{font-size:10px;letter-spacing:.22em;color:#5c5c6a;text-transform:uppercase;font-weight:700}
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,#fff,#2dd4a7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;width:fit-content}
-.tabnav{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:4px;background:rgba(12,12,22,.82);border:1px solid var(--line);border-radius:99px;padding:5px;backdrop-filter:blur(24px);z-index:120;box-shadow:0 8px 32px rgba(0,0,0,.45)}
-.tab{display:flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:99px;background:transparent;color:#9a9aa8;font-size:13px;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1)}
-.tab .ti{font-size:15px}
+.tabnav{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:3px;background:rgba(12,12,22,.82);border:1px solid var(--line);border-radius:99px;padding:3px;backdrop-filter:blur(24px);z-index:120;box-shadow:0 8px 32px rgba(0,0,0,.45)}
+.tab{display:flex;align-items:center;gap:4px;padding:5px 11px;border:none;border-radius:99px;background:transparent;color:#9a9aa8;font-size:11px;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1)}
+.tab .ti{font-size:12px}
 .tab.active{background:linear-gradient(135deg,#2dd4a7,#059669);color:#fff;box-shadow:0 3px 14px rgba(45,212,167,.35)}
 .tab:active{transform:scale(.95)}
 #page-settings .card{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
@@ -173,6 +173,37 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 #page-settings input:focus,#page-settings textarea:focus{outline:none;border-color:#2dd4a7}
 #page-settings .log-area{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:11px;font-family:monospace;color:#9a9aa8;max-height:180px;overflow-y:auto;white-space:pre-wrap}
 @keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.tool-panel{position:relative;background:rgba(255,255,255,.045);border-radius:20px;padding:16px;margin-bottom:14px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 2px 20px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08)}
+.tool-panel-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.tp-ico{font-size:20px}
+.tp-name{font-size:16px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
+.tool-panel-body{display:flex;flex-direction:column;gap:12px}
+.tool-panel-body .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tool-panel-body input,.tool-panel-body select{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;flex:1;min-width:90px}
+.tool-panel-body input:focus,.tool-panel-body select:focus{outline:none;border-color:#2dd4a7}
+.tool-panel-body button{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:99px;padding:9px 16px;color:var(--text);font-size:13px;cursor:pointer;transition:all .25s cubic-bezier(.32,.72,0,1)}
+.tool-panel-body button:active{transform:scale(.95)}
+.tool-panel-body button.primary{background:linear-gradient(135deg,#2dd4a7,#059669);border:none;color:#fff}
+.tool-panel-body button.danger{background:linear-gradient(135deg,#fb7185,#e11d48);border:none;color:#fff}
+.tool-panel-body button:disabled{opacity:.4;cursor:default}
+.panel-list{display:flex;flex-direction:column;gap:8px}
+.panel-item{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:13px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(10px)}
+.panel-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-item .sz{color:#9a9aa8;white-space:nowrap}
+.panel-item input[type=checkbox]{width:16px;height:16px;accent-color:#2dd4a7}
+.panel-note{font-size:11px;color:#9a9aa8;line-height:1.7}
+.panel-empty{text-align:center;color:#5c5c6a;padding:20px 0;font-size:13px}
+.bars{display:flex;align-items:flex-end;gap:8px;height:120px;padding:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%}
+.bar .b{width:100%;background:linear-gradient(180deg,#2dd4a7,#7c5cff);border-radius:6px 6px 2px 2px;min-height:2px;box-shadow:0 0 8px rgba(45,212,167,.25)}
+.bar .bl{font-size:9px;color:#5c5c6a}
+.switch{position:relative;width:44px;height:24px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:99px;transition:.3s;cursor:pointer}
+.switch .sl:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked + .sl{background:linear-gradient(135deg,#2dd4a7,#059669)}
+.switch input:checked + .sl:before{transform:translateX(20px)}
 
 </style>
 </head>
@@ -206,6 +237,12 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   <button class="btn btn-primary" id="scanBtn">🔍&nbsp;开始扫描</button>
   <div style="text-align:center;margin-top:-8px"><a href="javascript:void(0)" id="forceScanBtn" style="color:var(--muted);font-size:12px">60s 内复用上次结果 · 强制重扫</a></div>
 
+  <div class="bottom-bar" id="bottomBar" hidden>
+  <label class="select-all"><input type="checkbox" id="selectAll">全选</label>
+  <button class="btn btn-clean" id="cleanallBtn" style="background:linear-gradient(135deg,var(--accent),#059669);padding:12px 14px">一键全清</button>
+  <button class="btn btn-clean" id="cleanBtn">清理 (0 B)</button>
+</div>
+
   <section class="card progress-card" id="progressCard" hidden>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
     <div class="progress-text" id="progressText">扫描中...</div>
@@ -220,7 +257,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 
   <div class="page" id="page-tools" hidden>
     <div class="page-head"><span class="page-eyebrow">TOOLS</span><h2 class="page-title">工具箱</h2></div>
-    <div class="tools" id="toolsGrid"></div>
+    <div id="toolsPage"></div>
   </div>
 
   <div class="page" id="page-settings" hidden>
@@ -266,11 +303,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   <div class="panel-body" id="toolBody"></div>
 </div>
 
-<div class="bottom-bar" id="bottomBar" hidden>
-  <label class="select-all"><input type="checkbox" id="selectAll">全选</label>
-  <button class="btn btn-clean" id="cleanallBtn" style="background:linear-gradient(135deg,var(--accent),#059669);padding:12px 14px">一键全清</button>
-  <button class="btn btn-clean" id="cleanBtn">清理 (0 B)</button>
-</div>
+
 
 <div class="overlay" id="overlay" hidden>
   <div class="overlay-sheet">
@@ -554,14 +587,18 @@ const TOOLS = [
   {id:'fstrim', icon:'⚡', name:'fstrim'}, {id:'ai', icon:'🤖', name:'AI建议'},
 ];
 function initTools() {
-  const g = $('toolsGrid');
-  g.innerHTML = TOOLS.map(t => `<div class="tool-card" data-tool="${t.id}"><span class="dot"></span><div class="ti">${t.icon}</div>${t.name}</div>`).join('');
-  g.querySelectorAll('.tool-card').forEach(c => c.onclick = () => openTool(c.dataset.tool));
+  const page = $('toolsPage');
+  page.innerHTML = TOOLS.map(t => `
+    <div class="tool-panel" id="card-${t.id}">
+      <div class="tool-panel-head"><span class="tp-ico">${t.icon}</span><span class="tp-name">${t.name}</span></div>
+      <div class="tool-panel-body" id="body-${t.id}"></div>
+    </div>`).join('');
+  TOOLS.forEach(t => { currentTool = t.id; openTool(t.id); });
 }
+let currentTool = '';
 function openPanel(title, html) {
-  $('toolTitle').textContent = title;
-  $('toolBody').innerHTML = html;
-  $('toolPanel').hidden = false;
+  const b = $('body-' + currentTool);
+  if (b) b.innerHTML = html;
 }
 $('toolClose').onclick = () => $('toolPanel').hidden = true;
 $('toolPanel').onclick = e => { if (e.target === $('toolPanel')) $('toolPanel').hidden = true; };
@@ -675,37 +712,47 @@ initTools();
 
 // --- 整理中心 ---
 function toolClassify() {
-  openPanel('📂 整理中心', `
-    <div class="panel-note">按规则把 Download 里的文件分类整理到对应目录（图片/视频/音乐/文档/安装包/压缩包）</div>
-    <div class="row">
-      <button class="primary" id="clPreview">预览</button>
-      <button id="clRun">执行整理</button>
-      <button id="clGet">读取规则</button>
-    </div>
-    <div class="panel-list" id="clList"></div>`);
-  const render = (moves) => {
-    const el = $('clList');
-    el.innerHTML = (moves||[]).length ? moves.map(m=>`<div class="panel-item"><span class="nm">${esc(m)}</span></div>`).join('')
-      : '<div class="panel-empty">无待整理文件</div>';
-  };
-  $('clPreview').onclick = async () => {
-    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'preview'})});
-    render(r.moves);
-  };
-  $('clRun').onclick = async () => {
-    if (!confirm('确认执行整理？文件会被移动到分类目录')) return;
-    const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'run'})});
-    render(r.moves);
-    alert('已整理 ' + r.count + ' 个文件');
-  };
-  $('clGet').onclick = async () => {
+  const b = $('body-classify');
+  b.innerHTML = '';
+  const load = async () => {
     const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'get'})});
-    const txt = (r.rules||[]).map(ru => `Src: ${ru.src}\nDest: ${ru.dest}\n` + Object.entries(ru.map||{}).map(([k,v])=>`  ${k} → ${v}`).join('\n')).join('\n\n');
-    alert(txt || '无规则');
+    const rules = r.rules||[];
+    const dest = rules.length ? rules[0].dest : '/sdcard/下载';
+    let html = '<div class="panel-note" style="margin-bottom:12px">📁 统一目标: <b style="color:var(--text)">' + esc(dest) + '</b></div>';
+    html += '<div class="row"><button class="primary" id="clPreview">🔍 预览</button><button id="clRun">⚡ 执行整理</button></div>';
+    rules.forEach((rule, ri) => {
+      const maps = Object.entries(rule.map||{}).map(([k,v]) => k+'→'+v).join(' · ');
+      html += '<div class="tool-panel" style="margin:10px 0;padding:14px">';
+      html += '<div class="row"><span>📂 源: <b>'+esc(rule.src)+'</b></span></div>';
+      html += '<div class="panel-note" style="font-size:12px;margin:4px 0">'+esc(maps)+'</div>';
+      html += '<div class="row" style="margin-top:6px">';
+      html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">🔄 处理子项目<input type="checkbox" data-ri="'+ri+'" class="cl-switch" '+(rule.recurse?'checked':'')+'></label>';
+      html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">🛡 完整性检测<input type="checkbox" data-ri="'+ri+'" class="cl-int" '+(rule.integrity?'checked':'')+'></label>';
+      html += '</div></div>';
+    });
+    html += '<div class="panel-list" id="clList"></div>';
+    b.innerHTML = html;
+    document.querySelectorAll('.cl-switch,.cl-int').forEach(cb => cb.onchange = async () => {
+      const rules2 = await (await fetch('http://127.0.0.1:46780/api/classify', {method:'POST', body: JSON.stringify({action:'get'})})).json();
+      const rs = rules2.rules||[];
+      document.querySelectorAll('.cl-switch').forEach((c,i) => { if(rs[i]) rs[i].recurse = c.checked; });
+      document.querySelectorAll('.cl-int').forEach((c,i) => { if(rs[i]) rs[i].integrity = c.checked; });
+      await api('/classify', {method:'POST', body: JSON.stringify({action:'save', rules: rs})});
+    });
+    $('clPreview').onclick = async () => {
+      const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'preview'})});
+      $('clList').innerHTML = (r.moves||[]).length ? r.moves.map(m => '<div class="panel-item"><span class="nm">'+esc(m)+'</span></div>').join('') : '<div class="panel-empty">无待整理文件</div>';
+    };
+    $('clRun').onclick = async () => {
+      if (!confirm('执行整理？')) return;
+      const r = await api('/classify', {method:'POST', body: JSON.stringify({action:'run'})});
+      alert('已整理 '+r.count+' 个文件');
+      $('clList').innerHTML = (r.moves||[]).map(m => '<div class="panel-item"><span class="nm">'+esc(m)+'</span></div>').join('');
+    };
   };
+  load();
 }
 
-// --- 重复文件 ---
 function toolDuplicate() {
   openPanel('👯 重复文件', `
     <div class="row"><button class="primary" id="dupScan">扫描重复文件</button></div>
