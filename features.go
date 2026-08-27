@@ -50,6 +50,7 @@ func registerFeatures(mux *http.ServeMux) {
 type fileHit struct {
 	path string
 	size int64
+	mod  time.Time
 }
 
 // walkSdcard 遍历 sdcard 下文件，跳过系统/应用私有目录
@@ -76,7 +77,7 @@ func walkSdcard(fn func(h fileHit)) {
 			if err != nil || e.Type()&fs.ModeSymlink != 0 {
 				continue
 			}
-			fn(fileHit{path: filepath.Join(dir, e.Name()), size: info.Size()})
+			fn(fileHit{path: filepath.Join(dir, e.Name()), size: info.Size(), mod: info.ModTime()})
 		}
 	}
 	for _, root := range sdcardRoots {
@@ -88,14 +89,33 @@ func walkSdcard(fn func(h fileHit)) {
 
 // ---------- 大文件 ----------
 
-func scanBig(minSize int64, ext string) []JunkItem {
+func scanBig(minSize int64, ext string, minDays int) []JunkItem {
 	var items []JunkItem
-	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
+	var exts []string
+	for _, e := range strings.Split(ext, ",") {
+		e = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(e, ".")))
+		if e != "" {
+			exts = append(exts, e)
+		}
+	}
 	walkSdcard(func(h fileHit) {
 		if h.size < minSize {
 			return
 		}
-		if ext != "" && !strings.HasSuffix(strings.ToLower(h.path), "."+ext) {
+		if len(exts) > 0 {
+			lower := strings.ToLower(h.path)
+			match := false
+			for _, e := range exts {
+				if strings.HasSuffix(lower, "."+e) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return
+			}
+		}
+		if minDays > 0 && time.Since(h.mod) < time.Duration(minDays)*24*time.Hour {
 			return
 		}
 		items = append(items, JunkItem{ID: "big:" + h.path, Path: h.path,
@@ -108,14 +128,17 @@ func scanBig(minSize int64, ext string) []JunkItem {
 	return items
 }
 
+
 func apiBig(w http.ResponseWriter, r *http.Request) {
-	minSize := int64(50 << 20) // 默认 50MB
+	minSize := int64(50 << 20)
 	ext := ""
+	days := 0
 	if v := r.URL.Query().Get("min"); v != "" {
 		fmt.Sscanf(v, "%d", &minSize)
 	}
 	ext = r.URL.Query().Get("ext")
-	writeJSON(w, 200, map[string]any{"items": scanBig(minSize, ext)})
+	fmt.Sscanf(r.URL.Query().Get("days"), "%d", &days)
+	writeJSON(w, 200, map[string]any{"items": scanBig(minSize, ext, days)})
 }
 
 // ---------- 空文件 ----------

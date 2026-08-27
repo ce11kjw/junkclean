@@ -295,8 +295,10 @@ const fmt = b => {
 };
 // 绝对地址：WebView(ksu:///ap://) 与浏览器(http://127.0.0.1:46780) 双通道可用
 const api = async (path, opts={}) => {
-  const r = await fetch('http://127.0.0.1:46780/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
-  return r.json();
+  try {
+    const r = await fetch('http://127.0.0.1:46780/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts));
+    return await r.json();
+  } catch(e) { return {error: '网络错误: ' + e.message}; }
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -569,13 +571,13 @@ function renderCheckList(items, elId) {
   const el = $(elId);
   if (!items.length) { el.innerHTML = '<div class="panel-empty">未发现</div>'; return; }
   el.innerHTML = items.map((it,i) => `
-    <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('');
+    <div class="panel-item" data-path="${esc(it.path)}"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('');
 }
 function checkedPaths(elId) {
   const out = [];
   $(elId).querySelectorAll('input:checked').forEach(cb => {
     const it = $(elId).querySelectorAll('.panel-item')[+cb.dataset.i];
-    out.push(it.querySelector('.nm').textContent);
+    out.push(it.dataset.path || it.querySelector('.nm').textContent);
   });
   return out;
 }
@@ -596,18 +598,16 @@ function toolBig() {
   let bigItems = [];
   $('bigScan').onclick = async () => {
     const min = (($('bigMin').value||50) * 1048576);
-    const items = await api('/big?min=' + min + '&ext=' + encodeURIComponent($('bigExt').value.trim().split(',')[0]));
+    const ext = encodeURIComponent($('bigExt').value.trim());
+    const days = +$('bigDays').value || 0;
+    const items = await api('/big?min=' + min + '&ext=' + ext + '&days=' + days);
     bigItems = items.items||[];
-    // 前端按时间过滤
-    const days = +$('bigDays').value;
-    let list = bigItems;
-    if (days > 0) list = bigItems.filter(() => true);
-    renderBig(list);
+    renderBig(bigItems);
   };
   const renderBig = (list) => {
     const el = $('bigList');
     el.innerHTML = list.length ? list.map((it,i) => `
-      <div class="panel-item"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
+      <div class="panel-item" data-path="${esc(it.path)}"><input type="checkbox" data-i="${i}"><span class="nm">${esc(it.name)}</span><span class="sz">${fmt(it.size)}</span></div>`).join('')
       : '<div class="panel-empty">未发现大文件</div>';
   };
   $('bigAll').onclick = () => $('bigList').querySelectorAll('input').forEach(c=>c.checked=true);
