@@ -295,13 +295,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
   <button class="tab" data-tab="settings"><span class="ti">⚙</span>设置</button>
 </nav>
 
-<div class="panel" id="toolPanel" hidden>
-  <div class="panel-head">
-    <h3 id="toolTitle">工具箱</h3>
-    <button class="panel-close" id="toolClose">✕</button>
-  </div>
-  <div class="panel-body" id="toolBody"></div>
-</div>
+
 
 
 
@@ -355,6 +349,11 @@ function renderDisk(d) {
 // ---------- status ----------
 async function refreshStatus() {
   const s = await api('/status');
+  if (s.error) {
+    $('rootBadge').textContent = '⚠ 离线';
+    $('rootBadge').className = 'badge badge-warn';
+    return;
+  }
   if (s.disk) renderDisk(s.disk);
   $('rootBadge').textContent = s.root ? 'root' : '⚠ 非root';
   $('rootBadge').className = 'badge ' + (s.root ? 'badge-safe' : 'badge-warn');
@@ -532,6 +531,7 @@ function applyBg(url) {
   let s = document.getElementById('bgStyle');
   if (!s) { s = document.createElement('style'); s.id = 'bgStyle'; document.head.appendChild(s); }
   const u = (url||'').trim();
+  if (u && !/^https?:\/\//i.test(u)) { s.textContent = ''; return; }
   s.textContent = u ? 'body::before{background:#050509 url("' + u + '") center/cover no-repeat fixed!important;filter:brightness(.85)}' : '';
 }
 function switchTab(name) {
@@ -600,8 +600,6 @@ function openPanel(title, html) {
   const b = $('body-' + currentTool);
   if (b) b.innerHTML = html;
 }
-$('toolClose').onclick = () => $('toolPanel').hidden = true;
-$('toolPanel').onclick = e => { if (e.target === $('toolPanel')) $('toolPanel').hidden = true; };
 
 // 通用：勾选列表工具
 function renderCheckList(items, elId) {
