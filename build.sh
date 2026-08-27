@@ -28,12 +28,14 @@ ZIP="JunkClean-v${VER}.zip"
 zip -r "$ZIP" module.prop system META-INF scripts customize.sh action.sh service.sh uninstall.sh webroot icon >/dev/null
 
 # update.json（OTA）
+SHA256=$(sha256sum "$ZIP" | cut -d" " -f1)
 cat > update.json <<EOF
 {
   "version": "$VER",
   "versionCode": $VC,
   "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/$ZIP",
-  "changelog": "v$VER 自动构建更新"
+  "sha256": "$SHA256",
+  "changelog": "${1:-v$VER 自动构建更新}"
 }
 EOF
 

@@ -3,6 +3,10 @@ package main
 
 import (
 	"archive/zip"
+	"os/signal"
+	"context"
+	"crypto/sha256"
+	"bytes"
 	"bufio"
 	"embed"
 	"encoding/json"
@@ -410,8 +414,17 @@ func loadConfig() {
 	cfgLock.Unlock()
 }
 
+// atomicWrite 先写临时文件再 rename，防写入中断损坏
+func atomicWrite(path string, data []byte, perm os.FileMode) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 func saveConfig() {
-	os.WriteFile(confF, mustJSON(cfg), 0600)
+	atomicWrite(confF, mustJSON(cfg), 0600)
 }
 
 func mustJSON(v any) []byte {
@@ -419,7 +432,19 @@ func mustJSON(v any) []byte {
 	return b
 }
 
+const maxLogBytes = 512 * 1024
+
 func logLine(s string) {
+	if st, err := os.Stat(logFile); err == nil && st.Size() > maxLogBytes {
+		if data, err := os.ReadFile(logFile); err == nil {
+			// 保留后半部分，从下一个换行开始
+			half := data[len(data)/2:]
+			if i := bytes.IndexByte(half, '\n'); i >= 0 {
+				half = half[i+1:]
+			}
+			atomicWrite(logFile, half, 0644)
+		}
+	}
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return
@@ -459,8 +484,21 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 // 预检请求放行（WebView 跨域 fetch）
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		allowed := origin == "" ||
+			strings.HasPrefix(origin, "http://127.0.0.1") ||
+			strings.HasPrefix(origin, "http://localhost") ||
+			strings.HasPrefix(origin, "file://") ||
+			strings.HasPrefix(origin, "ksu://") ||
+			strings.HasPrefix(origin, "https://mui.kernelsu")
+		if !allowed {
+			writeJSON(w, 403, map[string]string{"error": "跨域来源不被允许"})
+			return
+		}
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.WriteHeader(204)
@@ -591,6 +629,7 @@ func apiUpdateinfo(w http.ResponseWriter, r *http.Request) {
 		Version     string `json:"version"`
 		VersionCode int    `json:"versionCode"`
 		ZipURL      string `json:"zipUrl"`
+		SHA256      string `json:"sha256"`
 		Changelog   string `json:"changelog"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&up); err != nil {
@@ -600,7 +639,7 @@ func apiUpdateinfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"current": ver, "currentCode": verCode,
 		"remote": up.Version, "remoteCode": up.VersionCode,
-		"zipUrl": up.ZipURL, "changelog": up.Changelog,
+		"zipUrl": up.ZipURL, "changelog": up.Changelog, "sha256": up.SHA256,
 		"hasUpdate": up.VersionCode > verCode,
 	})
 }
@@ -667,8 +706,9 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		URL  string `json:"url"`
-		Path string `json:"path"`
+		URL    string `json:"url"`
+		Path   string `json:"path"`
+		SHA256 string `json:"sha256"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
@@ -705,6 +745,20 @@ func apiHotupdate(w http.ResponseWriter, r *http.Request) {
 	// 解压
 	os.RemoveAll(tmpDir)
 	os.MkdirAll(tmpDir, 0755)
+	if req.SHA256 != "" {
+		data, err := os.ReadFile(tmpZip)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "读取 zip 失败"})
+			return
+		}
+		sum := fmt.Sprintf("%x", sha256.Sum256(data))
+		if !strings.EqualFold(sum, req.SHA256) {
+			os.Remove(tmpZip)
+			writeJSON(w, 400, map[string]string{"error": "SHA256 校验失败，已丢弃"})
+			return
+		}
+		logLine("hotupdate: sha256 校验通过")
+	}
 	if err := unzipTo(tmpZip, tmpDir); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "解压失败: " + err.Error()})
 		return
@@ -941,5 +995,19 @@ func main() {
 			log.Fatal("端口 " + port + " 被占用: " + err.Error())
 		}
 	}
-	log.Fatal(http.Serve(ln, nil))
+	srv := &http.Server{}
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
+		<-sig
+		logLine("daemon: 收到退出信号，保存状态")
+		saveConfig()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		srv.Close()
+		_ = ctx
+	}()
+	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }

@@ -722,7 +722,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dat
   if (!confirm('发现新版本 v' + info.remote + ' (当前 v' + info.current + ')' + cl + '\n\n是否更新？')) return;
   toast('更新中...', 'info');
   $('hotBtn').disabled = true;
-  const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url: info.zipUrl})});
+  const r = await api('/hotupdate', {method:'POST', body: JSON.stringify({url: info.zipUrl, sha256: info.sha256 || ''})});
   $('hotBtn').disabled = false;
   if (r.error) { toast(r.error, true); return; }
   toast(r.msg || '更新完成');

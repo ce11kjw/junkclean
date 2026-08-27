@@ -445,7 +445,7 @@ func loadClassifyRules() []ClassifyRule {
 }
 
 func saveClassifyRules(rules []ClassifyRule) {
-	os.WriteFile(stateDir+"/classify.json", mustJSON(rules), 0600)
+	atomicWrite(stateDir+"/classify.json", mustJSON(rules), 0600)
 }
 
 // doClassify 执行整理：匹配 @src 下文件 → 按 @map 移到 @dest/<子目录>
@@ -683,7 +683,7 @@ func loadTasks() []Task {
 }
 
 func saveTasks(tasks []Task) {
-	os.WriteFile(stateDir+"/tasks.json", mustJSON(tasks), 0600)
+	atomicWrite(stateDir+"/tasks.json", mustJSON(tasks), 0600)
 }
 
 // startScheduler 启动定时扫描（daemon 启动时调用）
