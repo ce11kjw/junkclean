@@ -3,7 +3,7 @@
 MODPATH=${MODPATH:-$(dirname "$0")}
 ADR=/data/adb/junkclean
 
-ui_print "• JunkClean v4.0.0 安装流程开始"
+ui_print "• JunkClean 安装流程开始"
 
 # ========== 冲突检测：同类别 GC/Trim/清理模块 ==========
 CONFLICT_IDS="
@@ -40,7 +40,10 @@ mkdir -p "$ADR"
   "whitelist": [],
   "aiEndpoint": "",
   "aiKey": "",
-  "aiModel": ""
+  "aiModel": "",
+  "bgUrl": "",
+  "autoClean": false,
+  "autoTrashDays": 0
 }
 CFG
 chmod 600 "$ADR/config.json" 2>/dev/null
@@ -61,22 +64,16 @@ mkdir -p "$INSTALL"
 cp -rf "$MODPATH/." "$INSTALL/" 2>/dev/null
 chmod -R 777 "$INSTALL" 2>/dev/null
 
-# ========== 自动升级检查（autoupdate=1 开启） ==========
+# ========== 自动升级检查（autoupdate=1 开启，调 update.sh 原子更新） ==========
 if [ "$(grep '^autoupdate=' "$INSTALL/module.prop" 2>/dev/null | cut -d= -f2)" = "1" ]; then
   ui_print "• 检查最新版本..."
-  NEW=$(curl -s --max-time 8 https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json 2>/dev/null | grep -o '"versionCode":[0-9]*' | grep -o '[0-9]*')
-  CUR=$(grep '^versionCode=' "$INSTALL/module.prop" 2>/dev/null | cut -d= -f2)
-  if [ -n "$NEW" ] && [ "$NEW" -gt "${CUR:-0}" ]; then
-    ui_print "• 发现新版本 v$NEW，下载中..."
-    ZIP=$(curl -s --max-time 8 https://raw.githubusercontent.com/ce11kjw/junkclean/main/update.json 2>/dev/null | grep -o '"zipUrl":"[^"]*"' | cut -d'"' -f4)
-    if [ -n "$ZIP" ]; then
-      curl -s -L --max-time 60 -o /data/local/tmp/jc-latest.zip "$ZIP" 2>/dev/null
-      unzip -o -q /data/local/tmp/jc-latest.zip -d "$INSTALL" 2>/dev/null         && ui_print "• 已升级到 v$NEW" || ui_print "• 升级失败，使用当前版本"
-      rm -f /data/local/tmp/jc-latest.zip
-    fi
-  else
-    ui_print "• 已是最新版本"
-  fi
+  OUT=$(sh "$INSTALL/scripts/update.sh" "$INSTALL" 2>&1)
+  echo "$OUT" >> /data/adb/junkclean/daemon.log 2>/dev/null
+  case "$OUT" in
+    *已更新*) ui_print "• $OUT" ;;
+    *已是最新*) ui_print "• $OUT" ;;
+    *) ui_print "• 更新检查完成" ;;
+  esac
 fi
 
 # ========== 重启 daemon（不重启手机） ==========
