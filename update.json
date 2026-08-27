@@ -1,7 +1,7 @@
 {
-  "version": "4.2.21",
-  "versionCode": 441,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.2.21.zip",
-  "sha256": "9b3c7f0004d0ca39ab6a2701cd158caf826544da7b89a87ea5e6d1d0d3ae0eb8",
-  "changelog": "P0安全: CORS白名单+热更新SHA256校验+原子写入+日志轮转+优雅退出"
+  "version": "4.2.22",
+  "versionCode": 442,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.2.22.zip",
+  "sha256": "5ff81b67ca64dd1ae465a4d012b2debf499cab3fe8e7a4480e71cd3c9e549e8b",
+  "changelog": "修复: SHA256校验失败时只删下载的临时文件,不误删用户指定路径"
 }
