@@ -30,6 +30,21 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 .btn-primary{width:100%;padding:16px;background:linear-gradient(135deg,var(--accent),#059669);color:#fff;font-size:17px;margin:16px 0;box-shadow:0 4px 28px rgba(45,212,167,.28)}
 .btn-primary:hover{box-shadow:0 6px 36px rgba(45,212,167,.4);transform:translateY(-1px)}
 .btn-clean{background:linear-gradient(135deg,var(--danger),#e11d48);color:#fff;padding:12px 20px;font-size:14px;box-shadow:0 4px 20px rgba(251,113,133,.2)}
+.sw{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-t{position:absolute;inset:0;background:var(--line);border-radius:24px;transition:.25s cubic-bezier(.32,.72,0,1);cursor:pointer}
+.sw-t:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.25s cubic-bezier(.32,.72,0,1)}
+.sw input:checked+.sw-t{background:var(--accent)}
+.sw input:checked+.sw-t:before{transform:translateX(20px)}
+.grp{margin-bottom:10px}
+.grp-h{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;cursor:pointer;user-select:none;transition:.2s}
+.grp-h:active{transform:scale(.995)}
+.grp-h b{font-size:13.5px;font-weight:650}
+.grp-h .arw{font-size:11px;color:var(--muted);transition:transform .25s cubic-bezier(.32,.72,0,1)}
+.grp.open .grp-h .arw{transform:rotate(90deg)}
+.grp-b{display:none;padding-top:8px}
+.grp.open .grp-b{display:block}
+.grp-h .cnt{font-size:11px;color:var(--muted);margin-left:auto;margin-right:8px}
 .btn-danger{background:linear-gradient(135deg,var(--danger),#e11d48);color:#fff;padding:14px 28px;font-size:15px;box-shadow:0 4px 20px rgba(251,113,133,.22)}
 .btn-secondary{background:var(--surface);color:var(--muted);padding:14px 28px;font-size:15px;border:1px solid var(--line)}
 .btn-secondary:hover{color:var(--text);border-color:var(--line2)}
@@ -322,6 +337,47 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
   </section>
   </div>
 
+  <div class="page" id="page-schedule" hidden>
+    <div class="page-head"><span class="page-eyebrow">SCHEDULE</span><h2 class="page-title">定时清理</h2></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600">启用定时清理</div>
+          <div class="panel-note" style="font-size:11px">到点自动清理下面的目录，平时不用管</div>
+        </div>
+        <label class="sw"><input type="checkbox" id="schOn"><span class="sw-t"></span></label>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:12px;align-items:center">
+        <span style="font-size:13px;font-weight:600">清理间隔</span>
+        <select id="schMin" style="padding:6px 10px;border-radius:8px;background:var(--card2);color:var(--text);border:1px solid var(--line)">
+          <option value="30">30 分钟</option><option value="60">1 小时</option>
+          <option value="120">2 小时</option><option value="360" selected>6 小时</option>
+          <option value="720">12 小时</option><option value="1440">1 天</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="gap:8px">
+        <input id="schPath" placeholder="/sdcard/Download/temp" style="flex:1">
+        <button class="btn btn-primary" id="schAdd" style="width:auto;padding:0 14px">＋ 添加</button>
+      </div>
+      <div class="panel-note" style="font-size:11px;margin-top:6px">
+        末尾带 <b>/</b> = 只清里面文件保留目录；不带 <b>/</b> = 删整个目录
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">已保存目录</div>
+      <div id="schList"><div class="panel-empty">暂无，填路径后点添加</div></div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="btn btn-danger" id="schRun" style="flex:1">立即清理全部</button>
+        <button class="btn btn-secondary" id="schClear" style="flex:1">清空列表</button>
+      </div>
+      <div id="schResult" class="panel-note" style="margin-top:8px"></div>
+    </div>
+  </div>
+
   <div class="page" id="page-tools" hidden>
     <div class="page-head"><span class="page-eyebrow">TOOLS</span><h2 class="page-title">工具箱</h2></div>
     <div id="toolsPage"></div>
@@ -330,70 +386,135 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
   <div class="page" id="page-settings" hidden>
     <div class="page-head"><span class="page-eyebrow">SETTINGS</span><h2 class="page-title">设置</h2></div>
     <div id="settingsBody">
-      <div class="card">
-  <div class="row" style="justify-content:space-between">
-    <span style="font-size:13px;font-weight:600">主题</span>
-    <div class="row" style="gap:6px">
-      <button class="theme-btn" data-theme="dark">深色</button>
-      <button class="theme-btn" data-theme="oled">OLED</button>
-      <button class="theme-btn" data-theme="light">浅色</button>
-    </div>
-  </div>
-  <div class="row" style="justify-content:space-between;margin-top:10px">
-    <span style="font-size:13px;font-weight:600">强调色</span>
-    <div class="row" style="gap:8px">
-      <button class="accent-btn" data-accent="emerald" style="background:#2dd4a7"></button>
-      <button class="accent-btn" data-accent="violet" style="background:#7c5cff"></button>
-      <button class="accent-btn" data-accent="blue" style="background:#4a9eff"></button>
-      <button class="accent-btn" data-accent="pink" style="background:#ff7eb6"></button>
-    </div>
-  </div>
-</div>
-<div class="card"><label>背景图片直链<input id="bgUrl" placeholder="https://... 直链" style="margin-top:4px"></label></div>
-<label>白名单包名（每行一个，跳过不扫描）
-    <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
-  </label>
-  <label>AI 端点
-    <input id="aiEndpoint" placeholder="https://api.openai.com/v1">
-  </label>
-  <label>AI Key
-    <input id="aiKey" type="password" placeholder="sk-...">
-  </label>
-  <label>AI 模型
-    <input id="aiModel" placeholder="gpt-4o-mini">
-  </label>
-  <button class="btn btn-primary" id="saveCfgBtn" style="margin:4px 0">保存设置</button>
-  <h2 style="margin-top:8px">热更新</h2>
-  
-  <button class="btn btn-primary" id="hotBtn" style="margin:8px 0">🔥 热更新（不重启手机）</button>
-  <button class="btn btn-secondary" id="hotRollback" style="width:100%;margin-bottom:8px">↩ 回滚到备份版本</button>
-  <div id="hotResult" style="font-size:13px;color:var(--muted);line-height:1.7;word-break:break-all"></div>
-  <div class="card" style="margin-top:12px">
-      <h3 style="font-size:14px;font-weight:700">关于</h3>
-      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用 · GitHub: ce11kjw/junkclean</div>
-    </div>
-    <div class="card" style="margin-top:12px"><h3 style="font-size:14px;font-weight:700">关于</h3><div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div></div>
-    <div class="card" style="margin-top:12px">
-      <h3 style="font-size:14px;font-weight:700">关于</h3>
-      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div>
-    </div>
-    <div class="card" style="margin-top:12px">
-      <h3 style="font-size:14px;font-weight:700">关于</h3>
-      <div class="panel-note">JunkClean v4.2.18 · 模块化垃圾清理工具<br>开源 · KSU/AP/Magisk 通用</div>
-    </div>
-  <div class="card" style="margin-top:12px">
-    <h3 style="font-size:14px;font-weight:700;margin-bottom:6px">关于</h3>
-    <div class="panel-note" style="font-size:12px;line-height:1.8">JunkClean · 模块化垃圾清理<br>KSU / APatch / Magisk 通用<br><a href="https://github.com/ce11kjw/junkclean" style="color:var(--accent)">GitHub 仓库</a></div>
-  </div>
-  <h2 style="margin-top:8px">操作日志</h2>
-  <div class="log-area" id="logArea">加载中...</div>
+      <!-- 外观 -->
+      <div class="grp open" id="sgrp-0">
+        <div class="grp-h" onclick="document.getElementById('sgrp-0').classList.toggle('open')">
+          <b>外观</b><span class="cnt">主题 · 强调色 · 背景</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <span style="font-size:13px;font-weight:600">主题</span>
+              <div class="row" style="gap:6px">
+                <button class="theme-btn" data-theme="dark">深色</button>
+                <button class="theme-btn" data-theme="oled">OLED</button>
+                <button class="theme-btn" data-theme="light">浅色</button>
+              </div>
+            </div>
+            <div class="row" style="justify-content:space-between;margin-top:10px">
+              <span style="font-size:13px;font-weight:600">强调色</span>
+              <div class="row" style="gap:8px">
+                <button class="accent-btn" data-accent="emerald" style="background:#2dd4a7"></button>
+                <button class="accent-btn" data-accent="violet" style="background:#7c5cff"></button>
+                <button class="accent-btn" data-accent="blue" style="background:#4a9eff"></button>
+                <button class="accent-btn" data-accent="pink" style="background:#ff7eb6"></button>
+              </div>
+            </div>
+          </div>
+          <div class="card"><label>背景图片直链<input id="bgUrl" placeholder="https://... 直链" style="margin-top:4px"></label></div>
+        </div>
+      </div>
 
+      <!-- 白名单与保护路径 -->
+      <div class="grp" id="sgrp-1">
+        <div class="grp-h" onclick="document.getElementById('sgrp-1').classList.toggle('open')">
+          <b>白名单与保护路径</b><span class="cnt">扫描跳过</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <label>白名单包名（每行一个，跳过不扫描）
+              <textarea id="wlInput" rows="4" placeholder="com.example.app"></textarea>
+            </label>
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">保护路径</div>
+            <div class="panel-note" style="font-size:11px;margin-bottom:8px">
+              扫描跳过 + 删除拦截。支持通配符 *，如 <b>Android/data/*/cache</b>
+            </div>
+            <div class="row" style="gap:8px">
+              <input id="protPath" placeholder="/sdcard/重要目录 或 DCIM" style="flex:1">
+              <button class="btn btn-primary" id="protAdd" style="width:auto;padding:0 12px">添加</button>
+            </div>
+            <div id="protList" style="margin-top:10px"><div class="panel-empty">加载中...</div></div>
+            <button class="btn btn-secondary" id="protReset" style="width:100%;margin-top:8px">恢复默认保护路径</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 清理规则库 -->
+      <div class="grp" id="sgrp-2">
+        <div class="grp-h" onclick="document.getElementById('sgrp-2').classList.toggle('open')">
+          <b>清理规则库</b><span class="cnt">可编辑 JSON</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <div class="panel-note" style="font-size:11px;margin-bottom:8px" id="rulePath">规则文件加载中...</div>
+            <div id="ruleList"><div class="panel-empty">点下方按钮加载</div></div>
+            <div class="row" style="gap:8px;margin-top:10px">
+              <button class="btn btn-secondary" id="ruleLoad" style="flex:1">查看规则</button>
+              <button class="btn btn-secondary" id="ruleReset" style="flex:1">恢复默认</button>
+            </div>
+            <button class="btn btn-primary" id="ruleScan" style="width:100%;margin-top:8px">按规则扫描</button>
+            <div id="ruleResult" class="panel-note" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 配置 -->
+      <div class="grp" id="sgrp-3">
+        <div class="grp-h" onclick="document.getElementById('sgrp-3').classList.toggle('open')">
+          <b>AI 配置</b><span class="cnt">端点 · Key · 模型</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <label>AI 端点<input id="aiEndpoint" placeholder="https://api.openai.com/v1"></label>
+            <label>AI Key<input id="aiKey" type="password" placeholder="sk-..."></label>
+            <label>AI 模型<input id="aiModel" placeholder="gpt-4o-mini"></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 维护 -->
+      <div class="grp" id="sgrp-4">
+        <div class="grp-h" onclick="document.getElementById('sgrp-4').classList.toggle('open')">
+          <b>维护</b><span class="cnt">热更新 · 日志</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <button class="btn btn-primary" id="hotBtn" style="width:100%;margin-bottom:8px">🔥 热更新（不重启手机）</button>
+            <button class="btn btn-secondary" id="hotRollback" style="width:100%">↩ 回滚到备份版本</button>
+            <div id="hotResult" style="font-size:12px;color:var(--muted);line-height:1.7;word-break:break-all;margin-top:8px"></div>
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">操作日志</div>
+            <div class="log-area" id="logArea">加载中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 关于 -->
+      <div class="grp" id="sgrp-5">
+        <div class="grp-h" onclick="document.getElementById('sgrp-5').classList.toggle('open')">
+          <b>关于</b><span class="cnt">v4.3.0</span><span class="arw">▶</span>
+        </div>
+        <div class="grp-b">
+          <div class="card">
+            <div class="panel-note" style="font-size:12px;line-height:1.8">
+              JunkClean · 模块化垃圾清理<br>KSU / APatch / Magisk 通用<br>
+              <a href="https://github.com/ce11kjw/junkclean" style="color:var(--accent)">GitHub 仓库</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="saveCfgBtn" style="width:100%;margin-top:8px">保存设置</button>
     </div>
   </div>
 </div>
 
 <nav class="tabnav" id="tabnav">
   <button class="tab active" data-tab="home"><span class="ti">◉</span>首页</button>
+  <button class="tab" data-tab="schedule"><span class="ti">⏰</span>定时清理</button>
   <button class="tab" data-tab="tools"><span class="ti">▦</span>工具箱</button>
   <button class="tab" data-tab="settings"><span class="ti">⚙</span>设置</button>
 </nav>
@@ -779,12 +900,157 @@ const TOOLS = [
   {id:'monitor', icon:'📡', name:'监控'}, {id:'stats', icon:'📊', name:'统计'},
   {id:'fstrim', icon:'⚡', name:'fstrim'}, {id:'ai', icon:'🤖', name:'AI建议'},
 ];
+// 三分组（对齐 APP 工具箱分区）
+const TOOL_GROUPS = [
+  {name:'缓存清理', ids:['cleanapp','thumb'], open:true},
+  {name:'文件分析', ids:['big','duplicate','empty'], open:false},
+  {name:'整理与维护', ids:['classify','trash','fstrim','monitor','stats','ai','schedule'], open:false},
+];
+// ---------- 保护路径（对齐 APP） ----------
+async function protApi(action, extra) {
+  return await api('/protected', {method:'POST', body: JSON.stringify(Object.assign({action}, extra||{}))});
+}
+async function loadProt() {
+  const r = await protApi('list');
+  if (!r) return;
+  const el = $('protList');
+  const list = r.protected || [];
+  if (!list.length) { el.innerHTML = '<div class="panel-empty">暂无保护路径</div>'; return; }
+  el.innerHTML = list.map((p, i) =>
+    `<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)">
+      <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}</span>
+      <button class="btn btn-secondary" style="width:auto;padding:3px 9px;font-size:11px" onclick="protDel(${i})">×</button>
+    </div>`).join('');
+}
+async function protDel(i) { await protApi('remove', {index:i}); loadProt(); }
+function initProt() {
+  $('protAdd').onclick = async () => {
+    const p = $('protPath').value.trim();
+    if (!p) { toast('请输入路径'); return; }
+    await protApi('add', {path:p});
+    $('protPath').value = '';
+    toast('已添加保护：' + p);
+    loadProt();
+  };
+  $('protReset').onclick = async () => {
+    if (!confirm('恢复默认保护路径？会覆盖你的自定义。')) return;
+    const r = await protApi('reset');
+    toast('已恢复 ' + (r.count||0) + ' 条默认');
+    loadProt();
+  };
+  loadProt();
+}
+
+// ---------- 清理规则库（对齐 APP RuleEngine） ----------
+async function ruleApi(action, extra) {
+  return await api('/rulelib', {method:'POST', body: JSON.stringify(Object.assign({action}, extra||{}))});
+}
+function initRules() {
+  $('ruleLoad').onclick = async () => {
+    const r = await ruleApi('list');
+    if (!r) return;
+    $('rulePath').textContent = '规则文件：' + (r.path || '');
+    const rules = r.rules || [];
+    $('ruleList').innerHTML = rules.map(x =>
+      `<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)">
+        <span style="font-size:12px">${x.enabled ? '✓' : '○'} ${x.label}</span>
+        <span style="font-size:10.5px;color:var(--muted)">${x.risk}</span>
+      </div>`).join('') || '<div class="panel-empty">无规则</div>';
+  };
+  $('ruleReset').onclick = async () => {
+    if (!confirm('恢复默认规则库？会覆盖自定义修改。')) return;
+    const r = await ruleApi('reset');
+    toast('已重置 ' + (r.count||0) + ' 条规则');
+    $('ruleLoad').click();
+  };
+  $('ruleScan').onclick = async () => {
+    const btn = $('ruleScan');
+    btn.disabled = true; btn.textContent = '扫描中...';
+    const r = await ruleApi('scan');
+    btn.disabled = false; btn.textContent = '按规则扫描';
+    if (!r) return;
+    let total = 0; (r.items||[]).forEach(x => total += (x.size||0));
+    $('ruleResult').textContent = '命中 ' + (r.count||0) + ' 项 · ' + fmt(total);
+  };
+}
+
+// ---------- 定时清理页（对齐 APP） ----------
+async function schApi(action, extra) {
+  return await api('/cleandirs', {method:'POST', body: JSON.stringify(Object.assign({action}, extra||{}))});
+}
+async function loadSchedule() {
+  const r = await schApi('list');
+  if (!r) return;
+  $('schOn').checked = !!r.scheduleOn;
+  $('schMin').value = String(r.scheduleMin || 360);
+  renderSchList(r.dirs || []);
+}
+function renderSchList(dirs) {
+  const el = $('schList');
+  if (!dirs.length) { el.innerHTML = '<div class="panel-empty">暂无，填路径后点添加</div>'; return; }
+  el.innerHTML = dirs.map((line, i) => {
+    const p = line.split('|');
+    const path = p[0] || '';
+    const whole = p[1] === '1';
+    const short = path.replace('/sdcard/', '').replace('/storage/emulated/0/', '');
+    return `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 ${short}</div>
+        <div style="font-size:10.5px;color:var(--muted)">${whole ? '删整个目录' : '只清内容'}</div>
+      </div>
+      <button class="btn btn-secondary" style="width:auto;padding:4px 10px;font-size:12px" onclick="schDel(${i})">×</button>
+    </div>`;
+  }).join('');
+}
+async function schDel(i) { await schApi('remove', {index:i}); loadSchedule(); }
+function initSchedule() {
+  $('schOn').onchange = async e => {
+    await schApi('toggle', {on: e.target.checked});
+    toast(e.target.checked ? '已开启定时清理' : '已关闭');
+  };
+  $('schMin').onchange = async e => {
+    await schApi('interval', {min: parseInt(e.target.value)});
+    toast('间隔已更新');
+  };
+  $('schAdd').onclick = async () => {
+    const p = $('schPath').value.trim();
+    if (!p) { toast('请输入目录路径'); return; }
+    const r = await schApi('add', {path:p});
+    if (r && r.error) { toast(r.error); return; }
+    $('schPath').value = '';
+    toast('已添加，' + (r.delItself ? '到点删整个目录' : '到点只清内容'));
+    loadSchedule();
+  };
+  $('schRun').onclick = async () => {
+    const btn = $('schRun');
+    btn.disabled = true; btn.textContent = '清理中...';
+    const r = await schApi('run');
+    btn.disabled = false; btn.textContent = '立即清理全部';
+    if (r) $('schResult').textContent = '清理完成 · ' + (r.count||0) + ' 项 · 释放 ' + fmt(r.freed||0);
+    loadSchedule();
+  };
+  $('schClear').onclick = async () => {
+    if (!confirm('清空所有已保存的目录？')) return;
+    await schApi('clear'); loadSchedule(); toast('已清空');
+  };
+  loadSchedule();
+}
+
 function initTools() {
   const page = $('toolsPage');
-  page.innerHTML = TOOLS.map(t => `
-    <div class="tool-panel" id="card-${t.id}">
-      <div class="tool-panel-head"><span class="tp-ico">${t.icon}</span><span class="tp-name">${t.name}</span></div>
-      <div class="tool-panel-body" id="body-${t.id}"></div>
+  const byId = {}; TOOLS.forEach(t => byId[t.id] = t);
+  page.innerHTML = TOOL_GROUPS.map((g, gi) => `
+    <div class="grp${g.open ? ' open' : ''}" id="grp-${gi}">
+      <div class="grp-h" onclick="document.getElementById('grp-${gi}').classList.toggle('open')">
+        <b>${g.name}</b><span class="cnt">${g.ids.length} 项</span><span class="arw">▶</span>
+      </div>
+      <div class="grp-b">
+        ${g.ids.filter(id => byId[id]).map(id => `
+          <div class="tool-panel" id="card-${id}">
+            <div class="tool-panel-head"><span class="tp-ico">${byId[id].icon}</span><span class="tp-name">${byId[id].name}</span></div>
+            <div class="tool-panel-body" id="body-${id}"></div>
+          </div>`).join('')}
+      </div>
     </div>`).join('');
   TOOLS.forEach(t => { currentTool = t.id; openTool(t.id); });
 }
@@ -924,6 +1190,9 @@ api('/updateinfo').then(info => {
   }
 }).catch(() => {});
 initTools();
+  initSchedule();
+  initProt();
+  initRules();
 
 
 // --- 整理中心 ---

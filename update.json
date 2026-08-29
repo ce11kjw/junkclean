@@ -1,7 +1,7 @@
 {
-  "version": "4.2.22",
-  "versionCode": 442,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.2.22.zip",
-  "sha256": "5ff81b67ca64dd1ae465a4d012b2debf499cab3fe8e7a4480e71cd3c9e549e8b",
-  "changelog": "修复: SHA256校验失败时只删下载的临时文件,不误删用户指定路径"
+  "version": "4.3.1",
+  "versionCode": 431,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.1.zip",
+  "sha256": "83e66c0f04181bdc4f693333d06daf3e6beb3f02c94d3a5697b62bc348a01be5",
+  "changelog": "v4.3.0: WebUI 4tab + 定时清理页 + 保护路径 + 规则库 + 工具箱三分组 + 设置页折叠（对齐 APP v3.0.28）"
 }

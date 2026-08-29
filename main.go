@@ -30,8 +30,8 @@ import (
 var webFS embed.FS
 
 const (
-	ver      = "4.2.22"
-	verCode  = 442
+	ver      = "4.3.1"
+	verCode  = 431
 	port     = "46780"
 	stateDir = "/data/adb/junkclean"
 	logFile  = stateDir + "/junkclean.log"
@@ -76,10 +76,16 @@ type Config struct {
 	AutoClean     bool            `json:"autoClean"`
 	AutoTrashDays int             `json:"autoTrashDays"`
 	LastTrim      string          `json:"lastTrim"`
-	BGUrl         string          
-	ScanRoot      string           // 自定义扫描根目录`json:"bgUrl"`
+	BGUrl         string          `json:"bgUrl"`
+	ScanRoot      string          `json:"scanRoot"`
 	Theme         string          `json:"theme"`
 	Accent        string          `json:"accent"`
+
+	// v4.3.0 对齐 APP：定时目录清理 / 保护路径 / 规则库
+	CleanDirs   []string `json:"cleanDirs"`   // 每项 "路径|1(删整个)/0(只清内容)"
+	Protected   []string `json:"protected"`   // 保护路径（支持通配符 *）
+	ScheduleOn  bool     `json:"scheduleOn"`  // 定时清理开关
+	ScheduleMin int      `json:"scheduleMin"` // 间隔（分钟）
 }
 
 type ScanState struct {
@@ -986,6 +992,7 @@ func main() {
 	http.HandleFunc("/api/cleanall", corsMiddleware(apiCleanall))
 	http.HandleFunc("/api/check", corsMiddleware(apiCheck))
 	registerFeatures(http.DefaultServeMux)
+	registerV43(http.DefaultServeMux)
 	startScheduler()
 	fmt.Printf("JunkClean v%s daemon on 127.0.0.1:%s (root=%v)\n", ver, port, os.Geteuid() == 0)
 	// 端口被占时等待旧进程退出（热更新重启场景），最多 5s
