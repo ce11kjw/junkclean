@@ -1,7 +1,7 @@
 {
-  "version": "4.3.2",
-  "versionCode": 432,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.2.zip",
-  "sha256": "a7c9e4044e3060563556b79d6f87ac7ce99951c48fc0408c7029cce8ee7f4f71",
-  "changelog": "v4.3.2 审核修复: 危险路径守卫（拒绝存储根/系统分区/模块数据目录）+ 受保护路径拒绝入列 + 定时循环启动即计时 + 移除 SDROOT 硬编码复用 sdcardRoots"
+  "version": "4.3.3",
+  "versionCode": 433,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.3.zip",
+  "sha256": "d30244d3311a54358e3abd2fe5ab9a7ef958ed7f385e34595760af4cfabd59f7",
+  "changelog": "v4.3.3 审核修复2: 根目录输入拦截 + 受保护路径拒绝入列（避免加进去却不清理的误导）"
 }
