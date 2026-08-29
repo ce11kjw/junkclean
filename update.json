@@ -1,7 +1,7 @@
 {
-  "version": "4.3.4",
-  "versionCode": 434,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.4.zip",
-  "sha256": "a1776a7469a007706797a48bcde402477895cd7f2c5c010d32223a49b39dbb95",
-  "changelog": "v4.3.4 审核修复3: 根目录输入拦截 + 受保护路径拒绝入列（避免加进去却不清理的误导）"
+  "version": "4.3.5",
+  "versionCode": 435,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.5.zip",
+  "sha256": "e43246db5a57e609863af4ec9b001cd08efb5c3ff300cf5d2e5666e6808cf27d",
+  "changelog": "v4.3.5: 工具箱卡片懒加载（首屏 12 个 API 请求降到 2 个）"
 }

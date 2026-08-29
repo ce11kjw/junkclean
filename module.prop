@@ -1,7 +1,7 @@
 id=junkclean
 name=JunkClean
-version=4.3.4
-versionCode=434
+version=4.3.5
+versionCode=435
 author=CE11KJW
 description=智能垃圾清理+存储维护：体检/清理/整理/监控/AI建议 · KSU/AP/Magisk · 零数据采集
 autoupdate=1
