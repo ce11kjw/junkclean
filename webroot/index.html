@@ -1041,7 +1041,7 @@ function initTools() {
   const byId = {}; TOOLS.forEach(t => byId[t.id] = t);
   page.innerHTML = TOOL_GROUPS.map((g, gi) => `
     <div class="grp${g.open ? ' open' : ''}" id="grp-${gi}">
-      <div class="grp-h" onclick="document.getElementById('grp-${gi}').classList.toggle('open')">
+      <div class="grp-h" onclick="toggleGroup(${gi})">
         <b>${g.name}</b><span class="cnt">${g.ids.length} 项</span><span class="arw">▶</span>
       </div>
       <div class="grp-b">
@@ -1052,7 +1052,27 @@ function initTools() {
           </div>`).join('')}
       </div>
     </div>`).join('');
-  TOOLS.forEach(t => { currentTool = t.id; openTool(t.id); });
+  // 懒加载：只初始化默认展开分组的卡片，折叠分组点开时才请求（原来一次性打 12 个 API）
+  TOOL_GROUPS.forEach((g, gi) => {
+    if (g.open) g.ids.forEach(id => loadToolOnce(id));
+  });
+}
+
+// loadToolOnce 保证同一卡片只请求一次
+const toolLoaded = {};
+function loadToolOnce(id) {
+  if (toolLoaded[id]) return;
+  toolLoaded[id] = true;
+  currentTool = id;
+  try { openTool(id); } catch (e) { toolLoaded[id] = false; }
+}
+// 展开分组时加载其内卡片
+function toggleGroup(gi) {
+  const el = document.getElementById('grp-' + gi);
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) {
+    (TOOL_GROUPS[gi].ids || []).forEach(id => loadToolOnce(id));
+  }
 }
 let currentTool = '';
 function openPanel(title, html) {
