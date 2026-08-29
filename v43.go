@@ -14,8 +14,6 @@ import (
 // v4.3.0 对齐 APP：定时目录清理 / 保护路径 / 规则库
 // 端点：/api/cleandirs  /api/protected  /api/rulelib
 
-const SDROOT = "/sdcard"
-
 // startScheduleLoop 后台定时循环：按 cfg.ScheduleMin 触发目录清理
 func startScheduleLoop() {
 	go func() {
@@ -42,7 +40,7 @@ func startScheduleLoop() {
 	}()
 }
 
-var lastSchedRun time.Time
+var lastSchedRun = time.Now()   // 启动即计时，避免 60s 后立刻触发一轮
 
 func registerV43(mux *http.ServeMux) {
 	startScheduleLoop()
@@ -98,6 +96,31 @@ var defaultProtected = []string{
 	".keys", "keystore", ".ssh",
 }
 
+// dangerousDir 拒绝存储根、系统分区等不可作为清理目标的路径。
+// 返回空串表示安全，否则返回拒绝原因。
+func dangerousDir(p string) string {
+	p = filepath.Clean(p)
+	if p == "/" || p == "." {
+		return "拒绝：不能清理根目录"
+	}
+	// 存储根本身（/sdcard、/storage/emulated/0）不可整体删除
+	for _, r := range []string{sdcardRoots[0], "/sdcard", "/storage/emulated/0", "/storage/self/primary"} {
+		if p == filepath.Clean(r) {
+			return "拒绝：不能把存储根目录设为清理目标"
+		}
+	}
+	// 复用 main.go 的系统分区黑名单
+	for _, f := range forbidden {
+		if p == f || strings.HasPrefix(p, f+"/") {
+			return "拒绝：系统分区不可清理（" + f + "）"
+		}
+	}
+	if strings.HasPrefix(p, stateDir) {
+		return "拒绝：模块自身数据目录不可清理"
+	}
+	return ""
+}
+
 // ---------- /api/cleandirs：定时清理目录 ----------
 
 func apiCleanDirs(w http.ResponseWriter, r *http.Request) {
@@ -135,12 +158,26 @@ func apiCleanDirs(w http.ResponseWriter, r *http.Request) {
 		// 尾斜杠规则：带 / = 只清内容(0)；不带 = 删整个目录(1)
 		delItself := !strings.HasSuffix(p, "/")
 		clean := strings.TrimRight(p, "/")
+		if clean == "" {
+			writeJSON(w, 400, map[string]string{"error": "拒绝：不能清理根目录"})
+			return
+		}
 		if !filepath.IsAbs(clean) {
-			clean = filepath.Join(SDROOT, clean)
+			clean = filepath.Join(sdcardRoots[0], clean)
 		}
 		st, err := os.Stat(clean)
 		if err != nil || !st.IsDir() {
 			writeJSON(w, 400, map[string]string{"error": "目录不存在：" + clean})
+			return
+		}
+		if bad := dangerousDir(clean); bad != "" {
+			writeJSON(w, 400, map[string]string{"error": bad})
+			return
+		}
+		// 受保护路径加进来也不会被清理，直接拒绝避免误导
+		if isProtectedPath(clean) {
+			writeJSON(w, 400, map[string]string{
+				"error": "该路径受保护，不会被清理。如需清理请先在设置里移除对应保护条目"})
 			return
 		}
 		flag := "0"
@@ -227,6 +264,10 @@ func runCleanDirs() (int64, int) {
 		p := parts[0]
 		delItself := len(parts) > 1 && parts[1] == "1"
 
+		if bad := dangerousDir(p); bad != "" {
+			logLine(fmt.Sprintf("定时清理拒绝危险路径 %s: %s", p, bad))
+			continue   // 危险条目直接丢弃，不留在列表里
+		}
 		if isProtectedPath(p) {
 			logLine(fmt.Sprintf("定时清理跳过受保护路径: %s", p))
 			survivors = append(survivors, line)
@@ -370,7 +411,7 @@ type CleanRule struct {
 	Enabled      bool     `json:"enabled"`
 }
 
-func ruleLibPath() string { return filepath.Join(SDROOT, ".junkclean", "rules.json") }
+func ruleLibPath() string { return filepath.Join(sdcardRoots[0], ".junkclean", "rules.json") }
 
 var defaultRules = []CleanRule{
 	{ID: "log_files", Label: "日志文件", Risk: "low", TargetType: "file",

@@ -1,7 +1,7 @@
 {
-  "version": "4.3.1",
-  "versionCode": 431,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.1.zip",
-  "sha256": "83e66c0f04181bdc4f693333d06daf3e6beb3f02c94d3a5697b62bc348a01be5",
-  "changelog": "v4.3.0: WebUI 4tab + 定时清理页 + 保护路径 + 规则库 + 工具箱三分组 + 设置页折叠（对齐 APP v3.0.28）"
+  "version": "4.3.2",
+  "versionCode": 432,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.2.zip",
+  "sha256": "a7c9e4044e3060563556b79d6f87ac7ce99951c48fc0408c7029cce8ee7f4f71",
+  "changelog": "v4.3.2 审核修复: 危险路径守卫（拒绝存储根/系统分区/模块数据目录）+ 受保护路径拒绝入列 + 定时循环启动即计时 + 移除 SDROOT 硬编码复用 sdcardRoots"
 }
