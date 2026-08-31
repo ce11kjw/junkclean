@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.3.8 (2026-08-31)
+- v4.3.8: 审核修复 - 删除 CSS rotate 与 morphicons 的双重旋转冲突
+
 ## v4.3.7 (2026-08-31)
 - v4.3.7: 替换全部 emoji 为 Lucide 矢量图标 + morphicons 3 处变形（折叠箭头/sgrp/确认按钮）
 
