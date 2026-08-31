@@ -1,7 +1,7 @@
 {
-  "version": "4.3.6",
-  "versionCode": 436,
-  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.6.zip",
-  "sha256": "d515450eb6ba7532770e6f706897f39b6f2a76a126a422d6d4d83ef137dc870d",
-  "changelog": "v4.3.6: 工具箱卡片懒加载（首屏 12 个 API 请求降到 2 个，折叠分组点开才加载）"
+  "version": "4.3.7",
+  "versionCode": 437,
+  "zipUrl": "https://raw.githubusercontent.com/ce11kjw/junkclean/main/JunkClean-v4.3.7.zip",
+  "sha256": "96e544798b543675c5d1742c82843da3e8ebded5386a9079f2fc344ad8bf28c9",
+  "changelog": "v4.3.7: 替换全部 emoji 为 Lucide 矢量图标 + morphicons 3 处变形（折叠箭头/sgrp/确认按钮）"
 }
